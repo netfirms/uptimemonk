@@ -29,6 +29,10 @@ crosses into Firestore. That single decision is what makes the Firestore bill
 independent of monitor count, and what keeps a real product inside the free
 tier.
 
+> Working on this with an AI agent? Read **[AGENTS.md](AGENTS.md)** first — it
+> carries the invariants that look like bugs but are not, and the boundaries
+> around credentials and the live worker.
+
 ## Why this shape
 
 The product was first built entirely on Firebase. Three hard limits killed it:
@@ -174,30 +178,37 @@ Note: `firebase-tools@15` requires Java 21; pin `@14` if you are on Java 17.
 |---|---|---|---|---|
 | `sg-1` | `uptimemonk-worker-1` (47.129.253.94) | ap-southeast-1a | 0/1 | $5 · 2 vCPU · 414 MB |
 
-**Live.** Both units active, Firestore listener syncing, one monitor scheduled,
-scheduler lag 0 ms. Memory in use: worker 49 MB, API 43 MB against 220/110
+**Live and serving traffic.** Both units active, Firestore listener syncing,
+monitors checking, scheduler lag 0 ms. Memory in use: worker 49 MB, API 43 MB against 220/110
 limits. Deployed as plain Node under systemd — see Deploying below.
 
 Note the RAM: the $5 plan is 414 MB, not the 1 GB the defaults assume, so
 `PROBE_CONCURRENCY=50` and the systemd `MemoryMax` values are tuned down, and
 provisioning adds a 1 GB swap file. Moving to the $7 plan means raising both.
 
-### Open port 443
+### Public endpoints
 
-`api.uptimemonke.com` resolves here and Caddy holds a valid Let's Encrypt
-certificate, but **443 is closed in the Lightsail console firewall**, so the
-API is not publicly reachable. Port 80 is open, which is the only reason the
-certificate could be issued at all (HTTP-01 succeeded after `tls-alpn-01`
-timed out).
+Both are live and verified:
+
+| | |
+|---|---|
+| https://uptimemonke.com | dashboard (Firebase Hosting) |
+| https://api.uptimemonke.com | worker API, Let's Encrypt cert valid to 2026-12-15 |
+
+`/healthz` returns `200` with `lagMs` near 0; unauthenticated `/v1/monitors`
+correctly returns `401`.
+
+Port 443 had to be opened in the **Lightsail console firewall** — it is outside
+the OS, so `ufw` allowing 443 is not sufficient. Port 80 being open is the only
+reason the certificate could be issued at all while 443 was closed
+(`tls-alpn-01` timed out, HTTP-01 succeeded). If TLS ever breaks after an
+instance rebuild, check that firewall first:
 
 ```bash
 aws lightsail open-instance-public-ports --region ap-southeast-1 \
   --instance-name uptimemonk-worker-1 \
   --port-info fromPort=443,toPort=443,protocol=TCP
 ```
-
-Or open it in the console. Until then, HTTPS works only from the instance
-itself — verified with `curl --resolve api.uptimemonke.com:443:127.0.0.1`.
 
 ## Deploying
 
@@ -273,8 +284,6 @@ identical, so the same design just starts costing cents.
 - **Rebalancing does not transfer state.** Orgs moving between workers restart
   at `pending`, and incidents open on the old owner are orphaned. The fix is to
   read last-known status from the `orgStatus` mirror when adopting an org.
-- **Port 443 is closed in the Lightsail firewall** — see above. Nothing public
-  works until it is opened.
 - **`RESEND_API_KEY` is empty, so no alert can be delivered.** Monitoring that
   cannot page anyone is the worst failure this product has.
 - **No dead-man's switch** (`UPTIMEMONK_HEARTBEAT_URL` empty). With one worker,
