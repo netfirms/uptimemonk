@@ -1,0 +1,169 @@
+import { USER_AGENT } from "../config";
+import {
+  BlockedTargetError,
+  assertSafeUrl,
+  sanitizeHeaders,
+} from "../lib/targetGuard";
+import type { CheckResult, Monitor, ProbeRegion } from "../types";
+
+/** Redirect chains longer than this are a loop or an attempt to hide a hop. */
+const MAX_REDIRECTS = 5;
+
+const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
+
+function statusMatches(code: number, accepted?: string[]): boolean {
+  const patterns = accepted?.length ? accepted : ["2xx", "3xx"];
+  return patterns.some((p) => {
+    const norm = p.trim().toLowerCase();
+    if (/^\d{3}$/.test(norm)) return Number(norm) === code;
+    if (/^\dxx$/.test(norm)) return Math.floor(code / 100) === Number(norm[0]);
+    const range = norm.match(/^(\d{3})-(\d{3})$/);
+    if (range) return code >= Number(range[1]) && code <= Number(range[2]);
+    return false;
+  });
+}
+
+/**
+ * HTTP / keyword check. Uses Node 22's built-in fetch, so no extra deps and a
+ * small cold start. Body is only read for keyword monitors.
+ *
+ * Redirects are followed by hand rather than by undici, because every hop has
+ * to be re-validated: a target that passes the guard can still answer with
+ * "302 -> http://169.254.169.254/", and undici would follow it happily.
+ */
+export async function checkHttp(
+  monitor: Monitor,
+  region: ProbeRegion
+): Promise<CheckResult> {
+  const started = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    Math.max(1, monitor.timeoutSeconds) * 1000
+  );
+
+  try {
+    let url = await assertSafeUrl(monitor.target);
+    const follow = monitor.followRedirects !== false;
+    const wantsBody = monitor.type === "keyword";
+
+    let method = monitor.method ?? (wantsBody ? "GET" : "HEAD");
+    let body = method === "POST" ? monitor.requestBody : undefined;
+    let res: Response;
+    let hops = 0;
+
+    for (;;) {
+      res = await fetch(url, {
+        method,
+        redirect: "manual",
+        signal: controller.signal,
+        headers: {
+          "user-agent": USER_AGENT,
+          accept: "*/*",
+          ...sanitizeHeaders(monitor.requestHeaders),
+        },
+        body,
+      });
+
+      const location = res.headers.get("location");
+      if (!follow || !REDIRECT_CODES.has(res.status) || !location) break;
+
+      if (++hops > MAX_REDIRECTS) {
+        return {
+          ok: false,
+          responseTimeMs: Date.now() - started,
+          statusCode: res.status,
+          error: `Too many redirects (more than ${MAX_REDIRECTS})`,
+          region,
+          checkedAt: started,
+        };
+      }
+
+      // Re-validate every hop, and follow the same method rules browsers use.
+      url = await assertSafeUrl(new URL(location, url).toString());
+      if (res.status === 301 || res.status === 302 || res.status === 303) {
+        if (method === "POST") {
+          method = wantsBody ? "GET" : "HEAD";
+          body = undefined;
+        }
+      }
+    }
+
+    const responseTimeMs = Date.now() - started;
+    const codeOk = statusMatches(res.status, monitor.acceptedStatusCodes);
+
+    if (!wantsBody) {
+      return {
+        ok: codeOk,
+        responseTimeMs,
+        statusCode: res.status,
+        error: codeOk ? undefined : `Unexpected status ${res.status}`,
+        region,
+        checkedAt: started,
+      };
+    }
+
+    // Keyword monitors need the body. Cap it so a huge page can't blow memory.
+    const text = (await res.text()).slice(0, 512 * 1024);
+    const found = monitor.keyword ? text.includes(monitor.keyword) : true;
+    const wanted = monitor.keywordInverted ? !found : found;
+    const ok = codeOk && wanted;
+
+    return {
+      ok,
+      responseTimeMs,
+      statusCode: res.status,
+      error: ok
+        ? undefined
+        : !codeOk
+          ? `Unexpected status ${res.status}`
+          : monitor.keywordInverted
+            ? `Keyword "${monitor.keyword}" was present`
+            : `Keyword "${monitor.keyword}" not found`,
+      region,
+      checkedAt: started,
+    };
+  } catch (err) {
+    const responseTimeMs = Date.now() - started;
+    if (err instanceof BlockedTargetError) {
+      return {
+        ok: false,
+        responseTimeMs,
+        error: err.message,
+        region,
+        checkedAt: started,
+      };
+    }
+    const aborted = (err as Error)?.name === "AbortError";
+    return {
+      ok: false,
+      responseTimeMs,
+      error: aborted
+        ? `Timed out after ${monitor.timeoutSeconds}s`
+        : describeNetworkError(err),
+      region,
+      checkedAt: started,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Turns undici's nested cause chain into something a customer can read. */
+export function describeNetworkError(err: unknown): string {
+  const e = err as { message?: string; cause?: { code?: string; message?: string } };
+  const code = e?.cause?.code;
+  const map: Record<string, string> = {
+    ENOTFOUND: "DNS lookup failed (host not found)",
+    ECONNREFUSED: "Connection refused",
+    ECONNRESET: "Connection reset by peer",
+    ETIMEDOUT: "Connection timed out",
+    EHOSTUNREACH: "Host unreachable",
+    CERT_HAS_EXPIRED: "TLS certificate has expired",
+    DEPTH_ZERO_SELF_SIGNED_CERT: "Self-signed TLS certificate",
+    UNABLE_TO_VERIFY_LEAF_SIGNATURE: "TLS certificate could not be verified",
+    ERR_TLS_CERT_ALTNAME_INVALID: "TLS certificate does not match hostname",
+  };
+  if (code && map[code]) return map[code];
+  return e?.cause?.message || e?.message || "Request failed";
+}

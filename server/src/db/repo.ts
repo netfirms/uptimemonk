@@ -1,0 +1,544 @@
+import { randomUUID } from "node:crypto";
+import { getDb } from "./index.js";
+import { hourKey } from "../lib/time.js";
+import type {
+  AlertContact,
+  CheckResult,
+  DayRollup,
+  Incident,
+  Monitor,
+  MonitorStatus,
+  OutboxRow,
+  ProbeRegion,
+} from "../types.js";
+
+/** SQLite has no boolean type; 0/1 round-trips are all in this one place. */
+const bool = (v: unknown) => v === 1 || v === true;
+const num = (v: unknown) => (v === 1 || v === true ? 1 : 0);
+const json = <T>(raw: unknown, fallback: T): T => {
+  if (typeof raw !== "string") return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+export function rowToMonitor(r: any): Monitor {
+  const config = json<Record<string, unknown>>(r.config, {});
+  return {
+    id: r.id,
+    orgId: r.org_id,
+    name: r.name,
+    type: r.type,
+    target: r.target,
+    intervalSeconds: r.interval_seconds,
+    timeoutSeconds: r.timeout_seconds,
+    confirmationThreshold: r.confirmation_threshold,
+    regions: json(r.regions, [] as ProbeRegion[]),
+    enabled: bool(r.enabled),
+    maintenanceWindows: json(r.maintenance_windows, []),
+    alertContactIds: json(r.alert_contact_ids, [] as string[]),
+    heartbeatToken: r.heartbeat_token ?? undefined,
+    status: r.status as MonitorStatus,
+    lastCheckedAt: r.last_checked_at ?? undefined,
+    lastStatusChangedAt: r.last_status_changed_at ?? undefined,
+    lastResponseTimeMs: r.last_response_time_ms ?? undefined,
+    lastError: r.last_error ?? null,
+    consecutiveFailures: r.consecutive_failures,
+    inMaintenance: bool(r.in_maintenance),
+    certExpiresAt: r.cert_expires_at ?? null,
+    uptime24h: r.uptime_24h ?? undefined,
+    uptime7d: r.uptime_7d ?? undefined,
+    uptime30d: r.uptime_30d ?? undefined,
+    dueAt: r.due_at,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    ...config, // type-specific fields: keyword, port, dnsRecordType, …
+  } as Monitor;
+}
+
+/** Fields that live in the `config` JSON blob rather than their own column. */
+const CONFIG_KEYS = [
+  "port",
+  "method",
+  "requestHeaders",
+  "requestBody",
+  "acceptedStatusCodes",
+  "followRedirects",
+  "keyword",
+  "keywordInverted",
+  "dnsRecordType",
+  "dnsExpectedValue",
+  "sslExpiryWarningDays",
+  "heartbeatGraceSeconds",
+] as const;
+
+function configBlob(m: Partial<Monitor>): string {
+  const out: Record<string, unknown> = {};
+  for (const key of CONFIG_KEYS) {
+    if (m[key] !== undefined) out[key] = m[key];
+  }
+  return JSON.stringify(out);
+}
+
+// ---------------------------------------------------------------- monitors
+
+/**
+ * Insert or update a monitor from its Firestore config, without ever
+ * clobbering local state.
+ *
+ * The excluded columns are the point: `status`, `due_at`, failure counts and
+ * uptime are owned by the worker. A config sync that reset them would restart
+ * every monitor's state machine each time the listener reconnected.
+ */
+export function upsertMonitorConfig(m: Monitor): void {
+  getDb()
+    .prepare(
+      `INSERT INTO monitors (
+        id, org_id, name, type, target, config, interval_seconds, timeout_seconds,
+        confirmation_threshold, regions, enabled, maintenance_windows,
+        alert_contact_ids, heartbeat_token, status, due_at, created_at, updated_at
+      ) VALUES (
+        @id, @orgId, @name, @type, @target, @config, @intervalSeconds, @timeoutSeconds,
+        @confirmationThreshold, @regions, @enabled, @maintenanceWindows,
+        @alertContactIds, @heartbeatToken, 'pending', @dueAt, @createdAt, @updatedAt
+      )
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        type = excluded.type,
+        target = excluded.target,
+        config = excluded.config,
+        interval_seconds = excluded.interval_seconds,
+        timeout_seconds = excluded.timeout_seconds,
+        confirmation_threshold = excluded.confirmation_threshold,
+        regions = excluded.regions,
+        enabled = excluded.enabled,
+        maintenance_windows = excluded.maintenance_windows,
+        alert_contact_ids = excluded.alert_contact_ids,
+        heartbeat_token = excluded.heartbeat_token,
+        updated_at = excluded.updated_at`
+    )
+    .run({
+      id: m.id,
+      orgId: m.orgId,
+      name: m.name,
+      type: m.type,
+      target: m.target ?? "",
+      config: configBlob(m),
+      intervalSeconds: m.intervalSeconds,
+      timeoutSeconds: m.timeoutSeconds,
+      confirmationThreshold: m.confirmationThreshold,
+      regions: JSON.stringify(m.regions ?? []),
+      enabled: num(m.enabled),
+      maintenanceWindows: JSON.stringify(m.maintenanceWindows ?? []),
+      alertContactIds: JSON.stringify(m.alertContactIds ?? []),
+      heartbeatToken: m.heartbeatToken ?? null,
+      dueAt: m.dueAt ?? Date.now(),
+      createdAt: m.createdAt ?? Date.now(),
+      updatedAt: m.updatedAt ?? Date.now(),
+    });
+}
+
+export function deleteMonitor(id: string): void {
+  getDb().prepare("DELETE FROM monitors WHERE id = ?").run(id);
+}
+
+export function getMonitor(id: string): Monitor | null {
+  const row = getDb().prepare("SELECT * FROM monitors WHERE id = ?").get(id);
+  return row ? rowToMonitor(row) : null;
+}
+
+export function getMonitorByHeartbeatToken(token: string): Monitor | null {
+  const row = getDb()
+    .prepare("SELECT * FROM monitors WHERE heartbeat_token = ?")
+    .get(token);
+  return row ? rowToMonitor(row) : null;
+}
+
+export function listMonitors(orgId?: string): Monitor[] {
+  const rows = orgId
+    ? getDb().prepare("SELECT * FROM monitors WHERE org_id = ? ORDER BY name").all(orgId)
+    : getDb().prepare("SELECT * FROM monitors ORDER BY name").all();
+  return rows.map(rowToMonitor);
+}
+
+export function allMonitorIds(): Set<string> {
+  return new Set(
+    getDb().prepare("SELECT id FROM monitors").all().map((r: any) => r.id)
+  );
+}
+
+export function setDueAt(id: string, dueAt: number): void {
+  getDb().prepare("UPDATE monitors SET due_at = ? WHERE id = ?").run(dueAt, id);
+}
+
+// ------------------------------------------------------------ check results
+
+export interface PendingWrite {
+  monitor: Monitor;
+  result: CheckResult;
+  status: MonitorStatus;
+  failures: number;
+  suppressed: boolean;
+  statusChanged: boolean;
+}
+
+/**
+ * Flush a batch of check results in a single transaction.
+ *
+ * better-sqlite3 is synchronous, so every statement blocks the event loop.
+ * Batching is what keeps that acceptable: a thousand rows inside one
+ * transaction costs about a millisecond, where a thousand separate writes
+ * would hand the loop a syscall per probe.
+ */
+export function flushResults(writes: PendingWrite[]): void {
+  if (!writes.length) return;
+  const db = getDb();
+
+  const updateMonitor = db.prepare(
+    `UPDATE monitors SET
+       status = @status,
+       last_checked_at = @checkedAt,
+       last_response_time_ms = @responseTimeMs,
+       last_error = @error,
+       consecutive_failures = @failures,
+       in_maintenance = @inMaintenance,
+       cert_expires_at = COALESCE(@certExpiresAt, cert_expires_at),
+       last_status_changed_at = CASE WHEN @statusChanged = 1
+         THEN @checkedAt ELSE last_status_changed_at END,
+       updated_at = @checkedAt
+     WHERE id = @id`
+  );
+
+  // One row per monitor-hour. arrayUnion has no SQLite equivalent, so append
+  // to the JSON array with json_insert at the end position.
+  const upsertBucket = db.prepare(
+    `INSERT INTO hour_buckets (monitor_id, hour, org_id, up, down, sum_ms, samples)
+     VALUES (@monitorId, @hour, @orgId, @up, @down, @sumMs, json_array(json(@sample)))
+     ON CONFLICT(monitor_id, hour) DO UPDATE SET
+       up = up + excluded.up,
+       down = down + excluded.down,
+       sum_ms = sum_ms + excluded.sum_ms,
+       samples = json_insert(samples, '$[#]', json(@sample))`
+  );
+
+  db.transaction((batch: PendingWrite[]) => {
+    for (const w of batch) {
+      const certExpiresAt =
+        typeof w.result.meta?.expiresAt === "number"
+          ? (w.result.meta.expiresAt as number)
+          : null;
+
+      updateMonitor.run({
+        id: w.monitor.id,
+        status: w.status,
+        checkedAt: w.result.checkedAt,
+        responseTimeMs: w.result.responseTimeMs,
+        error: w.result.error ?? null,
+        failures: w.failures,
+        inMaintenance: num(w.suppressed),
+        certExpiresAt,
+        statusChanged: num(w.statusChanged),
+      });
+
+      upsertBucket.run({
+        monitorId: w.monitor.id,
+        hour: hourKey(w.result.checkedAt),
+        orgId: w.monitor.orgId,
+        up: w.result.ok ? 1 : 0,
+        down: w.result.ok ? 0 : 1,
+        sumMs: w.result.responseTimeMs,
+        sample: JSON.stringify({
+          t: w.result.checkedAt,
+          ms: w.result.responseTimeMs,
+          ok: w.result.ok,
+          ...(w.result.statusCode ? { code: w.result.statusCode } : {}),
+        }),
+      });
+    }
+  })(writes);
+}
+
+// --------------------------------------------------------------- incidents
+
+/**
+ * Open an incident and queue its alerts in ONE transaction.
+ *
+ * This is the whole reason for the outbox: a crash between "we noticed the
+ * outage" and "we told the customer" is the one gap this product cannot have.
+ * Either both rows exist or neither does.
+ */
+export function openIncident(
+  monitor: Monitor,
+  cause: string,
+  region: ProbeRegion,
+  startedAt: number,
+  suppressed: boolean
+): string {
+  const db = getDb();
+  const id = randomUUID();
+
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO incidents (id, org_id, monitor_id, monitor_name, started_at,
+                              cause, confirmed_by, status, suppressed, synced)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, 0)`
+    ).run(
+      id,
+      monitor.orgId,
+      monitor.id,
+      monitor.name,
+      startedAt,
+      cause,
+      JSON.stringify([region]),
+      num(suppressed)
+    );
+
+    // Maintenance suppresses paging, not the record.
+    if (!suppressed) queueAlerts(id, monitor, "down", startedAt);
+  })();
+
+  return id;
+}
+
+export function resolveOpenIncident(
+  monitor: Monitor,
+  resolvedAt: number,
+  suppressed: boolean
+): string | null {
+  const db = getDb();
+  const open: any = db
+    .prepare(
+      `SELECT * FROM incidents WHERE monitor_id = ? AND status = 'open'
+       ORDER BY started_at DESC LIMIT 1`
+    )
+    .get(monitor.id);
+  if (!open) return null;
+
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE incidents SET status = 'resolved', resolved_at = ?,
+         duration_seconds = ?, synced = 0 WHERE id = ?`
+    ).run(resolvedAt, Math.round((resolvedAt - open.started_at) / 1000), open.id);
+
+    if (!suppressed) queueAlerts(open.id, monitor, "up", resolvedAt);
+  })();
+
+  return open.id;
+}
+
+/** Must be called inside an open transaction — see openIncident. */
+function queueAlerts(
+  incidentId: string,
+  monitor: Monitor,
+  event: "down" | "up",
+  now: number
+): void {
+  const insert = getDb().prepare(
+    `INSERT INTO alert_outbox (incident_id, contact_id, event, next_attempt_at, created_at)
+     VALUES (?, ?, ?, ?, ?)`
+  );
+  for (const contactId of monitor.alertContactIds ?? []) {
+    insert.run(incidentId, contactId, event, now, now);
+  }
+}
+
+export function getIncident(id: string): Incident | null {
+  const r: any = getDb().prepare("SELECT * FROM incidents WHERE id = ?").get(id);
+  if (!r) return null;
+  return {
+    id: r.id,
+    orgId: r.org_id,
+    monitorId: r.monitor_id,
+    monitorName: r.monitor_name,
+    startedAt: r.started_at,
+    resolvedAt: r.resolved_at,
+    durationSeconds: r.duration_seconds,
+    cause: r.cause,
+    confirmedBy: json(r.confirmed_by, []),
+    status: r.status,
+    suppressed: bool(r.suppressed),
+    acknowledgedBy: r.acknowledged_by,
+  };
+}
+
+export function unsyncedIncidents(limit = 50): Incident[] {
+  const rows = getDb()
+    .prepare("SELECT id FROM incidents WHERE synced = 0 LIMIT ?")
+    .all(limit) as any[];
+  return rows.map((r) => getIncident(r.id)!).filter(Boolean);
+}
+
+export function markIncidentsSynced(ids: string[]): void {
+  if (!ids.length) return;
+  const stmt = getDb().prepare("UPDATE incidents SET synced = 1 WHERE id = ?");
+  getDb().transaction(() => ids.forEach((id) => stmt.run(id)))();
+}
+
+// ------------------------------------------------------------------ outbox
+
+export function dueOutbox(now: number, limit = 50): OutboxRow[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM alert_outbox WHERE status = 'pending' AND next_attempt_at <= ?
+       ORDER BY next_attempt_at LIMIT ?`
+    )
+    .all(now, limit) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    incidentId: r.incident_id,
+    contactId: r.contact_id,
+    event: r.event,
+    attempts: r.attempts,
+    nextAttemptAt: r.next_attempt_at,
+    status: r.status,
+    lastError: r.last_error,
+  }));
+}
+
+export function markOutboxSent(id: number): void {
+  getDb()
+    .prepare("UPDATE alert_outbox SET status = 'sent', attempts = attempts + 1 WHERE id = ?")
+    .run(id);
+}
+
+/** Exponential backoff, giving up after `maxAttempts` so a dead webhook
+ *  cannot occupy the drainer forever. */
+export function markOutboxFailed(
+  id: number,
+  attempts: number,
+  error: string,
+  maxAttempts = 6
+): void {
+  const giveUp = attempts + 1 >= maxAttempts;
+  const backoffMs = Math.min(30 * 60_000, 10_000 * 2 ** attempts);
+  getDb()
+    .prepare(
+      `UPDATE alert_outbox SET attempts = attempts + 1, last_error = ?,
+         status = ?, next_attempt_at = ? WHERE id = ?`
+    )
+    .run(error.slice(0, 500), giveUp ? "failed" : "pending", Date.now() + backoffMs, id);
+}
+
+// ---------------------------------------------------------------- contacts
+
+export function upsertContact(c: AlertContact): void {
+  getDb()
+    .prepare(
+      `INSERT INTO alert_contacts (id, org_id, channel, name, destination,
+                                   telegram_chat_id, enabled, verified)
+       VALUES (@id, @orgId, @channel, @name, @destination, @telegramChatId, @enabled, @verified)
+       ON CONFLICT(id) DO UPDATE SET
+         channel = excluded.channel, name = excluded.name,
+         destination = excluded.destination,
+         telegram_chat_id = excluded.telegram_chat_id,
+         enabled = excluded.enabled, verified = excluded.verified`
+    )
+    .run({
+      id: c.id,
+      orgId: c.orgId,
+      channel: c.channel,
+      name: c.name,
+      destination: c.destination,
+      telegramChatId: c.telegramChatId ?? null,
+      enabled: num(c.enabled),
+      verified: num(c.verified),
+    });
+}
+
+export function getContact(id: string): AlertContact | null {
+  const r: any = getDb().prepare("SELECT * FROM alert_contacts WHERE id = ?").get(id);
+  if (!r) return null;
+  return {
+    id: r.id,
+    orgId: r.org_id,
+    channel: r.channel,
+    name: r.name,
+    destination: r.destination,
+    telegramChatId: r.telegram_chat_id ?? undefined,
+    enabled: bool(r.enabled),
+    verified: bool(r.verified),
+  };
+}
+
+export function deleteContact(id: string): void {
+  getDb().prepare("DELETE FROM alert_contacts WHERE id = ?").run(id);
+}
+
+// ------------------------------------------------------------------- orgs
+
+export function upsertOrg(id: string, name: string, plan: string, ownerUid?: string): void {
+  getDb()
+    .prepare(
+      `INSERT INTO orgs (id, name, plan, owner_uid) VALUES (?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, plan = excluded.plan`
+    )
+    .run(id, name, plan, ownerUid ?? null);
+}
+
+export function getOrgPlan(id: string): string {
+  const r: any = getDb().prepare("SELECT plan FROM orgs WHERE id = ?").get(id);
+  return r?.plan ?? "free";
+}
+
+// ------------------------------------------------------------- aggregation
+
+export function bucketsForDay(day: string): Map<string, { orgId: string; up: number; down: number; sumMs: number }> {
+  const rows = getDb()
+    .prepare(
+      `SELECT monitor_id, org_id, SUM(up) up, SUM(down) down, SUM(sum_ms) sum_ms
+       FROM hour_buckets WHERE hour >= ? AND hour <= ? GROUP BY monitor_id`
+    )
+    .all(`${day}00`, `${day}23`) as any[];
+
+  const out = new Map<string, { orgId: string; up: number; down: number; sumMs: number }>();
+  for (const r of rows) {
+    out.set(r.monitor_id, { orgId: r.org_id, up: r.up, down: r.down, sumMs: r.sum_ms });
+  }
+  return out;
+}
+
+export function writeDayRollup(r: DayRollup): void {
+  getDb()
+    .prepare(
+      `INSERT INTO day_rollups (monitor_id, day, org_id, up, down, avg_ms,
+                                uptime_ratio, downtime_seconds)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(monitor_id, day) DO UPDATE SET
+         up = excluded.up, down = excluded.down, avg_ms = excluded.avg_ms,
+         uptime_ratio = excluded.uptime_ratio,
+         downtime_seconds = excluded.downtime_seconds`
+    )
+    .run(r.monitorId, r.day, r.orgId, r.up, r.down, r.avgMs, r.uptimeRatio, r.downtimeSeconds);
+}
+
+export function trailingUptime(monitorId: string, days: string[]): number {
+  if (!days.length) return 100;
+  const placeholders = days.map(() => "?").join(",");
+  const r: any = getDb()
+    .prepare(
+      `SELECT SUM(up) up, SUM(up + down) total FROM day_rollups
+       WHERE monitor_id = ? AND day IN (${placeholders})`
+    )
+    .get(monitorId, ...days);
+  if (!r?.total) return 100;
+  return Number(((r.up / r.total) * 100).toFixed(4));
+}
+
+export function setUptimes(
+  monitorId: string,
+  u24: number,
+  u7: number,
+  u30: number
+): void {
+  getDb()
+    .prepare("UPDATE monitors SET uptime_24h = ?, uptime_7d = ?, uptime_30d = ? WHERE id = ?")
+    .run(u24, u7, u30, monitorId);
+}
+
+/** Nightly retention. Day rollups are tiny and kept indefinitely. */
+export function pruneBuckets(beforeHour: string): number {
+  const info = getDb().prepare("DELETE FROM hour_buckets WHERE hour < ?").run(beforeHour);
+  return info.changes;
+}

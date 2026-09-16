@@ -1,0 +1,172 @@
+/**
+ * Server-side domain types.
+ *
+ * Deliberately free of firebase-admin's `Timestamp`: on a worker every instant
+ * is epoch milliseconds, which is what SQLite stores and what `Date.now()`
+ * returns. Conversion to and from Firestore Timestamps happens only at the
+ * sync boundary, in sync/mirror.ts.
+ */
+
+export type ProbeRegion = "ap-southeast-1" | "us-east-1" | "eu-west-1";
+
+export type MonitorType =
+  | "http" // plain HTTP(S) status-code check
+  | "keyword" // HTTP(S) + body must (not) contain a string
+  | "tcp" // TCP connect to host:port
+  | "dns" // DNS record resolves / matches expected value
+  | "ssl" // TLS certificate expiry
+  | "icmp" // real ping — possible here, unlike on Cloud Functions
+  | "heartbeat"; // cron / "push" monitor — the job calls us
+
+export type MonitorStatus = "pending" | "up" | "down" | "paused";
+
+export interface MaintenanceWindow {
+  /** ISO weekday numbers, 1 = Monday … 7 = Sunday. Empty = every day. */
+  weekdays: number[];
+  /** "HH:mm" in the window's timezone. */
+  start: string;
+  end: string;
+  /** IANA timezone, e.g. "Asia/Bangkok". */
+  timezone: string;
+}
+
+export interface Monitor {
+  id: string;
+  orgId: string;
+  name: string;
+  type: MonitorType;
+
+  /** URL for http/keyword/ssl, hostname for tcp/dns/icmp, unused for heartbeat. */
+  target: string;
+  port?: number;
+  method?: "GET" | "HEAD" | "POST";
+  requestHeaders?: Record<string, string>;
+  requestBody?: string;
+  acceptedStatusCodes?: string[];
+  followRedirects?: boolean;
+
+  keyword?: string;
+  keywordInverted?: boolean;
+
+  dnsRecordType?: "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "NS";
+  dnsExpectedValue?: string;
+
+  sslExpiryWarningDays?: number;
+
+  heartbeatToken?: string;
+  heartbeatGraceSeconds?: number;
+
+  intervalSeconds: number;
+  timeoutSeconds: number;
+  confirmationThreshold: number;
+  /** Home region first; a second entry is asked to confirm failures. */
+  regions: ProbeRegion[];
+
+  enabled: boolean;
+  maintenanceWindows?: MaintenanceWindow[];
+  alertContactIds: string[];
+
+  // ---- live state, owned by the worker ----
+  status: MonitorStatus;
+  lastCheckedAt?: number;
+  lastStatusChangedAt?: number;
+  lastResponseTimeMs?: number;
+  lastError?: string | null;
+  consecutiveFailures: number;
+  inMaintenance: boolean;
+  /** Scheduling lives here now, not in Firestore. */
+  dueAt: number;
+  uptime24h?: number;
+  uptime7d?: number;
+  uptime30d?: number;
+  certExpiresAt?: number | null;
+
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CheckResult {
+  ok: boolean;
+  responseTimeMs: number;
+  statusCode?: number;
+  error?: string;
+  meta?: Record<string, unknown>;
+  region: ProbeRegion;
+  checkedAt: number;
+}
+
+export interface HourBucket {
+  monitorId: string;
+  orgId: string;
+  hour: string; // "YYYYMMDDHH"
+  up: number;
+  down: number;
+  sumMs: number;
+  samples: Array<{ t: number; ms: number; ok: boolean; code?: number }>;
+}
+
+export interface DayRollup {
+  monitorId: string;
+  orgId: string;
+  day: string; // "YYYYMMDD"
+  up: number;
+  down: number;
+  avgMs: number;
+  uptimeRatio: number;
+  downtimeSeconds: number;
+}
+
+export interface Incident {
+  id: string;
+  orgId: string;
+  monitorId: string;
+  monitorName: string;
+  startedAt: number;
+  resolvedAt?: number | null;
+  durationSeconds?: number;
+  cause: string;
+  confirmedBy: ProbeRegion[];
+  status: "open" | "resolved";
+  /** Started inside a maintenance window: recorded, but nobody is paged. */
+  suppressed: boolean;
+  acknowledgedBy?: string | null;
+}
+
+export type AlertChannel =
+  | "email"
+  | "webhook"
+  | "slack"
+  | "discord"
+  | "telegram";
+
+export interface AlertContact {
+  id: string;
+  orgId: string;
+  channel: AlertChannel;
+  name: string;
+  destination: string;
+  telegramChatId?: string;
+  enabled: boolean;
+  verified: boolean;
+}
+
+export type Plan = "free" | "solo" | "team" | "scale";
+
+export interface Org {
+  id: string;
+  name: string;
+  ownerUid: string;
+  plan: Plan;
+}
+
+/** A row in the alert outbox — the durable queue that replaces Cloud Tasks. */
+export interface OutboxRow {
+  id: number;
+  incidentId: string;
+  contactId: string;
+  event: "down" | "up";
+  attempts: number;
+  nextAttemptAt: number;
+  status: "pending" | "sent" | "failed";
+  lastError?: string | null;
+}

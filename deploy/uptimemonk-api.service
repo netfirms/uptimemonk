@@ -1,0 +1,57 @@
+[Unit]
+Description=UptimeMonk API
+After=network-online.target
+Wants=network-online.target
+
+# LoadCredential below hard-fails the unit when the key is missing, which turns
+# "not configured yet" into a 5-second crash-loop. These make systemd skip the
+# unit with a readable reason instead.
+ConditionPathExists=/etc/uptimemonk/sa.json
+ConditionPathExists=/etc/uptimemonk/env
+
+[Service]
+Type=simple
+User=uptimemonk
+Group=uptimemonk
+WorkingDirectory=/opt/uptimemonk/server
+ExecStart=/usr/bin/node /opt/uptimemonk/server/dist/api.js
+Restart=always
+RestartSec=5
+Environment=UPTIMEMONK_SVC=api
+
+# Secrets: systemd reads the key as root and hands it to the process, so it
+# never sits in an environment block that a process listing can read.
+LoadCredential=gcp-sa:/etc/uptimemonk/sa.json
+EnvironmentFile=/etc/uptimemonk/env
+# Host-side paths, for the non-container deployment.
+Environment=UPTIMEMONK_DB=/var/lib/uptimemonk/uptimemonk.db
+Environment=UPTIMEMONK_STATUS_FILE=/var/lib/uptimemonk/worker.json
+
+# Sandboxing. This process talks to the whole internet on purpose, so give it
+# nothing else.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+ReadWritePaths=/var/lib/uptimemonk
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# ICMP needs no capability here: provision.sh sets net.ipv4.ping_group_range so
+# `ping` can use an unprivileged datagram socket. That is strictly better than
+# AmbientCapabilities=CAP_NET_RAW — the service runs with no capabilities at
+# all, and NoNewPrivileges above stays on (it would otherwise block the setuid
+# path that ping falls back to).
+
+# 200 concurrent probes plus the database; the default 1024 becomes the real
+# ceiling long before RAM does.
+LimitNOFILE=8192
+MemoryMax=110M
+MemoryHigh=95M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,66 @@
+[Unit]
+Description=UptimeMonk worker (scheduler, probes, alerts)
+After=network-online.target
+Wants=network-online.target
+
+# LoadCredential below hard-fails the unit when the key is missing, which turns
+# "not configured yet" into a 5-second crash-loop. These make systemd skip the
+# unit with a readable reason instead.
+ConditionPathExists=/etc/uptimemonk/sa.json
+ConditionPathExists=/etc/uptimemonk/env
+
+[Service]
+Type=simple
+User=uptimemonk
+Group=uptimemonk
+WorkingDirectory=/opt/uptimemonk/server
+ExecStart=/usr/bin/node /opt/uptimemonk/server/dist/worker.js
+Restart=always
+RestartSec=5
+Environment=UPTIMEMONK_SVC=worker
+
+# Secrets: systemd reads the key as root and hands it to the process, so it
+# never sits in an environment block that a process listing can read.
+LoadCredential=gcp-sa:/etc/uptimemonk/sa.json
+EnvironmentFile=/etc/uptimemonk/env
+# Host-side paths, for the non-container deployment.
+Environment=UPTIMEMONK_DB=/var/lib/uptimemonk/uptimemonk.db
+Environment=UPTIMEMONK_STATUS_FILE=/var/lib/uptimemonk/worker.json
+
+# Sandboxing. This process talks to the whole internet on purpose, so give it
+# nothing else.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+ReadWritePaths=/var/lib/uptimemonk
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# The Node process holds no capabilities. ICMP works because Ubuntu ships
+# /usr/bin/ping with the file capability cap_net_raw=ep, so the privilege stays
+# confined to that binary instead of being granted to the service.
+#
+# Measured: this works with NoNewPrivileges=true, but NOT with an empty
+# CapabilityBoundingSet — execve() on a binary whose permitted file caps fall
+# outside the bounding set fails with EPERM. Do not "harden" this by adding
+# CapabilityBoundingSet= without re-testing that ping still runs.
+#
+# provision.sh also sets net.ipv4.ping_group_range. That is belt-and-braces
+# here, but it is the actual mechanism in the container deployment, where the
+# image strips ping's file capability.
+
+# 200 concurrent probes plus the database; the default 1024 becomes the real
+# ceiling long before RAM does.
+LimitNOFILE=8192
+# Sized for the 512 MB Lightsail plan. On a 1 GB instance raise to 700M and
+# lift PROBE_CONCURRENCY to 200 in /etc/uptimemonk/env.
+MemoryMax=220M
+MemoryHigh=190M
+
+[Install]
+WantedBy=multi-user.target

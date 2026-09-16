@@ -1,0 +1,20 @@
+# Caddy obtains, staples and renews the certificate with no cron job and no
+# certbot to keep healthy. The Stripe webhook needs a publicly trusted
+# endpoint, which makes renewal a revenue path rather than a nicety.
+api.uptimemonke.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:8080
+
+	# The API binds to loopback only; Caddy is its sole client.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/uptimemonk.log
+		format json
+	}
+}

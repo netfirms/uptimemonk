@@ -1,0 +1,129 @@
+import { readFileSync } from "node:fs";
+import type { ProbeRegion } from "./types.js";
+
+/**
+ * Configuration comes from the environment, which systemd populates from a
+ * root-owned EnvironmentFile. Nothing here has a secret as a default, and the
+ * process refuses to start rather than run half-configured — a monitoring
+ * service that boots without its alert credentials is worse than one that
+ * doesn't boot at all, because it looks healthy.
+ */
+
+function required(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `Missing required environment variable ${name}. See deploy/uptimemonk.env.example`
+    );
+  }
+  return value;
+}
+
+function optional(name: string, fallback: string): string {
+  return process.env[name] || fallback;
+}
+
+function int(name: string, fallback: number): number {
+  const raw = process.env[name];
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/**
+ * Worker identity.
+ *
+ * A "worker" is one Lightsail instance. Scaling the system out means running
+ * more of them, so each needs to know which slice of the fleet it owns —
+ * decided locally from a stable hash, with no coordination between workers.
+ */
+
+/** Probe vantage point. Monitors whose home region matches are probed here. */
+export const REGION = optional("UPTIMEMONK_REGION", "ap-southeast-1") as ProbeRegion;
+
+/** Human-readable name for logs and peer verification, e.g. "sg-1". */
+export const WORKER_ID = optional("UPTIMEMONK_WORKER_ID", `${REGION}-0`);
+
+/** 0-based position of this worker within its region's pool. */
+export const WORKER_INDEX = int("UPTIMEMONK_WORKER_INDEX", 0);
+
+/**
+ * How many workers serve this region. Every worker in the pool must agree on
+ * this number — if they disagree, some organisations are probed twice and
+ * others not at all.
+ */
+export const WORKER_COUNT = Math.max(1, int("UPTIMEMONK_WORKER_COUNT", 1));
+
+if (WORKER_INDEX < 0 || WORKER_INDEX >= WORKER_COUNT) {
+  throw new Error(
+    `UPTIMEMONK_WORKER_INDEX (${WORKER_INDEX}) must be between 0 and ` +
+      `UPTIMEMONK_WORKER_COUNT - 1 (${WORKER_COUNT - 1}). ` +
+      `A worker outside its own pool would probe nothing.`
+  );
+}
+
+export const DB_PATH = optional("UPTIMEMONK_DB", "/var/lib/uptimemonk/uptimemonk.db");
+
+export const PORT = int("PORT", 8080);
+
+export const APP_URL = optional("APP_URL", "https://uptimemonke.com");
+export const API_URL = optional("API_URL", "https://api.uptimemonke.com");
+
+// ---- probe tuning ----
+/** Concurrent in-flight probes. Guards file descriptors and memory, not CPU. */
+export const PROBE_CONCURRENCY = int("PROBE_CONCURRENCY", 200);
+/** How often buffered check results are flushed to SQLite, in one transaction. */
+export const DB_FLUSH_MS = int("DB_FLUSH_MS", 5_000);
+/** How often the aggregated status mirror is pushed to Firestore. */
+export const MIRROR_FLUSH_MS = int("MIRROR_FLUSH_MS", 5 * 60_000);
+/** A state change flushes immediately, but never more often than this per org. */
+export const MIRROR_MIN_INTERVAL_MS = int("MIRROR_MIN_INTERVAL_MS", 10_000);
+/** Full reconcile against Firestore, in case a listener dies without erroring. */
+export const RECONCILE_MS = int("RECONCILE_MS", 15 * 60_000);
+/** Raw hourly samples are deleted after this many days. */
+export const RETENTION_DAYS = int("RETENTION_DAYS", 35);
+
+/**
+ * SQLite memory knobs. Defaults suit a 1 GB instance; the 512 MB plan wants
+ * roughly a quarter of each, which provision.sh sets automatically.
+ */
+export const SQLITE_CACHE_KB = int("SQLITE_CACHE_KB", 16_000);
+export const SQLITE_MMAP_BYTES = int("SQLITE_MMAP_BYTES", 64 * 1024 * 1024);
+
+export const USER_AGENT = optional(
+  "USER_AGENT",
+  "UptimeMonk/1.0 (+https://uptimemonke.com/bot)"
+);
+
+// ---- secrets ----
+export const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
+export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
+export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "";
+export const ALERT_FROM_EMAIL = optional("ALERT_FROM_EMAIL", "alerts@uptimemonke.com");
+
+/**
+ * Shared secret for the cross-region verify call. The second box exposes
+ * /internal/verify and signs nothing else; without this, anyone who finds the
+ * endpoint can make us probe arbitrary hosts on their behalf.
+ */
+export const VERIFY_SECRET = process.env.VERIFY_SECRET ?? "";
+/** Base URL of the peer box that confirms failures, if there is one. */
+export const VERIFY_PEER_URL = process.env.VERIFY_PEER_URL ?? "";
+
+/** External dead-man's switch. The worker pings this every tick. */
+export const HEARTBEAT_URL = process.env.UPTIMEMONK_HEARTBEAT_URL ?? "";
+
+/**
+ * GCP credentials. systemd's LoadCredential puts the key in a directory it
+ * owns and exports CREDENTIALS_DIRECTORY; fall back to the standard variable
+ * so local development works without systemd.
+ */
+export function googleCredentials(): { projectId: string; credential?: object } {
+  const projectId = required("GOOGLE_CLOUD_PROJECT");
+  const credDir = process.env.CREDENTIALS_DIRECTORY;
+  const path = credDir
+    ? `${credDir}/gcp-sa`
+    : process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+  if (!path) return { projectId };
+  return { projectId, credential: JSON.parse(readFileSync(path, "utf8")) };
+}

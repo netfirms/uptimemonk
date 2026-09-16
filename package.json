@@ -1,0 +1,23 @@
+{
+  "name": "uptimemonk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Root workspace: tooling for scripts/ and the emulator. App code lives in functions/ and web/.",
+  "type": "module",
+  "scripts": {
+    "emulators": "firebase emulators:start --only functions,firestore,auth,tasks --project demo-uptimemonk",
+    "seed": "FIRESTORE_EMULATOR_HOST=localhost:8080 GOOGLE_CLOUD_PROJECT=demo-uptimemonk node scripts/seed.mjs",
+    "test:rules": "node --test scripts/rules.test.mjs",
+    "deploy": "bash deploy/deploy-all.sh",
+    "deploy:firebase": "bash deploy/deploy-firebase.sh",
+    "deploy:lightsail": "bash deploy/deploy-lightsail.sh"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase-admin": "^13.0.2",
+    "firebase-tools": "^14.0.0"
+  },
+  "dependencies": {
+    "firebase": "^12.19.0"
+  }
+}

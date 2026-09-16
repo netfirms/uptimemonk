@@ -1,0 +1,92 @@
+:root {
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --border: #e7e5e4;
+  --text: #1c1917;
+  --muted: #78716c;
+  --up: #16a34a;
+  --down: #dc2626;
+  --pending: #a8a29e;
+  --maintenance: #d97706;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c0a09;
+    --surface: #1c1917;
+    --border: #292524;
+    --text: #fafaf9;
+    --muted: #a8a29e;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.wrap { max-width: 900px; margin: 0 auto; padding: 32px 16px 64px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.grow { flex: 1; min-width: 180px; }
+.muted { color: var(--muted); font-size: 13px; }
+
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.dot.up { background: var(--up); }
+.dot.down { background: var(--down); }
+.dot.pending { background: var(--pending); }
+.dot.paused { background: var(--pending); }
+.dot.maintenance { background: var(--maintenance); }
+
+/* 90-day uptime bar, the thing everyone copies from status pages */
+.bars { display: flex; gap: 2px; align-items: flex-end; height: 34px; }
+.bars span {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--up);
+  height: 100%;
+}
+.bars span[data-state="down"] { background: var(--down); }
+.bars span[data-state="partial"] { background: var(--maintenance); }
+.bars span[data-state="none"] { background: var(--border); }
+
+@media (max-width: 480px) {
+  .bars span:nth-child(-n + 60) { display: none; }
+}
+
+/* --- forms (monitor create) --- */
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.field label { font-size: 13px; font-weight: 600; }
+.field input,
+.field select {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  max-width: 100%;
+}
+.field .muted { margin: 0; }
+button.primary {
+  background: var(--up);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 600;
+}
+button:disabled { opacity: 0.6; cursor: not-allowed; }

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+functions/lib/
+.next/
+*.tsbuildinfo
+.DS_Store
+*.log
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+.firebase/
+.env
+.env.local
+.env*.local
