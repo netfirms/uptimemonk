@@ -16,6 +16,9 @@ preference.
 | GCP project | `uptimemonk` (project id — unchanged by the domain rename) |
 | Naming | The product is **UptimeMonke**; the GCP project, systemd units, `UPTIMEMONK_*` env vars and the git repo stay `uptimemonk`. Renaming those buys nothing and breaks deploys. |
 | Firebase plan | **Spark (free)**. No Cloud Functions exist or can be deployed. |
+| Version | 0.4.0 — `curl https://api.uptimemonke.com/version` |
+| Email | Mailgun, sending as `alerts@mg.uptimemonke.com`. Working. |
+| Donations | Stripe Payment Link, **one-off $2.99**. Webhook secret is set; there is deliberately no `STRIPE_SECRET_KEY` — a link needs none. |
 
 Live checks are running. `curl https://api.uptimemonke.com/healthz` should
 return `"status":"ok"` with `lagMs` near 0. If `lagMs` climbs, the scheduler is
@@ -24,10 +27,10 @@ wedged — that is the failure mode that matters, not process liveness.
 ## Commands
 
 ```bash
-npm test                     # everything below that needs no emulator: 165 server
+npm test                     # everything that needs no emulator: 262 server
                              # + 33 monitoring + 23 feature tests
-npm --prefix server test     # 165 server tests alone, no network or emulator
-npm run test:rules           # 16 rules tests; needs the Firestore emulator
+npm --prefix server test     # 262 server tests alone, no network or emulator
+npm run test:rules           # 18 rules tests; needs the Firestore emulator running
 npm run test:status          # 6 status-page integration tests; starts the emulator itself
 npm run emulators            # firebase-tools@14 — v15 requires Java 21, host has 17
 npm run deploy               # deploy/deploy-all.sh (Firebase + Lightsail)
@@ -39,6 +42,26 @@ Deploys run the test suite first and will refuse to ship a failing tree.
 `npm test` also runs `scripts/test-all-features.mjs`, which the server-only
 suite does not. A stale assertion has hidden there before — run the root
 `npm test` before declaring a change green.
+
+## Where things stand
+
+Alerts, status pages and donations all work end to end. What is left is in
+Known gaps below, and only one is critical: **no dead-man's switch**, so if
+this box dies nothing external notices.
+
+Do not take a passing test suite as proof a money or alert path works. Both
+have failed in ways tests did not catch, because the tests asserted the
+design rather than the deployment:
+
+- Alerts had a complete outbox, drainer and five channels, and had **never
+  delivered anything** — every monitor was created with an empty contact list
+  and `queueAlerts` iterated it. Two real incidents passed in silence.
+- The donation webhook returned 503 while correctly configured, because it
+  demanded an API key that a Payment Link never needs.
+- A $2.99 donation funded fourteen years of service for a light workload.
+
+Each was found by checking production state or by driving a real request —
+not by reading code. Do the same.
 
 ## The two rules everything else follows from
 
@@ -305,6 +328,10 @@ crash-looping.
   and `INCIDENT_RETENTION_DAYS` prunes incidents, but daily rollups are only
   deleted with their monitor. Small — one row per monitor per day — but it
   grows without bound.
+- **Credit can be oversold within a day.** The burn is nightly and coarse, so
+  a workspace can spend past its balance between rollups. Worst case is a few
+  hours of unpaid capacity, which is fine at this scale; the established fix
+  is a reserve-then-settle split, and that is what to build if donations grow.
 - Litestream off-box backup not wired into provisioning.
 - **The public status page has no server-rendered content.** Static export on
   Spark has no Node runtime, so one shell is prerendered and a hosting rewrite
