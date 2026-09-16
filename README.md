@@ -72,6 +72,14 @@ The unit is a **check**, not a monitor. A 5-second monitor is 12x the load of a
 | A donation adds | 10,000 checks/day per $1 — the $2.99 one-off link buys 897,000 checks |
 | Roll-over | Unused credit carries over, capped at two cycles |
 | Running out | A 7-day grace window at full service, then back to the free allowance |
+| Monitor cap | **50** free, **200** once you have donated — a separate limit from the budget |
+
+The monitor **count** cap is deliberately separate from the budget on check
+*rate*, because they limit different things. Load falls with interval, so an
+hourly check costs almost nothing and on budget alone a free workspace could
+hold 600 monitors — three times a donor's cap. Count drives what the budget
+does not price: heap size, per-monitor rows, and config-sync time. It is
+tiered so a free workspace cannot out-reach a paying one at slow intervals.
 
 Spend it however suits: 14,400 checks/day is ten 1-minute monitors, or fifty
 5-minute ones, or a single 6-second one. The old model forbade that last option

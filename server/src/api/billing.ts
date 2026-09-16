@@ -8,6 +8,7 @@ import { getOrgCredit, postCredit, setDonationState } from "../db/repo.js";
 import {
   applyGrant,
   budgetFor,
+  maxMonitorsFor,
   monthlyGrant,
   monthlyGrantCents,
   standingOf,
@@ -76,6 +77,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       donationUsdMonthly: credit.donationUsdMonthly,
       graceUntil: credit.graceUntil,
       checksPerDayBudget: budgetFor(credit),
+      maxMonitors: maxMonitorsFor(credit),
       suggestedUsd: SUGGESTED_USD,
 
       /**

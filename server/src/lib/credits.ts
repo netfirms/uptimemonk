@@ -63,9 +63,29 @@ export const ROLLOVER_CYCLES = 2;
  *  commercial one. See MIN_INTERVAL_SECONDS in scheduler.ts. */
 export const HARD_MIN_INTERVAL_SECONDS = 5;
 
-/** A ceiling on monitor count regardless of credit, so one org cannot fill the
- *  heap. Generous enough that nobody legitimate meets it. */
-export const HARD_MAX_MONITORS = 2_000;
+/**
+ * A ceiling on monitor *count*, separate from the budget on check *rate*.
+ *
+ * The two limit different things and both are needed. The budget caps load —
+ * but load falls with interval, so an hourly check costs almost nothing, and
+ * on budget alone a free workspace could hold 600 monitors and a donor 1,845.
+ * Count drives things the budget does not price: heap size, the per-monitor
+ * rows, and how long a config sync takes.
+ *
+ * Tiered, or the free tier would out-reach a paying one at slow intervals.
+ */
+export const MAX_MONITORS_DONOR = 200;
+export const MAX_MONITORS_FREE = 50;
+
+/** @deprecated The cap depends on standing now — use `maxMonitorsFor`. */
+export const HARD_MAX_MONITORS = MAX_MONITORS_DONOR;
+
+export function maxMonitorsFor(c: OrgCredit, now = Date.now()): number {
+  const standing = standingOf(c, now);
+  return standing === "donor" || standing === "grace"
+    ? MAX_MONITORS_DONOR
+    : MAX_MONITORS_FREE;
+}
 
 export interface OrgCredit {
   /** Donated checks remaining. Free usage never draws on this. */

@@ -128,8 +128,11 @@ export default function Support({
                   <span style={{ width: `${pct}%` }} data-over={over || undefined} />
                 </div>
                 <p className="dim" style={{ marginTop: 6 }}>
-                  That is about {asMonitors(billing.checksPerDayBudget, 60)} monitors at one
-                  minute, or {asMonitors(billing.checksPerDayBudget, 300)} at five.
+                  That is about{" "}
+                  {Math.min(billing.maxMonitors, asMonitors(billing.checksPerDayBudget, 60))}{" "}
+                  monitors at one minute, or{" "}
+                  {Math.min(billing.maxMonitors, asMonitors(billing.checksPerDayBudget, 300))} at
+                  five — up to {billing.maxMonitors} in total.
                 </p>
               </div>
 

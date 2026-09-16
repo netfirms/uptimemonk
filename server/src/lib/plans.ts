@@ -1,5 +1,5 @@
 import type { Org } from "../types.js";
-import { FREE_CHECKS_PER_DAY, HARD_MAX_MONITORS, HARD_MIN_INTERVAL_SECONDS } from "./credits.js";
+import { FREE_CHECKS_PER_DAY, MAX_MONITORS_DONOR, HARD_MIN_INTERVAL_SECONDS } from "./credits.js";
 
 /**
  * What used to be the paywall.
@@ -34,7 +34,7 @@ export interface PlanLimits {
 
 /** Everything is on for everyone now; only capacity differs. */
 const OPEN = {
-  maxMonitors: HARD_MAX_MONITORS,
+  maxMonitors: MAX_MONITORS_DONOR,
   minIntervalSeconds: HARD_MIN_INTERVAL_SECONDS,
   maxStatusPages: 100,
   maxSeats: 50,

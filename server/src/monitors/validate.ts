@@ -8,8 +8,10 @@ import {
 } from "../lib/targetGuard.js";
 import { limitsFor, type PlanLimits } from "../lib/plans.js";
 import {
-  HARD_MAX_MONITORS,
+  MAX_MONITORS_DONOR,
+  MAX_MONITORS_FREE,
   HARD_MIN_INTERVAL_SECONDS,
+  maxMonitorsFor,
   checksPerDay,
   fitsBudget,
   type OrgCredit,
@@ -257,10 +259,16 @@ export function assertFitsBudget(
 ): void {
   const others = existingMonitors.filter((m) => m.id !== replacing);
 
-  if (others.length + 1 > HARD_MAX_MONITORS) {
+  const maxMonitors = maxMonitorsFor(credit, now);
+  if (others.length + 1 > maxMonitors) {
+    // 402, not 403: this is a "support the project and it lifts" limit rather
+    // than a permission the customer can never have.
     throw new ValidationError(
-      `A workspace is capped at ${HARD_MAX_MONITORS.toLocaleString()} monitors`,
-      403
+      maxMonitors === MAX_MONITORS_DONOR
+        ? `A workspace is capped at ${MAX_MONITORS_DONOR} monitors.`
+        : `A free workspace is capped at ${MAX_MONITORS_FREE} monitors. ` +
+          `Supporting the project raises it to ${MAX_MONITORS_DONOR}.`,
+      402
     );
   }
 

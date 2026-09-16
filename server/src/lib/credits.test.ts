@@ -9,6 +9,7 @@ import {
   burnDay,
   checksPerDay,
   fitsBudget,
+  maxMonitorsFor,
   monthlyGrant,
   monthlyGrantCents,
   rolloverCap,
@@ -242,5 +243,41 @@ describe("grandfathered plans", () => {
     assert.ok(budgetFor(legacy) >= FREE_CHECKS_PER_DAY * 2);
     // ...but any credit they also hold is still spent per check.
     assert.equal(burnDay(legacy, 400).credits, 600);
+  });
+});
+
+describe("the monitor-count cap", () => {
+  test("a donor may hold 200, and not 201", () => {
+    const d = donor();
+    assert.equal(maxMonitorsFor(d), 200);
+  });
+
+  test("a free workspace is held lower, or it would out-reach a paying one", () => {
+    // Count and budget limit different things: an hourly check costs almost
+    // nothing, so on budget alone a free workspace could hold 600 monitors —
+    // three times a donor's cap.
+    assert.equal(maxMonitorsFor(free()), 50);
+    assert.ok(maxMonitorsFor(free()) < maxMonitorsFor(donor()));
+  });
+
+  test("grace keeps the donor cap — that is what makes it grace", () => {
+    const lapsing = { credits: 0, donationUsdMonthly: 3, graceUntil: Date.now() + 1000 };
+    assert.equal(maxMonitorsFor(lapsing), 200);
+  });
+
+  test("a lapsed workspace falls back to the free cap, keeping its monitors", () => {
+    // The cap is only consulted when something is created, so monitors
+    // already running are never removed — the workspace simply cannot add.
+    const lapsed = { credits: 0, donationUsdMonthly: 3, graceUntil: Date.now() - 1 };
+    assert.equal(maxMonitorsFor(lapsed), 50);
+  });
+
+  test("the cap is reachable within a donor's budget at a sane interval", () => {
+    // A cap nobody can afford to reach is not a cap, it is a lie. 200 monitors
+    // must fit the daily budget at some reasonable interval.
+    const d = donor(2.99, monthlyGrantCents(299));
+    const perMonitor = budgetFor(d) / 200;
+    const interval = Math.ceil(86_400 / perMonitor);
+    assert.ok(interval <= 600, `200 monitors would need a ${interval}s interval`);
   });
 });

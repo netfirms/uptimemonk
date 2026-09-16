@@ -188,6 +188,8 @@ export interface Billing {
   donationUsdMonthly: number;
   graceUntil: number | null;
   checksPerDayBudget: number;
+  /** Monitor-count cap, which the budget does not express. */
+  maxMonitors: number;
   suggestedUsd: number[];
   /** The one-click Payment Link, already tagged with this workspace. */
   link?: {

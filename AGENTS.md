@@ -140,6 +140,12 @@ nothing for $0.49 and over-granted $1.50 by a third. There is no per-plan interv
 only floor left is the scheduler's own, and `assertFitsBudget` is what refuses,
 with a number rather than a tier name.
 
+**Monitor count and check budget are separate caps** (`maxMonitorsFor`,
+`fitsBudget`). Load falls with interval, so budget alone would let a free
+workspace hold 600 hourly monitors — three times a donor's 200. The cap is 50
+free / 200 donor, tiered precisely so free cannot out-reach paying at slow
+intervals. It refuses with 402, not 403: donating lifts it.
+
 **Running out of credit never stops monitoring.** Zero opens a 7-day grace
 window at full service, then the workspace falls back to the *free* allowance —
 not to nothing. Existing monitors keep checking; only adding and speeding up
