@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["firebase-admin"],
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version,
+    NEXT_PUBLIC_BASE_URL: "https://uptimemonke.com",
+    NEXT_PUBLIC_API_URL: "https://api.uptimemonke.com",
   },
 };
 

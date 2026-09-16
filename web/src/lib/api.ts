@@ -20,7 +20,13 @@ import { auth, db } from "./firebase";
  * is unreachable or restarting. This ensures zero downtime and instant writes.
  */
 
-const API_URL =
+export const BASE_URL =
+  process.env.NEXT_PUBLIC_BASE_URL ??
+  (typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:3000"
+    : "https://uptimemonke.com");
+
+export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   (typeof window !== "undefined" && window.location.hostname === "localhost"
     ? "http://localhost:8080"

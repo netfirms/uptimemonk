@@ -9,10 +9,21 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://uptimemonke.com"),
   title: "UptimeMonk — High-Frequency Infrastructure Monitoring",
   description: "Real-time uptime monitoring, SSL tracking, heartbeat pings, and elegant public status pages.",
   icons: {
     icon: "/favicon.ico",
+  },
+  alternates: {
+    canonical: "https://uptimemonke.com",
+  },
+  openGraph: {
+    title: "UptimeMonk — High-Frequency Infrastructure Monitoring",
+    description: "Real-time uptime monitoring, SSL tracking, heartbeat pings, and elegant public status pages.",
+    url: "https://uptimemonke.com",
+    siteName: "UptimeMonk",
+    type: "website",
   },
 };
 
