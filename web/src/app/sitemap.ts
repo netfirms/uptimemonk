@@ -7,7 +7,7 @@ import type { MetadataRoute } from "next";
 export const dynamic = "force-static";
 
 
-const SITE = "https://uptimemonke.com";
+const SITE = "https://www.uptimemonke.com";
 
 /**
  * Only the pages that are genuinely public and stable.

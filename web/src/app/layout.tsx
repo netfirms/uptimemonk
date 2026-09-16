@@ -10,21 +10,31 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://uptimemonke.com"),
-  title: "UptimeMonke — High-Frequency Infrastructure Monitoring",
-  description: "Real-time uptime monitoring, SSL tracking, heartbeat pings, and elegant public status pages.",
+  metadataBase: new URL("https://www.uptimemonke.com"),
+  title: {
+    default: "UptimeMonke — High-Frequency Infrastructure Monitoring",
+    template: "%s | UptimeMonke",
+  },
+  description:
+    "High-frequency website and API uptime monitoring with sub-minute checks, SSL certificate expiry tracking, cron heartbeat pings, instant multi-channel alerts, and elegant public status pages. 100% free forever.",
+  applicationName: "UptimeMonke",
+  authors: [{ name: "UptimeMonke Team", url: "https://www.uptimemonke.com" }],
+  creator: "UptimeMonke",
+  publisher: "UptimeMonke",
+  category: "technology",
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
     apple: "/apple-icon.png",
   },
   alternates: {
-    canonical: "https://uptimemonke.com",
+    canonical: "https://www.uptimemonke.com",
   },
   openGraph: {
     title: "UptimeMonke — High-Frequency Infrastructure Monitoring",
-    description: "Real-time uptime monitoring, SSL tracking, heartbeat pings, and elegant public status pages.",
-    url: "https://uptimemonke.com",
+    description:
+      "High-frequency website & API monitoring with sub-minute checks, SSL tracking, cron heartbeat pings, and elegant public status pages.",
+    url: "https://www.uptimemonke.com",
     siteName: "UptimeMonke",
     type: "website",
     locale: "en_US",
@@ -33,7 +43,7 @@ export const metadata: Metadata = {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "UptimeMonke — high-frequency infrastructure monitoring",
+        alt: "UptimeMonke — High-Frequency Infrastructure Monitoring",
       },
     ],
   },
@@ -41,22 +51,35 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "UptimeMonke — High-Frequency Infrastructure Monitoring",
     description:
-      "Real-time uptime monitoring, SSL tracking, heartbeat pings, and elegant public status pages.",
+      "High-frequency website & API monitoring with sub-minute checks, SSL tracking, cron heartbeat pings, and elegant public status pages.",
     images: ["/opengraph-image"],
   },
   robots: {
     index: true,
     follow: true,
-    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
-  applicationName: "UptimeMonke",
   keywords: [
     "uptime monitoring",
     "website monitoring",
-    "status page",
-    "ssl expiry monitoring",
-    "cron heartbeat monitoring",
+    "api uptime monitor",
+    "synthetic monitoring",
+    "ssl certificate monitoring",
+    "cron job heartbeat",
+    "public status page",
     "ping monitoring",
+    "port monitoring",
+    "slack uptime alerts",
+    "discord downtime alerts",
+    "incident management",
+    "free uptime robot alternative",
+    "devops monitoring tools",
   ],
 };
 
