@@ -127,6 +127,33 @@ hour of downtime replays for free. Nothing on the Firebase side can speak Redis
 anyway — Firestore's only push mechanism is a Cloud Function trigger, and Spark
 has none, so the only possible publisher is a worker, which makes it a loop.
 
+**Email has two providers and picks at runtime.** `sendEmail` uses Mailgun
+when `MAILGUN_API_KEY` is set and falls back to Resend, so changing provider is
+an env edit and a restart rather than a deploy. Mailgun's v3 messages API is
+**form-encoded** — posting JSON returns a 400 that reads like an auth failure —
+and authenticates as HTTP Basic with the literal username `api`. `ALERT_FROM_EMAIL`
+must sit on `MAILGUN_DOMAIN`; readiness warns when it does not, because a From
+off the sending domain fails DMARC and lands in spam, which is the same failure
+as not sending but harder to notice. See `alerts/email.test.ts`.
+
+**An empty `alertContactIds` means *everyone verified in the org*, not
+nobody.** This was a real, silent outage of the alerting system: every monitor
+is created with an empty list, the old `queueAlerts` iterated that list, and so
+two genuine incidents passed with zero rows written to the outbox while a
+verified contact sat unused. Silence is the one failure a monitoring product
+cannot have, so it is not the default. Deliberate silence is `muteAlerts`,
+which is explicit and badged in the UI. Deleting a contact detaches it from
+every monitor that named it — leaving the id behind would make the list
+non-empty and pointing at nothing, which reads as "explicitly chosen" and
+silences the monitor again. See `alerts/fanout.test.ts`.
+
+**Alert contacts are backend-only in `firestore.rules`, like monitors.** A
+Slack, Discord or webhook destination is a URL this server POSTs to from inside
+our network, so it has to clear `targetGuard` — and a security rule cannot
+resolve a hostname. The verification fields were already backend-only: a client
+that could write the token hash could confirm a contact it does not own and
+page a stranger.
+
 **A chart range decides which table answers it** (`lib/ranges.ts`,
 `monitors/series.ts`). 24h and 7d read `hour_buckets`, which carry the
 individual samples but are pruned at `RETENTION_DAYS` (35). 30d and 90d read
@@ -214,8 +241,8 @@ crash-looping.
 
 ## Known gaps
 
-- **`RESEND_API_KEY` is empty, so no alert can be delivered.** Monitoring that
-  cannot page anyone is the worst state this product can be in. Highest priority.
+- Telegram has no bot token, so Telegram contacts cannot deliver. Email
+  (Mailgun), Slack, Discord and webhook all work.
 - **No dead-man's switch** (`UPTIMEMONK_HEARTBEAT_URL` empty). One worker means
   nothing notices if the box dies — and it dies silently. Use a *different*
   provider; a monitor that monitors itself proves nothing.

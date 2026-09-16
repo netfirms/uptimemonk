@@ -40,7 +40,7 @@ tier.
 | Check types | HTTP · keyword · TCP port · DNS record · SSL expiry · ICMP ping · cron heartbeat |
 | Intervals | 5 s to 24 h, floored by plan |
 | Confirmation | `confirmationThreshold` consecutive failures, plus cross-region verification when a peer is configured (see below) |
-| Alerts | Email · Slack · Discord · Telegram · webhook, through a transactional outbox |
+| Alerts | Email (Mailgun, falling back to Resend) · Slack · Discord · Telegram · webhook, through a transactional outbox. A monitor with no contacts chosen pages every confirmed contact in the org; `muteAlerts` is the explicit opt-out |
 | History | Per-check samples for 35 days, then daily rollups; charts read the last 90 days |
 | Charts | 24 h · 7 d · 30 d · 90 d, on the dashboard and the public status page |
 | Status page | Public, per-monitor opt-in, at `/status/<org-id>` |
@@ -368,8 +368,9 @@ identical, so the same design just starts costing cents.
 - **Rebalancing does not transfer state.** Orgs moving between workers restart
   at `pending`, and incidents open on the old owner are orphaned. The fix is to
   read last-known status from the `orgStatus` mirror when adopting an org.
-- **`RESEND_API_KEY` is empty, so no alert can be delivered.** Monitoring that
-  cannot page anyone is the worst failure this product has.
+- Telegram has no bot token, so Telegram contacts cannot deliver. Email
+  (Mailgun), Slack, Discord and webhook all work. The UI marks a contact on an
+  unconfigured channel *undeliverable* rather than letting it fail quietly.
 - **No dead-man's switch** (`UPTIMEMONK_HEARTBEAT_URL` empty). With one worker,
   nothing notices if this box dies.
 - Litestream backups are not yet wired into `provision.sh`.
