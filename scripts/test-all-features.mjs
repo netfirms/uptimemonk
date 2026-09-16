@@ -202,29 +202,26 @@ describe("UptimeMonk — All Features Verification Suite", () => {
   // ----------------------------------------------------
   // FEATURE 3: MONITOR VALIDATION & PLAN LIMITS
   // ----------------------------------------------------
-  describe("Feature 3: Monitor Validation & Plan Limits", () => {
-    test("enforces plan limits for Free vs Solo tiers", async () => {
-      assert.equal(PLANS.free.maxMonitors, 10);
-      assert.equal(PLANS.free.minIntervalSeconds, 60);
+  describe("Feature 3: Monitor Validation & Capacity", () => {
+    test("no tier gates features any more — capacity is what differs", async () => {
+      // The paywall is gone: donations buy checks, and every feature works on
+      // a free workspace. A legacy plan only raises the free allowance.
+      assert.equal(PLANS.free.bonusChecksPerDay, 0);
+      assert.ok(PLANS.solo.bonusChecksPerDay > 0);
+      for (const p of ["free", "solo", "team", "scale"]) {
+        assert.equal(PLANS[p].minIntervalSeconds, 5, `${p} interval floor`);
+        assert.equal(PLANS[p].multiRegion, true, `${p} multi-region`);
+        assert.equal(PLANS[p].apiAccess, true, `${p} api`);
+      }
 
-      assert.equal(PLANS.solo.maxMonitors, 50);
-      assert.equal(PLANS.solo.minIntervalSeconds, 5);
-
-      // Free clamps to its one-minute floor
+      // A free workspace may ask for a sub-minute interval; whether it fits is
+      // a budget question, answered in credits.ts, not a tier question.
       const freeMonitor = await buildMonitor(
         { name: "Free", type: "http", target: "https://example.com", intervalSeconds: 30 },
         "org_1",
         "free"
       );
-      assert.equal(freeMonitor.intervalSeconds, 60);
-
-      // Solo plan allows 60
-      const soloMonitor = await buildMonitor(
-        { name: "Solo", type: "http", target: "https://example.com", intervalSeconds: 60 },
-        "org_1",
-        "solo"
-      );
-      assert.equal(soloMonitor.intervalSeconds, 60);
+      assert.equal(freeMonitor.intervalSeconds, 30);
     });
 
     test("generates secure URL-safe heartbeat token for heartbeat monitors", async () => {

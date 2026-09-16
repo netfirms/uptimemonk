@@ -1,6 +1,6 @@
 {
   "name": "uptimemonk",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Root workspace: tooling for scripts/ and the emulator. App code lives in functions/ and web/.",
   "type": "module",
