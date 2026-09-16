@@ -7,7 +7,7 @@ import { flush, recordResult } from "../monitors/recordResult.js";
 import { handleVerifyRequest, signatureMatches } from "../probe/verify.js";
 import { requireAuth } from "./auth.js";
 import { log } from "../lib/log.js";
-import { REGION, VERIFY_SECRET } from "../config.js";
+import { API_VERSION, REGION, VERIFY_SECRET } from "../config.js";
 
 const STATUS_FILE = process.env.UPTIMEMONK_STATUS_FILE ?? "/var/lib/uptimemonk/worker.json";
 
@@ -23,8 +23,13 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
    * happens, and a liveness probe cannot see it.
    */
   app.get("/healthz", async (_req, reply) => {
-    let worker: { updatedAt: number; lagMs: number; queueDepth: number; scheduled: number } | null =
-      null;
+    let worker: {
+      version?: string;
+      updatedAt: number;
+      lagMs: number;
+      queueDepth: number;
+      scheduled: number;
+    } | null = null;
     try {
       worker = JSON.parse(readFileSync(STATUS_FILE, "utf8"));
     } catch {
@@ -38,12 +43,34 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.code(healthy ? 200 : 503).send({
       status: healthy ? "ok" : stale ? "worker-stale" : "scheduler-lagging",
+      version: API_VERSION,
       region: REGION,
       worker: worker
         ? { ...worker, ageMs: now - worker.updatedAt }
         : { error: "no status published" },
     });
   });
+
+  /**
+   * Version information for API and worker.
+   */
+  const getVersionInfo = async () => {
+    let worker: { version?: string; updatedAt?: number } | null = null;
+    try {
+      worker = JSON.parse(readFileSync(STATUS_FILE, "utf8"));
+    } catch {
+      worker = null;
+    }
+
+    return {
+      api: API_VERSION,
+      worker: worker?.version ?? "unknown",
+      region: REGION,
+    };
+  };
+
+  app.get("/version", getVersionInfo);
+  app.get("/v1/version", getVersionInfo);
 
   /**
    * Heartbeat ingest — the "push" monitor. A customer's cron job ends with a

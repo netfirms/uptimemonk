@@ -35,17 +35,5 @@
       ]
     }
   ],
-  "fieldOverrides": [
-    {
-      "collectionGroup": "buckets",
-      "fieldPath": "expiresAt",
-      "ttl": true,
-      "indexes": []
-    },
-    {
-      "collectionGroup": "buckets",
-      "fieldPath": "samples",
-      "indexes": []
-    }
-  ]
+  "fieldOverrides": []
 }

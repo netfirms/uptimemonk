@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { ProbeRegion } from "./types.js";
+export { VERSION, API_VERSION, WORKER_VERSION } from "./version.js";
 
 /**
  * Configuration comes from the environment, which systemd populates from a

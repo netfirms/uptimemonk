@@ -189,6 +189,21 @@ export default function Dashboard() {
       {!monitors.length && (
         <p className="muted">No monitors yet — add your first one above.</p>
       )}
+
+      <footer
+        className="muted"
+        style={{
+          marginTop: "3rem",
+          paddingTop: "1rem",
+          borderTop: "1px solid var(--border, #222)",
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: "0.85rem",
+        }}
+      >
+        <span>UptimeMonk</span>
+        <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
+      </footer>
     </main>
   );
 }

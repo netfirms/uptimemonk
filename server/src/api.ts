@@ -5,7 +5,7 @@ import { openDb, closeDb } from "./db/index.js";
 import { monitorRoutes } from "./api/monitors.js";
 import { miscRoutes } from "./api/misc.js";
 import { log } from "./lib/log.js";
-import { APP_URL, PORT } from "./config.js";
+import { API_VERSION, APP_URL, PORT } from "./config.js";
 
 /**
  * The API process.
@@ -43,11 +43,15 @@ async function main(): Promise<void> {
     allowList: (req) => req.url === "/healthz",
   });
 
+  app.addHook("onSend", async (_req, reply) => {
+    reply.header("x-uptimemonk-version", API_VERSION);
+  });
+
   await app.register(monitorRoutes);
   await app.register(miscRoutes);
 
   await app.listen({ port: PORT, host: "127.0.0.1" }); // Caddy is the only client
-  log.info({ port: PORT }, "api listening");
+  log.info({ port: PORT, version: API_VERSION }, "api listening");
 
   const shutdown = async (signal: string) => {
     log.info({ signal }, "api shutting down");

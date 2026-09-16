@@ -11,7 +11,7 @@ import { startFlushLoop, stopFlushLoop } from "./monitors/recordResult.js";
 import { startDrainer, stopDrainer } from "./alerts/drainer.js";
 import { startRollupLoop } from "./scheduler/rollup.js";
 import { log } from "./lib/log.js";
-import { HEARTBEAT_URL, REGION } from "./config.js";
+import { HEARTBEAT_URL, REGION, WORKER_VERSION } from "./config.js";
 import { writeFileSync } from "node:fs";
 
 /**
@@ -32,6 +32,7 @@ function publishStatus(): void {
     writeFileSync(
       STATUS_FILE,
       JSON.stringify({
+        version: WORKER_VERSION,
         region: REGION,
         updatedAt: Date.now(),
         scheduled: scheduler.scheduled,
@@ -65,7 +66,7 @@ async function pingDeadMansSwitch(): Promise<void> {
 
 async function main(): Promise<void> {
   openDb();
-  log.info({ region: REGION }, "worker starting");
+  log.info({ region: REGION, version: WORKER_VERSION }, "worker starting");
 
   startFlushLoop();
   startMirror();

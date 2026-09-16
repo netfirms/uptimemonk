@@ -92,4 +92,10 @@ export const api = {
     request<{ orgId: string; created: boolean }>("/v1/bootstrap", { method: "POST" }),
 
   me: () => request<{ uid: string; orgId: string; role: string }>("/v1/me"),
+
+  version: async () => {
+    const res = await fetch(`${API_URL}/version`);
+    if (!res.ok) throw new Error("Could not fetch API version");
+    return res.json() as Promise<{ api: string; worker: string; region: string }>;
+  },
 };
