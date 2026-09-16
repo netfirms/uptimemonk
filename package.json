@@ -14,7 +14,8 @@
     "test:rules": "node --test scripts/rules.test.mjs",
     "deploy": "bash deploy/deploy-all.sh",
     "deploy:firebase": "bash deploy/deploy-firebase.sh",
-    "deploy:lightsail": "bash deploy/deploy-lightsail.sh"
+    "deploy:lightsail": "bash deploy/deploy-lightsail.sh",
+    "test:status": "npm --prefix server run build && firebase emulators:exec --only firestore --project demo-uptimemonk \"node --test server/test/status-page.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",

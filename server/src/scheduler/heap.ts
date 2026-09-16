@@ -42,6 +42,13 @@ export class DueHeap {
     return this.items[0];
   }
 
+  /** The entry for a specific id, or undefined. Lets a caller see the interval
+   *  an entry was scheduled with, to detect a config change. */
+  peekEntry(id: string): Due | undefined {
+    const i = this.index.get(id);
+    return i === undefined ? undefined : this.items[i];
+  }
+
   remove(id: string): boolean {
     const i = this.index.get(id);
     if (i === undefined) return false;

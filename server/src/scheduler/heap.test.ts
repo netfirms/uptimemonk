@@ -120,3 +120,59 @@ describe("initialDueAt", () => {
     assert.ok(buckets.size > 5, `expected spread, got ${buckets.size} buckets`);
   });
 });
+
+describe("DueHeap.peekEntry", () => {
+  test("exposes the interval an entry was scheduled with", () => {
+    // The scheduler needs this to notice a config change: without it,
+    // refresh() could not tell that a monitor's interval had changed and the
+    // new value was not read until the already-scheduled check fired.
+    const h = new DueHeap();
+    h.push({ id: "a", dueAt: 5000, intervalMs: 300_000 });
+
+    assert.equal(h.peekEntry("a")?.intervalMs, 300_000);
+    assert.equal(h.peekEntry("a")?.dueAt, 5000);
+    assert.equal(h.peekEntry("missing"), undefined);
+  });
+
+  test("reflects a rewritten entry rather than the original", () => {
+    const h = new DueHeap();
+    h.push({ id: "a", dueAt: 5000, intervalMs: 3_600_000 });
+    h.push({ id: "a", dueAt: 60_000, intervalMs: 60_000 });
+
+    assert.equal(h.size, 1, "rewritten, not duplicated");
+    assert.equal(h.peekEntry("a")?.intervalMs, 60_000);
+    assert.equal(h.peekEntry("a")?.dueAt, 60_000);
+  });
+});
+
+describe("rescheduling when the interval changes", () => {
+  // The arithmetic refresh() uses. Shortening must take effect now; lengthening
+  // must not push out a check that is already due.
+  const reschedule = (currentDueAt: number, newIntervalMs: number, now: number) =>
+    Math.min(currentDueAt, now + newIntervalMs);
+
+  test("shortening brings the next check forward immediately", () => {
+    // Hourly -> every minute, 59 minutes into the current gap. Without this,
+    // the change appeared to do nothing for the rest of the hour.
+    const now = 60_000;
+    const dueAt = reschedule(3_600_000, 60_000, now);
+    assert.equal(dueAt, 120_000, "one minute from now, not 59 minutes away");
+  });
+
+  test("lengthening leaves an already-scheduled check alone", () => {
+    // Every minute -> hourly. The imminent check still happens; only the gap
+    // after it grows, so nobody loses coverage at the moment they edit.
+    const now = 0;
+    assert.equal(reschedule(30_000, 3_600_000, now), 30_000);
+  });
+
+  test("never schedules further out than one new interval", () => {
+    for (const [due, interval, now] of [
+      [10_000_000, 60_000, 0],
+      [500, 300_000, 0],
+      [0, 60_000, 0],
+    ] as const) {
+      assert.ok(reschedule(due, interval, now) <= now + interval);
+    }
+  });
+});

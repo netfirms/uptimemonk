@@ -46,12 +46,21 @@ service cloud.firestore {
 
     match /monitors/{monitorId} {
       allow read: if inOrg(resource.data.orgId);
-      allow create: if inOrg(request.resource.data.orgId)
-                    && request.resource.data.type in ['http', 'keyword', 'tcp', 'dns', 'ssl', 'icmp', 'heartbeat']
-                    && request.resource.data.intervalSeconds >= 60;
-      allow update: if inOrg(resource.data.orgId)
-                    && inOrg(request.resource.data.orgId);
-      allow delete: if inOrg(resource.data.orgId);
+      // Monitor writes are backend-only, and this is a security boundary
+      // rather than a style preference.
+      //
+      // `target` becomes an outbound request from inside our network, so it
+      // must pass lib/targetGuard.ts — which resolves the hostname and checks
+      // every returned address against the link-local range where BOTH the
+      // AWS and GCP metadata services live. Rules cannot do a DNS resolution,
+      // and they cannot count monitors to enforce a plan limit either.
+      //
+      // Allowing a client to write `target` here lets it point a probe at
+      // 169.254.169.254 and read credentials back through keyword matching.
+      // A type allow-list and a minimum interval do not close that.
+      //
+      // Everything goes through the worker API: POST/PATCH/DELETE /v1/monitors.
+      allow create, update, delete: if false;
 
       // Check history no longer lives in Firestore at all — it is in SQLite on
       // the probe box, served through the API. Nothing may create it here.

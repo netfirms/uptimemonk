@@ -234,3 +234,53 @@ describe("Probe Checks Engine", () => {
     });
   });
 });
+
+describe("keyword matching is case-insensitive by default", () => {
+  // A monitor looking for "AGARWOOD OIL" reported a hard outage against a page
+  // that said "Agarwood Oil". A false outage is worse than a missed one: it
+  // teaches people to ignore the alerts.
+  const match = (text: string, keyword: string, caseSensitive = false) =>
+    caseSensitive
+      ? text.includes(keyword)
+      : text.toLowerCase().includes(keyword.toLowerCase());
+
+  test("matches regardless of case", () => {
+    const page = "<h1>Premium Agarwood Oil</h1><p>Agarwood oil from Thailand</p>";
+    assert.equal(match(page, "AGARWOOD OIL"), true, "the reported false positive");
+    assert.equal(match(page, "agarwood oil"), true);
+    assert.equal(match(page, "Agarwood Oil"), true);
+  });
+
+  test("still reports a genuinely absent keyword", () => {
+    assert.equal(match("<h1>Welcome</h1>", "AGARWOOD OIL"), false);
+  });
+
+  test("opting into case sensitivity restores exact matching", () => {
+    const page = "Agarwood Oil";
+    assert.equal(match(page, "AGARWOOD OIL", true), false);
+    assert.equal(match(page, "Agarwood Oil", true), true);
+  });
+});
+
+describe("a keyword check never issues HEAD", () => {
+  // Enforced at the probe as well as in validation: monitors created before
+  // the rule still carry method "HEAD" in their stored config, and a stored
+  // value must not be able to cause a permanent, unexplained outage.
+  const methodFor = (type: string, stored?: string) => {
+    const wantsBody = type === "keyword";
+    return wantsBody ? (stored === "POST" ? "POST" : "GET") : (stored ?? "HEAD");
+  };
+
+  test("repairs a stored HEAD on a keyword monitor", () => {
+    assert.equal(methodFor("keyword", "HEAD"), "GET", "the live misconfiguration");
+  });
+
+  test("keeps POST, which does return a body", () => {
+    assert.equal(methodFor("keyword", "POST"), "POST");
+  });
+
+  test("leaves a plain http monitor on HEAD", () => {
+    assert.equal(methodFor("http", "HEAD"), "HEAD");
+    assert.equal(methodFor("http", undefined), "HEAD");
+  });
+});

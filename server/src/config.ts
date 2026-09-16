@@ -82,6 +82,11 @@ export const MIRROR_MIN_INTERVAL_MS = int("MIRROR_MIN_INTERVAL_MS", 10_000);
 export const RECONCILE_MS = int("RECONCILE_MS", 15 * 60_000);
 /** Raw hourly samples are deleted after this many days. */
 export const RETENTION_DAYS = int("RETENTION_DAYS", 35);
+/**
+ * Resolved incidents are kept much longer than raw samples — they are what a
+ * customer refers back to — but not forever. Open incidents are never pruned.
+ */
+export const INCIDENT_RETENTION_DAYS = int("INCIDENT_RETENTION_DAYS", 365);
 
 /**
  * SQLite memory knobs. Defaults suit a 1 GB instance; the 512 MB plan wants
@@ -92,7 +97,7 @@ export const SQLITE_MMAP_BYTES = int("SQLITE_MMAP_BYTES", 64 * 1024 * 1024);
 
 export const USER_AGENT = optional(
   "USER_AGENT",
-  "UptimeMonk/1.0 (+https://uptimemonke.com/bot)"
+  "UptimeMonke/1.0 (+https://uptimemonke.com/bot)"
 );
 
 // ---- secrets ----

@@ -1,0 +1,33 @@
+# Litestream: continuous replication of the worker's SQLite to object storage.
+#
+# This is disaster recovery, NOT replication — you cannot read the replica
+# while the worker runs, and recovery means restoring to a new instance and
+# repointing DNS. What it buys is that a dead instance becomes a restore
+# rather than the loss of every check this worker has ever recorded.
+#
+# The database IS the history: hour buckets, day rollups and incidents all
+# live here and deliberately never reach Firestore.
+#
+# Install to /etc/litestream.yml, then:
+#   sudo systemctl enable --now litestream
+#
+# Restore onto a fresh worker:
+#   litestream restore -o /var/lib/uptimemonk/uptimemonk.db s3://BUCKET/uptimemonk
+
+dbs:
+  - path: /var/lib/uptimemonk/uptimemonk.db
+    replicas:
+      - type: s3
+        bucket: CHANGE_ME
+        path: uptimemonk
+        region: ap-southeast-1
+        # Credentials come from the environment, not this file — it is
+        # world-readable by design so litestream can be inspected.
+        # Put them in /etc/default/litestream (chmod 600):
+        #   LITESTREAM_ACCESS_KEY_ID=...
+        #   LITESTREAM_SECRET_ACCESS_KEY=...
+
+        # A snapshot a day, keeping a month, is plenty for a 100 KB database
+        # and keeps the storage bill effectively zero.
+        retention: 720h
+        snapshot-interval: 24h

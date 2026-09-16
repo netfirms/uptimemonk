@@ -1,6 +1,13 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { col } from "./firebase.js";
-import { listMonitors, markIncidentsSynced, unsyncedIncidents } from "../db/repo.js";
+import {
+  adoptOpenIncident,
+  hasLocalHistory,
+  listMonitors,
+  markIncidentsSynced,
+  seedStateIfUnknown,
+  unsyncedIncidents,
+} from "../db/repo.js";
 import { ownsOrg } from "../scheduler/assignment.js";
 import { log } from "../lib/log.js";
 import {
@@ -151,4 +158,90 @@ export async function stopMirror(): Promise<void> {
   // Force a final flush so the dashboard is not left showing stale state.
   for (const [, state] of dirty) state.lastFlushedAt = 0;
   await tick();
+}
+
+/**
+ * Adopt state for organisations this worker now owns but has no history for.
+ *
+ * Runs once at startup. Changing WORKER_COUNT reshuffles organisations between
+ * workers, and the new owner's SQLite knows nothing about the monitors it
+ * inherits — so without this they restart at `pending`, a monitor that was
+ * down re-alerts as a fresh outage, and the incident still open on the previous
+ * owner is never resolved because no local row matches it.
+ *
+ * The state is already in Firestore: the previous owner wrote it there. Only
+ * monitors with no local check history are touched.
+ */
+export async function adoptStateFromMirror(): Promise<number> {
+  const owned = new Set(
+    listMonitors()
+      .filter((m) =>
+        ownsOrg(m.orgId, m.regions?.[0], {
+          region: REGION,
+          index: WORKER_INDEX,
+          count: WORKER_COUNT,
+        })
+      )
+      .map((m) => m.orgId)
+  );
+  if (!owned.size) return 0;
+
+  let adopted = 0;
+
+  for (const orgId of owned) {
+    try {
+      const snap = await col.orgStatus().doc(orgId).get();
+      const monitors = (snap.data()?.monitors ?? {}) as Record<
+        string,
+        {
+          status?: string;
+          inMaintenance?: boolean;
+          lastCheckedAt?: number | null;
+          lastResponseTimeMs?: number | null;
+          lastError?: string | null;
+          uptime24h?: number | null;
+          uptime30d?: number | null;
+        }
+      >;
+
+      for (const [id, state] of Object.entries(monitors)) {
+        if (hasLocalHistory(id)) continue;
+        const restored = seedStateIfUnknown(id, {
+          status: (state.status as never) ?? "pending",
+          lastCheckedAt: state.lastCheckedAt ?? null,
+          lastResponseTimeMs: state.lastResponseTimeMs ?? null,
+          lastError: state.lastError ?? null,
+          inMaintenance: state.inMaintenance,
+          uptime24h: state.uptime24h ?? null,
+          uptime30d: state.uptime30d ?? null,
+        });
+        if (restored) adopted++;
+      }
+
+      // Bring across incidents still open, so the recovery that eventually
+      // arrives closes them and notifies rather than being dropped.
+      const open = await col
+        .incidents()
+        .where("orgId", "==", orgId)
+        .where("status", "==", "open")
+        .get();
+      for (const doc of open.docs) {
+        const d = doc.data();
+        adoptOpenIncident({
+          id: doc.id,
+          orgId,
+          monitorId: String(d.monitorId ?? ""),
+          monitorName: String(d.monitorName ?? ""),
+          startedAt: d.startedAt?.toMillis?.() ?? Date.now(),
+          cause: String(d.cause ?? "Adopted from another worker"),
+          suppressed: d.suppressed === true,
+        });
+      }
+    } catch (err) {
+      // A failed adoption costs continuity for one org, not the worker's boot.
+      log.error({ err, orgId }, "could not adopt state for org");
+    }
+  }
+
+  return adopted;
 }

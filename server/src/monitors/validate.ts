@@ -52,6 +52,7 @@ export interface MonitorInput {
   followRedirects?: boolean;
   keyword?: string;
   keywordInverted?: boolean;
+  keywordCaseSensitive?: boolean;
   dnsRecordType?: string;
   dnsExpectedValue?: string;
   sslExpiryWarningDays?: number;
@@ -60,6 +61,7 @@ export interface MonitorInput {
   timeoutSeconds?: number;
   confirmationThreshold?: number;
   regions?: string[];
+  publicOnStatusPage?: boolean;
   alertContactIds?: string[];
   maintenanceWindows?: Monitor["maintenanceWindows"];
 }
@@ -130,6 +132,8 @@ export async function buildMonitor(
     ),
     regions,
     alertContactIds: input.alertContactIds ?? existing?.alertContactIds ?? [],
+    publicOnStatusPage:
+      input.publicOnStatusPage ?? existing?.publicOnStatusPage ?? false,
     maintenanceWindows: input.maintenanceWindows ?? existing?.maintenanceWindows ?? [],
     updatedAt: now,
   };
@@ -138,7 +142,23 @@ export async function buildMonitor(
     monitor.port = clamp(Number(input.port ?? existing?.port) || 443, 1, 65535);
   }
   if (type === "http" || type === "keyword") {
-    monitor.method = (input.method ?? existing?.method ?? "HEAD") as Monitor["method"];
+    // A keyword check needs a body, and HEAD responses have none — so HEAD
+    // plus a keyword is not a preference, it is a contradiction that reports a
+    // permanent false outage. The default used to be HEAD for both types,
+    // which made every keyword monitor fail from the moment it was created.
+    const requested = input.method ?? existing?.method;
+    if (type === "keyword") {
+      if (input.method && input.method !== "GET" && input.method !== "POST") {
+        throw new ValidationError(
+          `A keyword monitor must use GET or POST — ${input.method} returns no body to search`
+        );
+      }
+      // Treat a stored HEAD as legacy data rather than intent: the form never
+      // offered the choice, so the value came from the old default.
+      monitor.method = (requested === "POST" ? "POST" : "GET") as Monitor["method"];
+    } else {
+      monitor.method = (requested ?? "HEAD") as Monitor["method"];
+    }
     // Strips Metadata-Flavor and friends: a customer must not be able to make
     // our probe look like an internal client.
     monitor.requestHeaders = sanitizeHeaders(input.requestHeaders ?? existing?.requestHeaders);
@@ -152,6 +172,8 @@ export async function buildMonitor(
     if (!keyword) throw new ValidationError("Keyword monitors need a keyword");
     monitor.keyword = keyword;
     monitor.keywordInverted = input.keywordInverted ?? existing?.keywordInverted ?? false;
+    monitor.keywordCaseSensitive =
+      input.keywordCaseSensitive ?? existing?.keywordCaseSensitive ?? false;
   }
   if (type === "dns") {
     monitor.dnsRecordType = (input.dnsRecordType ??
@@ -174,5 +196,23 @@ export async function buildMonitor(
     );
   }
 
-  return monitor;
+  // Firestore rejects an explicit `undefined` outright, and several fields
+  // above are built with `input.x ?? existing?.x` — which yields undefined
+  // whenever neither side set them. That threw on every create and edit:
+  //   Cannot use "undefined" as a Firestore value (found in field "requestBody")
+  //
+  // Dropping the keys is deliberate over enabling `ignoreUndefinedProperties`
+  // on the client: a field that was never set should be absent, and a genuine
+  // mistake elsewhere should still fail loudly rather than be swallowed.
+  return stripUndefined(monitor);
+}
+
+/** Remove keys whose value is undefined. Shallow by design — no nested field
+ *  in a monitor is built with the `??` pattern that produces them. */
+export function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out as Partial<T>;
 }

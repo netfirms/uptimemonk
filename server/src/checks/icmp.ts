@@ -53,10 +53,15 @@ export async function checkIcmp(
           return resolve({
             ok: false,
             responseTimeMs: elapsed,
+            // "No reply" is ambiguous between a host that is down and one
+            // that simply drops ICMP — which most CDNs and cloud load
+            // balancers do by default. Saying so turns a confusing red
+            // monitor into an obvious "use an HTTP check instead".
             error:
               /unknown host|Name or service not known/i.test(stdout)
                 ? "DNS lookup failed (host not found)"
-                : `No ICMP reply within ${timeoutSeconds}s`,
+                : `No ICMP reply within ${timeoutSeconds}s — the host may be down, ` +
+                  `or may block ping (common behind a CDN; try an HTTP check)`,
             region,
             checkedAt: started,
           });

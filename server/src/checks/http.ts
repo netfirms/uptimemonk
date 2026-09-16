@@ -49,7 +49,16 @@ export async function checkHttp(
     const follow = monitor.followRedirects !== false;
     const wantsBody = monitor.type === "keyword";
 
-    let method = monitor.method ?? (wantsBody ? "GET" : "HEAD");
+    // A keyword check reads the body, and a HEAD response has none — so HEAD
+    // here is not a preference, it is a guaranteed false outage. Enforced at
+    // the probe rather than only in validation, because stored config can
+    // predate the rule and a monitor must not be able to report a permanent
+    // failure for a reason no one can see.
+    let method = wantsBody
+      ? monitor.method === "POST"
+        ? "POST"
+        : "GET"
+      : (monitor.method ?? "HEAD");
     let body = method === "POST" ? monitor.requestBody : undefined;
     let res: Awaited<ReturnType<typeof fetch>>;
     let hops = 0;
@@ -108,7 +117,17 @@ export async function checkHttp(
 
     // Keyword monitors need the body. Cap it so a huge page can't blow memory.
     const text = (await res.text()).slice(0, 512 * 1024);
-    const found = monitor.keyword ? text.includes(monitor.keyword) : true;
+    // Case-insensitive unless the monitor explicitly asks otherwise.
+    //
+    // This was a plain `includes`, which meant a monitor looking for
+    // "AGARWOOD OIL" never matched a page saying "Agarwood Oil" — reported as
+    // a hard outage with no hint that casing was the reason. A false outage is
+    // worse than a missed one: it trains people to ignore the alerts.
+    const found = monitor.keyword
+      ? monitor.keywordCaseSensitive
+        ? text.includes(monitor.keyword)
+        : text.toLowerCase().includes(monitor.keyword.toLowerCase())
+      : true;
     const wanted = monitor.keywordInverted ? !found : found;
     const ok = codeOk && wanted;
 

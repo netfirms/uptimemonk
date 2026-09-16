@@ -17,6 +17,21 @@ export function dayKey(ms: number): string {
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
 }
 
+/**
+ * "YYYYMMDD" or "YYYYMMDDHH" back to epoch milliseconds.
+ *
+ * The keys are UTC, and this is what lets the UI label a bar in the viewer's
+ * own timezone instead of shipping a pre-formatted UTC string that would read
+ * as the wrong hour for most of the world.
+ */
+export function keyToMs(key: string): number {
+  const y = Number(key.slice(0, 4));
+  const mo = Number(key.slice(4, 6));
+  const d = Number(key.slice(6, 8));
+  const h = key.length >= 10 ? Number(key.slice(8, 10)) : 0;
+  return Date.UTC(y, mo - 1, d, h);
+}
+
 export function dayKeysBack(fromMs: number, days: number): string[] {
   const keys: string[] = [];
   for (let i = 0; i < days; i++) {

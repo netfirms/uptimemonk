@@ -52,6 +52,7 @@ function toMonitor(id: string, d: Record<string, unknown>): Monitor {
     followRedirects: d.followRedirects as boolean | undefined,
     keyword: d.keyword as string | undefined,
     keywordInverted: d.keywordInverted as boolean | undefined,
+    keywordCaseSensitive: d.keywordCaseSensitive as boolean | undefined,
     dnsRecordType: d.dnsRecordType as Monitor["dnsRecordType"],
     dnsExpectedValue: d.dnsExpectedValue as string | undefined,
     sslExpiryWarningDays: d.sslExpiryWarningDays as number | undefined,
@@ -62,6 +63,9 @@ function toMonitor(id: string, d: Record<string, unknown>): Monitor {
     confirmationThreshold: Number(d.confirmationThreshold) || 2,
     regions: (d.regions as Monitor["regions"]) ?? [],
     enabled: d.enabled !== false,
+    // Absent means private: a monitor written before this field existed must
+    // not appear on a public page just because the flag is missing.
+    publicOnStatusPage: d.publicOnStatusPage === true,
     maintenanceWindows: (d.maintenanceWindows as Monitor["maintenanceWindows"]) ?? [],
     alertContactIds: (d.alertContactIds as string[]) ?? [],
     status: "pending",

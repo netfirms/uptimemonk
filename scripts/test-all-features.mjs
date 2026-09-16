@@ -204,19 +204,19 @@ describe("UptimeMonk — All Features Verification Suite", () => {
   // ----------------------------------------------------
   describe("Feature 3: Monitor Validation & Plan Limits", () => {
     test("enforces plan limits for Free vs Solo tiers", async () => {
-      assert.equal(PLANS.free.maxMonitors, 20);
-      assert.equal(PLANS.free.minIntervalSeconds, 300);
+      assert.equal(PLANS.free.maxMonitors, 10);
+      assert.equal(PLANS.free.minIntervalSeconds, 60);
 
       assert.equal(PLANS.solo.maxMonitors, 50);
-      assert.equal(PLANS.solo.minIntervalSeconds, 60);
+      assert.equal(PLANS.solo.minIntervalSeconds, 5);
 
-      // Free plan clamps interval to 300
+      // Free clamps to its one-minute floor
       const freeMonitor = await buildMonitor(
         { name: "Free", type: "http", target: "https://example.com", intervalSeconds: 30 },
         "org_1",
         "free"
       );
-      assert.equal(freeMonitor.intervalSeconds, 300);
+      assert.equal(freeMonitor.intervalSeconds, 60);
 
       // Solo plan allows 60
       const soloMonitor = await buildMonitor(

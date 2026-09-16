@@ -2,12 +2,15 @@ import type { FastifyInstance } from "fastify";
 import { readFileSync } from "node:fs";
 import { Timestamp } from "firebase-admin/firestore";
 import { auth, col } from "../sync/firebase.js";
-import { getMonitorByHeartbeatToken, getMonitor, setDueAt } from "../db/repo.js";
+import { getMonitorByHeartbeatToken, getMonitor, getOrgPlan, setDueAt } from "../db/repo.js";
+import { limitsFor } from "../lib/plans.js";
 import { flush, recordResult } from "../monitors/recordResult.js";
 import { handleVerifyRequest, signatureMatches } from "../probe/verify.js";
 import { requireAuth } from "./auth.js";
 import { log } from "../lib/log.js";
+import { readinessSummary } from "../lib/readiness.js";
 import { API_VERSION, REGION, VERIFY_SECRET } from "../config.js";
+import type { Plan } from "../types.js";
 
 const STATUS_FILE = process.env.UPTIMEMONK_STATUS_FILE ?? "/var/lib/uptimemonk/worker.json";
 
@@ -41,7 +44,13 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
     const lagging = !!worker && worker.lagMs > LAG_BUDGET_MS;
     const healthy = !stale && !lagging;
 
+    // Config gaps do not make the service unhealthy — checks are still
+    // running — but they must be visible somewhere an operator looks, or a
+    // worker that cannot alert anyone reports a cheerful 200 forever.
+    const readiness = readinessSummary();
+
     return reply.code(healthy ? 200 : 503).send({
+      readiness,
       status: healthy ? "ok" : stale ? "worker-stale" : "scheduler-lagging",
       version: API_VERSION,
       region: REGION,
@@ -205,9 +214,26 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** Whoami — lets the dashboard confirm claims propagated after bootstrap. */
-  app.get("/v1/me", { preHandler: requireAuth() }, async (req) => ({
-    uid: req.user!.uid,
-    orgId: req.user!.orgId,
-    role: req.user!.role,
-  }));
+  /**
+   * Whoami, plus the plan limits the UI needs.
+   *
+   * Without these the form offered a 1-minute interval to a free account, the
+   * server clamped it to the plan floor, and the value silently came back
+   * different from what the user picked — which reads as "saving is broken".
+   */
+  app.get("/v1/me", { preHandler: requireAuth() }, async (req) => {
+    const plan = getOrgPlan(req.user!.orgId) as Plan;
+    const limits = limitsFor(plan);
+    return {
+      uid: req.user!.uid,
+      orgId: req.user!.orgId,
+      role: req.user!.role,
+      plan,
+      limits: {
+        label: limits.label,
+        minIntervalSeconds: limits.minIntervalSeconds,
+        maxMonitors: limits.maxMonitors,
+      },
+    };
+  });
 }

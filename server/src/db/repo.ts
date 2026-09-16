@@ -68,10 +68,12 @@ const CONFIG_KEYS = [
   "followRedirects",
   "keyword",
   "keywordInverted",
+  "keywordCaseSensitive",
   "dnsRecordType",
   "dnsExpectedValue",
   "sslExpiryWarningDays",
   "heartbeatGraceSeconds",
+  "publicOnStatusPage",
 ] as const;
 
 function configBlob(m: Partial<Monitor>): string {
@@ -140,8 +142,56 @@ export function upsertMonitorConfig(m: Monitor): void {
     });
 }
 
+/**
+ * Delete a monitor and everything that belongs to it.
+ *
+ * Without the cascade the monitor row vanished while its buckets, day rollups
+ * and incidents stayed behind forever. `day_rollups` and `incidents` are never
+ * pruned by design — they are the permanent record — so dead rows accumulated
+ * with nothing to ever remove them, and the orphaned incidents still showed up
+ * in the dashboard's list for the org.
+ *
+ * One transaction: a half-deleted monitor is worse than either outcome.
+ */
 export function deleteMonitor(id: string): void {
-  getDb().prepare("DELETE FROM monitors WHERE id = ?").run(id);
+  const db = getDb();
+  db.transaction(() => {
+    // Outbox rows reference incidents, so they go first.
+    db.prepare(
+      `DELETE FROM alert_outbox WHERE incident_id IN
+         (SELECT id FROM incidents WHERE monitor_id = ?)`
+    ).run(id);
+    db.prepare("DELETE FROM incidents WHERE monitor_id = ?").run(id);
+    db.prepare("DELETE FROM hour_buckets WHERE monitor_id = ?").run(id);
+    db.prepare("DELETE FROM day_rollups WHERE monitor_id = ?").run(id);
+    db.prepare("DELETE FROM monitors WHERE id = ?").run(id);
+  })();
+}
+
+/**
+ * One-off repair for monitors deleted before the cascade existed. Runs at
+ * worker start: cheap when there is nothing to do, and it is the only way the
+ * rows already stranded on disk ever go away.
+ */
+export function purgeOrphanedHistory(): number {
+  const db = getDb();
+  let removed = 0;
+  db.transaction(() => {
+    for (const table of ["hour_buckets", "day_rollups", "incidents"]) {
+      const info = db
+        .prepare(
+          `DELETE FROM ${table} WHERE monitor_id NOT IN (SELECT id FROM monitors)`
+        )
+        .run();
+      removed += info.changes;
+    }
+    removed += db
+      .prepare(
+        `DELETE FROM alert_outbox WHERE incident_id NOT IN (SELECT id FROM incidents)`
+      )
+      .run().changes;
+  })();
+  return removed;
 }
 
 export function getMonitor(id: string): Monitor | null {
@@ -537,8 +587,257 @@ export function setUptimes(
     .run(u24, u7, u30, monitorId);
 }
 
+/**
+ * Retention for resolved incidents.
+ *
+ * Incidents had no policy at all: a flapping monitor writes one per transition,
+ * and nothing ever removed them. Open incidents are never touched — an
+ * unresolved outage is current state, not history, however old it looks.
+ */
+export function pruneIncidents(beforeMs: number): number {
+  const db = getDb();
+  let removed = 0;
+  db.transaction(() => {
+    removed += db
+      .prepare(
+        `DELETE FROM alert_outbox WHERE incident_id IN
+           (SELECT id FROM incidents
+             WHERE status = 'resolved' AND resolved_at IS NOT NULL AND resolved_at < ?)`
+      )
+      .run(beforeMs).changes;
+    removed += db
+      .prepare(
+        `DELETE FROM incidents
+          WHERE status = 'resolved' AND resolved_at IS NOT NULL AND resolved_at < ?`
+      )
+      .run(beforeMs).changes;
+  })();
+  return removed;
+}
+
 /** Nightly retention. Day rollups are tiny and kept indefinitely. */
 export function pruneBuckets(beforeHour: string): number {
   const info = getDb().prepare("DELETE FROM hour_buckets WHERE hour < ?").run(beforeHour);
   return info.changes;
+}
+
+// ------------------------------------------------------------------ history
+
+export interface HistorySample {
+  t: number;
+  ms: number;
+  ok: boolean;
+  code?: number;
+}
+
+/** Day rollups, newest first. Powers the uptime bar on the detail view. */
+export function dayRollupsFor(monitorId: string, limit = 90): DayRollup[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM day_rollups WHERE monitor_id = ?
+       ORDER BY day DESC LIMIT ?`
+    )
+    .all(monitorId, limit) as any[];
+  return rows.map((r) => ({
+    monitorId: r.monitor_id,
+    orgId: r.org_id,
+    day: r.day,
+    up: r.up,
+    down: r.down,
+    avgMs: r.avg_ms,
+    uptimeRatio: r.uptime_ratio,
+    downtimeSeconds: r.downtime_seconds,
+  }));
+}
+
+/**
+ * Raw samples from the most recent hour buckets, oldest first.
+ *
+ * Downsampled to `maxPoints` before returning: at a 60-second interval a day
+ * is 1,440 points, which is more than a chart can show and more than is worth
+ * sending. Takes every Nth point rather than averaging, so a spike stays a
+ * spike instead of being smoothed into the noise.
+ */
+export function recentSamples(
+  monitorId: string,
+  hours = 24,
+  maxPoints = 300
+): HistorySample[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT samples FROM hour_buckets WHERE monitor_id = ?
+       ORDER BY hour DESC LIMIT ?`
+    )
+    .all(monitorId, hours) as any[];
+
+  const all: HistorySample[] = [];
+  for (const r of rows.reverse()) {
+    try {
+      const parsed = JSON.parse(r.samples ?? "[]") as HistorySample[];
+      if (Array.isArray(parsed)) all.push(...parsed);
+    } catch {
+      // A malformed bucket should cost one hour of chart, not the whole view.
+    }
+  }
+  all.sort((a, b) => a.t - b.t);
+
+  if (all.length <= maxPoints) return all;
+  const step = Math.ceil(all.length / maxPoints);
+  const out = all.filter((_, i) => i % step === 0);
+  // Always keep the most recent point: it is the one the header shows.
+  if (out[out.length - 1] !== all[all.length - 1]) out.push(all[all.length - 1]);
+  return out;
+}
+
+/** Incidents for one monitor, newest first. */
+export function incidentsFor(monitorId: string, limit = 25): Incident[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT id FROM incidents WHERE monitor_id = ?
+       ORDER BY started_at DESC LIMIT ?`
+    )
+    .all(monitorId, limit) as any[];
+  return rows.map((r) => getIncident(r.id)!).filter(Boolean);
+}
+
+/** Totals across the hour buckets still on disk, for the detail header. */
+/**
+ * Totals for a window.
+ *
+ * `sinceHour` scopes it to the same span the chart is showing — an all-time
+ * check count sitting beside a "last 24 hours" chart answers a question nobody
+ * asked. Omitted, it stays all-time.
+ */
+export function historySummary(
+  monitorId: string,
+  sinceHour?: string
+): {
+  checks: number;
+  up: number;
+  down: number;
+  avgMs: number;
+} {
+  const r: any = sinceHour
+    ? getDb()
+        .prepare(
+          `SELECT SUM(up) up, SUM(down) down, SUM(sum_ms) sum_ms
+           FROM hour_buckets WHERE monitor_id = ? AND hour >= ?`
+        )
+        .get(monitorId, sinceHour)
+    : getDb()
+        .prepare(
+          `SELECT SUM(up) up, SUM(down) down, SUM(sum_ms) sum_ms
+           FROM hour_buckets WHERE monitor_id = ?`
+        )
+        .get(monitorId);
+  const up = r?.up ?? 0;
+  const down = r?.down ?? 0;
+  const checks = up + down;
+  return { checks, up, down, avgMs: checks ? Math.round((r.sum_ms ?? 0) / checks) : 0 };
+}
+
+/**
+ * Hourly buckets, oldest first — the short-range counterpart to
+ * `dayRollupsFor`. Deliberately does not parse the `samples` blob: callers
+ * that want individual points use `recentSamples`, and a bar only needs the
+ * counts.
+ */
+export function hourBucketsFor(
+  monitorId: string,
+  hours = 24
+): { hour: string; up: number; down: number; avgMs: number; uptimeRatio: number }[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT hour, up, down, sum_ms FROM hour_buckets
+       WHERE monitor_id = ? ORDER BY hour DESC LIMIT ?`
+    )
+    .all(monitorId, hours) as any[];
+
+  return rows.reverse().map((r) => {
+    const checks = r.up + r.down;
+    return {
+      hour: r.hour,
+      up: r.up,
+      down: r.down,
+      avgMs: checks ? Math.round(r.sum_ms / checks) : 0,
+      uptimeRatio: checks ? r.up / checks : 0,
+    };
+  });
+}
+
+/**
+ * Restore live state onto a monitor this worker has no history for.
+ *
+ * Used when an organisation moves between workers. The new owner's SQLite
+ * knows nothing about the monitor, so without this its state machine restarts
+ * at `pending`: a monitor that was down goes quiet and then re-alerts as a
+ * fresh outage, and one that was up briefly reports as unknown.
+ *
+ * Only ever applied to a monitor with no local check history — never
+ * overwrites state this worker actually observed.
+ */
+export function seedStateIfUnknown(
+  id: string,
+  state: {
+    status: MonitorStatus;
+    lastCheckedAt?: number | null;
+    lastResponseTimeMs?: number | null;
+    lastError?: string | null;
+    inMaintenance?: boolean;
+    uptime24h?: number | null;
+    uptime30d?: number | null;
+  }
+): boolean {
+  const info = getDb()
+    .prepare(
+      `UPDATE monitors SET
+         status = @status,
+         last_checked_at = @lastCheckedAt,
+         last_response_time_ms = @lastResponseTimeMs,
+         last_error = @lastError,
+         in_maintenance = @inMaintenance,
+         uptime_24h = COALESCE(@uptime24h, uptime_24h),
+         uptime_30d = COALESCE(@uptime30d, uptime_30d)
+       WHERE id = @id AND last_checked_at IS NULL`
+    )
+    .run({
+      id,
+      status: state.status,
+      lastCheckedAt: state.lastCheckedAt ?? null,
+      lastResponseTimeMs: state.lastResponseTimeMs ?? null,
+      lastError: state.lastError ?? null,
+      inMaintenance: state.inMaintenance ? 1 : 0,
+      uptime24h: state.uptime24h ?? null,
+      uptime30d: state.uptime30d ?? null,
+    });
+  return info.changes > 0;
+}
+
+/** Re-create an open incident that belongs to a monitor this worker adopted,
+ *  so its eventual recovery resolves it and sends the "up" notice. */
+export function adoptOpenIncident(i: {
+  id: string;
+  orgId: string;
+  monitorId: string;
+  monitorName: string;
+  startedAt: number;
+  cause: string;
+  suppressed?: boolean;
+}): void {
+  getDb()
+    .prepare(
+      `INSERT INTO incidents (id, org_id, monitor_id, monitor_name, started_at,
+                              cause, confirmed_by, status, suppressed, synced)
+       VALUES (?, ?, ?, ?, ?, ?, '[]', 'open', ?, 1)
+       ON CONFLICT(id) DO NOTHING`
+    )
+    .run(i.id, i.orgId, i.monitorId, i.monitorName, i.startedAt, i.cause,
+         i.suppressed ? 1 : 0);
+}
+
+export function hasLocalHistory(monitorId: string): boolean {
+  const r: any = getDb()
+    .prepare("SELECT last_checked_at FROM monitors WHERE id = ?")
+    .get(monitorId);
+  return !!r?.last_checked_at;
 }

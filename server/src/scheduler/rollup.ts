@@ -3,6 +3,7 @@ import {
   getMonitor,
   listMonitors,
   pruneBuckets,
+  pruneIncidents,
   setUptimes,
   trailingUptime,
   writeDayRollup,
@@ -11,7 +12,7 @@ import { dayKey, dayKeysBack, hourKey } from "../lib/time.js";
 import { markOrgDirty } from "../sync/mirror.js";
 import { getDb } from "../db/index.js";
 import { log } from "../lib/log.js";
-import { RETENTION_DAYS } from "../config.js";
+import { INCIDENT_RETENTION_DAYS, RETENTION_DAYS } from "../config.js";
 
 /**
  * Nightly compaction and retention.
@@ -58,6 +59,11 @@ export function runDailyRollup(now = Date.now()): void {
   const cutoff = `${dayKey(now - RETENTION_DAYS * 86_400_000)}00`;
   const pruned = pruneBuckets(cutoff);
 
+  // Resolved incidents are kept far longer than raw samples — they are the
+  // record customers refer back to — but not forever. Open ones are never
+  // removed: an unresolved outage is current state, not history.
+  const prunedIncidents = pruneIncidents(now - INCIDENT_RETENTION_DAYS * 86_400_000);
+
   // Incremental rather than a full VACUUM, which rewrites the entire file and
   // needs free disk equal to the database.
   try {
@@ -67,7 +73,7 @@ export function runDailyRollup(now = Date.now()): void {
   }
 
   log.info(
-    { day, monitors: totals.size, prunedBuckets: pruned, cutoffHour: cutoff },
+    { day, monitors: totals.size, prunedBuckets: pruned, prunedIncidents, cutoffHour: cutoff },
     "daily rollup complete"
   );
 }

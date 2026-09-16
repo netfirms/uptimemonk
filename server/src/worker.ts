@@ -1,4 +1,5 @@
 import { openDb, closeDb } from "./db/index.js";
+import { purgeOrphanedHistory } from "./db/repo.js";
 import { Scheduler } from "./scheduler/scheduler.js";
 import {
   reconcileNow,
@@ -6,11 +7,12 @@ import {
   startReconcileLoop,
   stopConfigListener,
 } from "./sync/configListener.js";
-import { startMirror, stopMirror } from "./sync/mirror.js";
+import { adoptStateFromMirror, startMirror, stopMirror } from "./sync/mirror.js";
 import { startFlushLoop, stopFlushLoop } from "./monitors/recordResult.js";
 import { startDrainer, stopDrainer } from "./alerts/drainer.js";
 import { startRollupLoop } from "./scheduler/rollup.js";
 import { log } from "./lib/log.js";
+import { readinessIssues } from "./lib/readiness.js";
 import { HEARTBEAT_URL, REGION, WORKER_VERSION } from "./config.js";
 import { writeFileSync } from "node:fs";
 
@@ -68,6 +70,20 @@ async function main(): Promise<void> {
   openDb();
   log.info({ region: REGION, version: WORKER_VERSION }, "worker starting");
 
+  // Clears rows left behind by monitors deleted before deleteMonitor cascaded.
+  // Cheap when there is nothing to do, and the only way rows already stranded
+  // on disk ever go away.
+  const orphans = purgeOrphanedHistory();
+  if (orphans) log.info({ rows: orphans }, "purged orphaned history");
+
+  // Loud, but not fatal. Refusing to boot would turn a degraded monitor into
+  // no monitor at all, which is worse than one that cannot email.
+  for (const issue of readinessIssues()) {
+    const line = `${issue.key} is not configured — ${issue.detail}`;
+    if (issue.severity === "critical") log.error({ config: issue.key }, line);
+    else log.warn({ config: issue.key }, line);
+  }
+
   startFlushLoop();
   startMirror();
   startDrainer();
@@ -88,6 +104,17 @@ async function main(): Promise<void> {
 
   startConfigListener((changed, removed) => scheduler.refresh(changed, removed));
   startReconcileLoop((changed, removed) => scheduler.refresh(changed, removed));
+
+  // Adopt state for organisations this worker owns but has never checked —
+  // the case after a rebalance. Must run after the config sync (so the
+  // monitors exist locally) and before the scheduler loads, so the first
+  // check compares against real previous state rather than "pending".
+  try {
+    const adopted = await adoptStateFromMirror();
+    if (adopted) log.info({ monitors: adopted }, "adopted state from the status mirror");
+  } catch (err) {
+    log.error({ err }, "state adoption failed — monitors will restart at pending");
+  }
 
   scheduler.load();
   scheduler.start();

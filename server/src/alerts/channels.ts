@@ -109,7 +109,7 @@ export async function sendSlack(webhookUrl: string, p: AlertPayload): Promise<vo
 
 export async function sendDiscord(webhookUrl: string, p: AlertPayload): Promise<void> {
   await postJsonToUserUrl(webhookUrl, {
-    username: "UptimeMonk",
+    username: "UptimeMonke",
     embeds: [
       {
         title: subjectFor(p),

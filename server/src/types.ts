@@ -47,6 +47,8 @@ export interface Monitor {
 
   keyword?: string;
   keywordInverted?: boolean;
+  /** Default false: matching ignores case, which is what people expect. */
+  keywordCaseSensitive?: boolean;
 
   dnsRecordType?: "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "NS";
   dnsExpectedValue?: string;
@@ -63,6 +65,14 @@ export interface Monitor {
   regions: ProbeRegion[];
 
   enabled: boolean;
+  /**
+   * Show this monitor on the org's public status page.
+   *
+   * Opt-in, not opt-out: a monitor's existence and name become public, and
+   * defaulting that on would publish internal service names the first time
+   * anyone opened a status page.
+   */
+  publicOnStatusPage?: boolean;
   maintenanceWindows?: MaintenanceWindow[];
   alertContactIds: string[];
 

@@ -16,6 +16,18 @@ import {
 import type { Monitor } from "../types.js";
 
 /**
+ * Absolute floor, below the tightest plan. A guard against a bad config value,
+ * not a product limit — the plan floors live in lib/plans.ts.
+ *
+ * Capacity note for 5-second checks: one monitor at 5s is 17,280 checks a day,
+ * twelve times a 1-minute monitor. The probe pool is I/O-bound so concurrency
+ * is rarely the binding constraint, but the hour bucket's sample array grows to
+ * 720 entries per monitor per hour. Watch queue depth and database size before
+ * selling 5-second checks at volume on a 414 MB instance.
+ */
+const MIN_INTERVAL_SECONDS = 5;
+
+/**
  * The check loop.
  *
  * One heap, one timer. This is what Cloud Scheduler, Cloud Tasks, the
@@ -81,12 +93,34 @@ export class Scheduler {
         continue;
       }
       const intervalMs = this.intervalMsOf(m);
-      const existing = this.heap.has(id);
-      // Keep an existing slot: re-jittering on every config edit would make
-      // the fleet drift toward whenever the customer last touched the UI.
-      if (!existing) {
+      const current = this.heap.peekEntry(id);
+
+      if (!current) {
+        // New to this worker: give it a jittered first slot so a batch of
+        // arrivals does not all fire on the same second.
         this.heap.push({ id, dueAt: initialDueAt(id, intervalMs, now), intervalMs });
+        continue;
       }
+
+      if (current.intervalMs === intervalMs) continue; // nothing to do
+
+      // The interval changed. The heap entry has to be rewritten, or the new
+      // value is not read until the ALREADY-SCHEDULED check fires — so moving
+      // a monitor from hourly to every minute appeared to do nothing for up to
+      // an hour.
+      //
+      // Bring the next check forward when shortening, but never push it further
+      // out when lengthening: the check that is already due should still happen,
+      // and only the one after it uses the longer gap. Deliberately not
+      // re-jittered — that would drag the whole fleet toward whenever people
+      // happen to edit things.
+      const dueAt = Math.min(current.dueAt, now + intervalMs);
+      this.heap.push({ id, dueAt, intervalMs });
+      setDueAt(id, dueAt);
+      log.info(
+        { monitorId: id, fromMs: current.intervalMs, toMs: intervalMs, dueInMs: dueAt - now },
+        "interval changed, rescheduled"
+      );
     }
   }
 
@@ -124,7 +158,7 @@ export class Scheduler {
     const seconds =
       m.type === "heartbeat"
         ? Math.max(60, m.heartbeatGraceSeconds || m.intervalSeconds || 300)
-        : Math.max(10, m.intervalSeconds || 300);
+        : Math.max(MIN_INTERVAL_SECONDS, m.intervalSeconds || 300);
     return seconds * 1000;
   }
 

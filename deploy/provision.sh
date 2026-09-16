@@ -41,6 +41,23 @@ if ! command -v caddy >/dev/null; then
   apt-get update -qq && apt-get install -y -qq caddy
 fi
 
+echo "==> Litestream"
+# Continuous SQLite backup to object storage. Installed but NOT enabled: it
+# needs a bucket and credentials, and a backup agent that silently fails is
+# worse than an obviously absent one.
+if ! command -v litestream >/dev/null; then
+  LS_VER=0.3.13
+  ARCH=$(dpkg --print-architecture)
+  curl -fsSL -o /tmp/litestream.deb \
+    "https://github.com/benbjohnson/litestream/releases/download/v${LS_VER}/litestream-v${LS_VER}-linux-${ARCH}.deb" \
+    && dpkg -i /tmp/litestream.deb >/dev/null && rm -f /tmp/litestream.deb \
+    || echo "    litestream install skipped (download failed) — not fatal"
+fi
+if [[ -f "$(dirname "$0")/litestream.yml" && ! -f /etc/litestream.yml ]]; then
+  install -m 644 "$(dirname "$0")/litestream.yml" /etc/litestream.yml
+  echo "    config at /etc/litestream.yml — set the bucket, then enable the service"
+fi
+
 echo "==> Service user and directories"
 id -u uptimemonk >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin uptimemonk
 mkdir -p "$APP_DIR" "$DATA_DIR" "$CONF_DIR"
