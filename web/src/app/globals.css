@@ -96,24 +96,36 @@ code, pre, .font-mono {
 .brand-badge {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   text-decoration: none;
   color: #ffffff;
   font-weight: 800;
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   letter-spacing: -0.02em;
 }
 
+/* Holds the mascot. Was a solid green tile behind a white glyph — with a real
+   illustration in it the green became a frame around a dark square, so the
+   badge now IS the artwork. The background matches the mascot's own so any
+   letterboxing is invisible, and the green survives as a rim and glow. */
 .brand-robot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: #3BD671;
-  color: #0b131e;
-  box-shadow: 0 0 16px rgba(59, 214, 113, 0.35);
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0b131e;
+  border: 1px solid rgba(59, 214, 113, 0.45);
+  box-shadow: 0 0 16px rgba(59, 214, 113, 0.28);
+  flex: none;
+}
+.brand-robot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .workspace-pill {
@@ -453,6 +465,17 @@ button.btn-outline-red {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* The name now shares this row with up to three chips. Without wrapping,
+     a long name pushes the protocol tag off the card on a narrow screen —
+     and the tag is the thing being scanned for. */
+  flex-wrap: wrap;
+  row-gap: 5px;
+}
+
+/* Chips keep their size; the name gives way first. */
+.monitor-name .protocol-tag,
+.monitor-name .interval-tag {
+  flex: none;
 }
 
 .monitor-target {
@@ -873,4 +896,416 @@ button.btn-outline-red {
   .monitor-card { flex-direction: column; align-items: flex-start; gap: 12px; }
   .filter-row { flex-direction: column; align-items: stretch; }
   .search-box { max-width: 100%; }
+}
+
+/* --- monitor detail --------------------------------------------------- */
+/* Built on the app's tokens. An earlier version used var(--card, #fff),
+   and since no --card token exists it rendered a white panel on the dark
+   theme. */
+
+.detail-modal { max-width: 760px; }
+
+.detail-header { align-items: flex-start; gap: 12px; }
+.detail-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.detail-header-right { display: flex; align-items: center; gap: 10px; flex: none; }
+
+.detail-name {
+  font-size: 1.15rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  min-width: 0;
+}
+.detail-target {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Stat grid: hairline separators from the background showing through a gap,
+   so six tiles read as one object rather than six floating cards. */
+.detail-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.detail-stat {
+  background: var(--surface);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.detail-stat .stat-title {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.detail-stat .stat-num {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.detail-stat .stat-num.detail-stat-sm { font-size: 0.9rem; font-weight: 600; }
+
+.detail-section { margin-top: 26px; }
+.detail-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.detail-section-head h3 { font-size: 0.95rem; font-weight: 700; }
+.detail-section-head .dim { font-size: 0.75rem; }
+
+.detail-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-chart {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 10px 6px;
+  background: var(--surface-input);
+}
+.detail-chart svg { width: 100%; height: 140px; display: block; }
+
+/* The plot area. Markers are HTML rather than SVG shapes: the chart stretches
+   with preserveAspectRatio="none", which would turn a circle into an ellipse. */
+.chart-plot { position: relative; cursor: crosshair; }
+
+.chart-dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--surface-input);
+  pointer-events: none;
+}
+.chart-dot-peak { background: var(--maintenance); }
+.chart-dot-fail { background: var(--down); }
+
+.chart-peak-label {
+  position: absolute;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.16);
+  color: var(--maintenance);
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: 4px;
+  margin-left: 8px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: #0b131e;
+  border: 1px solid var(--border-hover);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}
+.chart-tooltip-value {
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.chart-tooltip-meta {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+
+.detail-empty {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.detail-empty p { margin: 0; }
+.detail-empty p + p { margin-top: 4px; }
+
+.detail-error {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: var(--down-bg);
+  color: #fca5a5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+  word-break: break-word;
+}
+
+.detail-incidents {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.detail-incident {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.detail-incident:last-child { border-bottom: none; }
+.detail-incident-cause {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-incident .dim { font-size: 0.75rem; }
+
+.detail-ongoing {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--down-bg);
+  color: var(--down);
+  flex: none;
+}
+
+@media (max-width: 560px) {
+  .detail-stats { grid-template-columns: repeat(2, 1fr); }
+  .detail-name { white-space: normal; }
+}
+
+/* --- Public status page affordances --- */
+
+/* The checkbox and its explanation sit on one baseline, with the text block
+   free to wrap under itself rather than under the box. */
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 400;
+}
+
+.check-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex: none;
+  accent-color: #3BD671;
+  cursor: pointer;
+}
+
+.check-row .dim {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  font-weight: 400;
+}
+
+/* Neutral, with a green dot rather than a green fill. A filled green chip
+   next to a green HTTP/KEYWORD tag read as one thing in two shades; the dot
+   keeps "this is published" visible while leaving green to mean protocol. */
+.interval-tag.public {
+  gap: 5px;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.interval-tag.public::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3BD671;
+  box-shadow: 0 0 0 2px rgba(59, 214, 113, 0.18);
+}
+
+/* The status-page link, styled as a secondary control beside the primary
+   "Add New Monitor" so it reads as a place to go rather than an action. */
+.btn-status-page {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.btn-status-page:hover {
+  color: #3BD671;
+  border-color: rgba(59, 214, 113, 0.4);
+  background: rgba(59, 214, 113, 0.08);
+}
+
+.btn-status-page svg {
+  flex: none;
+  opacity: 0.85;
+}
+
+.btn-status-page .badge-count {
+  margin-left: 1px;
+}
+
+/* --- Protocol tag on a monitor card --- */
+
+/* Its own shape rather than another `.interval-tag`: the interval is a
+   property of the check, the protocol is what kind of check it is, and two
+   identical grey chips side by side read as one run-on label. */
+.protocol-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  /* The neutral case, and the fallback for a type this build does not know. */
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #94a3b8;
+}
+
+/* Hue by family, not one colour per type: the eye is being asked "is this the
+   kind of check I am looking for", and seven unrelated colours answer more
+   slowly than three groups do. Web checks green, network blue, the two that
+   expire or are pushed to us amber and violet. */
+.protocol-tag.http,
+.protocol-tag.keyword {
+  background: rgba(59, 214, 113, 0.12);
+  border-color: rgba(59, 214, 113, 0.3);
+  color: #3BD671;
+}
+
+.protocol-tag.icmp,
+.protocol-tag.tcp,
+.protocol-tag.dns {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+}
+
+.protocol-tag.ssl {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.32);
+  color: #f59e0b;
+}
+
+.protocol-tag.heartbeat {
+  background: rgba(167, 139, 250, 0.14);
+  border-color: rgba(167, 139, 250, 0.32);
+  color: #a78bfa;
+}
+
+/* --- Chart time-range selector --- */
+
+.range-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.range-tabs button {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.range-tabs button:hover:not(:disabled) {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.range-tabs button.active {
+  background: rgba(59, 214, 113, 0.14);
+  color: #3BD671;
+}
+
+/* Switching windows keeps the old chart on screen while the next one loads,
+   so the control dims rather than the panel going blank. */
+.range-tabs button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* The section heading now holds a control, not just a caption. `baseline`
+   aligned the text inside the tab group with the h3, which sat the bordered
+   box a few pixels low. */
+.detail-section-head {
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* On the public page the selector sits in the hero, which is a two-column row
+   until there is no longer room for it beside the headline. */
+.status-range {
+  margin-left: auto;
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .status-range {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .range-tabs {
+    width: 100%;
+  }
+
+  .range-tabs button {
+    flex: 1;
+  }
 }

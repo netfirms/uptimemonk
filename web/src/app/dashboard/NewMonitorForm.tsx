@@ -2,8 +2,33 @@
 
 import { useState, useEffect } from "react";
 import { api, ApiError } from "@/lib/api";
+import { events } from "@/lib/analytics";
 
 export type MonitorType = "http" | "keyword" | "tcp" | "dns" | "ssl" | "icmp" | "heartbeat";
+
+/**
+ * The short name for a protocol, for the badge on a monitor card.
+ *
+ * Separate from the form's `label` on purpose: the form is choosing between
+ * options and has room to explain ("Website (HTTP)", "Ping (ICMP)"), while the
+ * card is scanned down a list and needs a word that lines up with its
+ * neighbours. Keeping both in this file keeps them from drifting apart.
+ */
+const PROTOCOL_TAGS: Record<MonitorType, string> = {
+  http: "HTTP",
+  keyword: "KEYWORD",
+  ssl: "SSL",
+  icmp: "PING",
+  tcp: "TCP",
+  dns: "DNS",
+  heartbeat: "HEARTBEAT",
+};
+
+/** Unknown types render their own name rather than vanishing — a monitor
+ *  created by a newer build should still be identifiable on an older page. */
+export function protocolTag(type: MonitorType | string): string {
+  return PROTOCOL_TAGS[type as MonitorType] ?? String(type).toUpperCase();
+}
 
 interface TypeOption {
   type: MonitorType;
@@ -11,6 +36,14 @@ interface TypeOption {
   hint: string;
   defaultTarget: string;
   desc: string;
+}
+
+/** Seconds as something readable — a 5-second floor rendered through a
+ *  minutes formatter came out as "0.08 minutes". */
+function fmtInterval(seconds: number): string {
+  if (seconds < 60) return `${seconds} seconds`;
+  if (seconds < 3600) return `${seconds / 60} minute${seconds === 60 ? "" : "s"}`;
+  return `${seconds / 3600} hour${seconds === 3600 ? "" : "s"}`;
 }
 
 const TYPE_OPTIONS: TypeOption[] = [
@@ -123,15 +156,31 @@ export function MonitorTypeIcon({ type, size = 18 }: { type: MonitorType | strin
   }
 }
 
+/** The fields the edit form needs to pre-fill. */
+export interface EditableMonitor {
+  id: string;
+  name: string;
+  target: string;
+  type: MonitorType | string;
+  intervalSeconds?: number;
+  port?: number;
+  keyword?: string;
+  publicOnStatusPage?: boolean;
+}
+
 export default function NewMonitorForm({
   isOpen,
   onClose,
   onCreated,
+  monitor,
 }: {
   isOpen?: boolean;
   onClose?: () => void;
   onCreated?: () => void;
+  /** Present = edit that monitor. Absent = create a new one. */
+  monitor?: EditableMonitor | null;
 }) {
+  const isEditing = !!monitor;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = isOpen !== undefined ? isOpen : internalOpen;
   const handleClose = () => {
@@ -145,8 +194,60 @@ export default function NewMonitorForm({
   const [keyword, setKeyword] = useState("");
   const [port, setPort] = useState("443");
   const [intervalSeconds, setIntervalSeconds] = useState("300");
+  const [isPublic, setIsPublic] = useState(false);
   const [busy, setBusy] = useState(false);
+  // The plan's floor, so the form never offers a value the server would clamp.
+  const [minInterval, setMinInterval] = useState(60);
+  const [planLabel, setPlanLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Load the monitor's current values when the dialog opens, and clear them
+  // when it opens for a new monitor instead. Keyed on the id so reopening for
+  // a different monitor re-fills rather than showing the previous one.
+  useEffect(() => {
+    if (!open) return;
+    if (monitor) {
+      setType((monitor.type as MonitorType) ?? "http");
+      setName(monitor.name ?? "");
+      setTarget(monitor.target ?? "");
+      setKeyword(monitor.keyword ?? "");
+      setPort(monitor.port != null ? String(monitor.port) : "443");
+      setIntervalSeconds(String(monitor.intervalSeconds ?? 300));
+      setIsPublic(monitor.publicOnStatusPage === true);
+    } else {
+      setType("http");
+      setName("");
+      setTarget("");
+      setKeyword("");
+      setPort("443");
+      setIntervalSeconds("300");
+      // A new monitor is private until someone says otherwise.
+      setIsPublic(false);
+    }
+    setError(null);
+  }, [open, monitor?.id]);
+
+  // Fetch the plan floor when the dialog opens. Previously the form offered a
+  // 1-minute interval to a free account, the server clamped it to the plan
+  // minimum, and the saved value came back different from the one picked —
+  // which looks exactly like "the frequency won't update".
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    api
+      .me()
+      .then((me) => {
+        if (cancelled) return;
+        setMinInterval(me.limits?.minIntervalSeconds ?? 60);
+        setPlanLabel(me.limits?.label ?? null);
+      })
+      .catch(() => {
+        // Non-fatal: leave every option enabled and let the server decide.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   // Close on Escape key
   useEffect(() => {
@@ -168,23 +269,41 @@ export default function NewMonitorForm({
     e.preventDefault();
     setBusy(true);
     setError(null);
+    const payload = {
+      type,
+      name: name || target || selectedOption.label,
+      target,
+      intervalSeconds: Number(intervalSeconds),
+      publicOnStatusPage: isPublic,
+      ...(needsKeyword ? { keyword } : {}),
+      ...(needsPort ? { port: Number(port) } : {}),
+    };
+
     try {
-      await api.createMonitor({
-        type,
-        name: name || target || selectedOption.label,
-        target,
-        intervalSeconds: Number(intervalSeconds),
-        ...(needsKeyword ? { keyword } : {}),
-        ...(needsPort ? { port: Number(port) } : {}),
-      });
+      if (monitor) {
+        await api.updateMonitor(monitor.id, payload);
+        void events.monitorEdited(type);
+      } else {
+        await api.createMonitor(payload);
+        void events.monitorCreated(type, Number(intervalSeconds));
+      }
+
       setName("");
       setTarget("");
       setKeyword("");
       handleClose();
       onCreated?.();
     } catch (err) {
+      void events.actionFailed(
+        monitor ? "edit_monitor" : "create_monitor",
+        err instanceof ApiError ? err.status : undefined
+      );
       setError(
-        err instanceof ApiError ? err.message : "Could not create that monitor"
+        err instanceof ApiError
+          ? err.message
+          : monitor
+            ? "Could not save those changes"
+            : "Could not create that monitor"
       );
     } finally {
       setBusy(false);
@@ -214,9 +333,11 @@ export default function NewMonitorForm({
       <div className="modal-content" role="dialog" aria-modal="true">
         <div className="modal-header">
           <div>
-            <h2>Create New Monitor</h2>
+            <h2>{isEditing ? "Edit Monitor" : "Create New Monitor"}</h2>
             <p className="dim" style={{ marginTop: "2px" }}>
-              Configure high-frequency checks and alerting.
+              {isEditing
+                ? "Changes take effect on the next check."
+                : "Configure high-frequency checks and alerting."}
             </p>
           </div>
           <button
@@ -239,12 +360,31 @@ export default function NewMonitorForm({
             <div className="field">
               <label>Monitor Protocol</label>
               <div className="type-grid">
+                {/* Locked while editing: an existing monitor's uptime history
+                    and response times are only comparable within one protocol,
+                    so switching type would silently corrupt its chart rather
+                    than change a setting. Delete and recreate to change it. */}
                 {TYPE_OPTIONS.map((opt) => (
                   <button
                     key={opt.type}
                     type="button"
                     className={`type-btn ${type === opt.type ? "selected" : ""}`}
+                    disabled={isEditing}
+                    aria-disabled={isEditing}
+                    title={
+                      isEditing
+                        ? "A monitor's protocol can't change — its history wouldn't match"
+                        : opt.desc
+                    }
+                    style={
+                      isEditing && type !== opt.type
+                        ? { opacity: 0.35, cursor: "not-allowed" }
+                        : isEditing
+                          ? { cursor: "default" }
+                          : undefined
+                    }
                     onClick={() => {
+                      if (isEditing) return;
                       setType(opt.type);
                       if (!target && opt.defaultTarget) setTarget(opt.defaultTarget);
                     }}
@@ -254,7 +394,11 @@ export default function NewMonitorForm({
                   </button>
                 ))}
               </div>
-              <p className="dim">{selectedOption.desc}</p>
+              <p className="dim">
+                {isEditing
+                  ? "Protocol is fixed for an existing monitor — its history wouldn't be comparable. Delete and recreate to change it."
+                  : selectedOption.desc}
+              </p>
             </div>
 
             {/* Target input */}
@@ -320,24 +464,65 @@ export default function NewMonitorForm({
               <label>Check Frequency</label>
               <div className="interval-chips">
                 {[
+                  { label: "5 sec", value: "5" },
+                  { label: "30 sec", value: "30" },
                   { label: "1 min", value: "60" },
                   { label: "5 min", value: "300" },
                   { label: "15 min", value: "900" },
                   { label: "1 hour", value: "3600" },
-                ].map((chip) => (
-                  <button
-                    key={chip.value}
-                    type="button"
-                    className={`interval-chip ${intervalSeconds === chip.value ? "selected" : ""}`}
-                    onClick={() => setIntervalSeconds(chip.value)}
-                  >
-                    {chip.label}
-                  </button>
-                ))}
+                ].map((chip) => {
+                  const belowPlan = Number(chip.value) < minInterval;
+                  return (
+                    <button
+                      key={chip.value}
+                      type="button"
+                      disabled={belowPlan}
+                      aria-disabled={belowPlan}
+                      title={
+                        belowPlan
+                          ? `${planLabel ?? "Your"} plan checks at most every ${fmtInterval(
+                              minInterval
+                            )}`
+                          : undefined
+                      }
+                      className={`interval-chip ${intervalSeconds === chip.value ? "selected" : ""}`}
+                      style={belowPlan ? { opacity: 0.35, cursor: "not-allowed" } : undefined}
+                      onClick={() => {
+                        if (belowPlan) return;
+                        setIntervalSeconds(chip.value);
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
               </div>
               <p className="dim" style={{ marginTop: "4px" }}>
-                Lightweight checks running from global edge probes.
+                {minInterval > 5
+                  ? `Faster intervals need an upgrade — the ${
+                      planLabel ?? "current"
+                    } plan checks every ${fmtInterval(minInterval)} at most.`
+                  : "Sub-minute checks running from the edge probe fleet."}
               </p>
+            </div>
+
+            <div className="field">
+              <label className="check-row" htmlFor="nm-public">
+                <input
+                  id="nm-public"
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                />
+                <span>
+                  <strong>Show on public status page</strong>
+                  <span className="dim" style={{ display: "block", marginTop: "2px" }}>
+                    Publishes this check&apos;s name, current state and 90-day
+                    uptime to your status page. The URL you are watching stays
+                    private.
+                  </span>
+                </span>
+              </label>
             </div>
 
             {error && (
@@ -363,7 +548,13 @@ export default function NewMonitorForm({
               Cancel
             </button>
             <button className="primary" type="submit" disabled={busy}>
-              {busy ? "Deploying Check…" : "Create Monitor"}
+              {busy
+                ? isEditing
+                  ? "Saving…"
+                  : "Deploying Check…"
+                : isEditing
+                  ? "Save Changes"
+                  : "Create Monitor"}
             </button>
           </div>
         </form>

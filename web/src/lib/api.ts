@@ -1,23 +1,21 @@
 "use client";
 
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { collection, doc, getDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
+import type { RangeKey } from "@/components/RangeTabs";
 
 /**
- * Client for UptimeMonk API and real-time Firestore synchronization.
+ * Client for the UptimeMonke worker API.
  *
- * Mutations attempt the edge probe API first and automatically fall back
- * to direct, security-rule-validated Firestore transactions if the edge probe
- * is unreachable or restarting. This ensures zero downtime and instant writes.
+ * Every mutation goes through the API and there is deliberately no direct
+ * Firestore fallback. `target` becomes an outbound request from inside our
+ * network, so it must pass the server's target guard — which resolves the
+ * hostname and rejects the link-local range where the cloud metadata services
+ * live. Plan limits need a count. Security rules can do neither, and they deny
+ * client writes to `monitors` outright, so a fallback could only ever turn one
+ * clear error into a confusing second one.
+ *
+ * Reads stay on Firestore, where the realtime listener is free.
  */
 
 export const BASE_URL =
@@ -47,14 +45,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const user = auth.currentUser;
   if (!user) throw new ApiError("Sign in to continue", 401);
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${await user.getIdToken()}`,
-      ...init.headers,
-    },
-  });
+  // Only claim a JSON body when one is actually being sent. DELETE and the
+  // pause POST carry none, and Fastify rejects an empty body declared as
+  // application/json (FST_ERR_CTP_EMPTY_JSON_BODY) — which is why deleting a
+  // monitor failed with a generic server error.
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${await user.getIdToken()}`,
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (init.body != null) headers["content-type"] = "application/json";
+
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
 
   if (res.status === 204) return undefined as T;
 
@@ -78,166 +79,149 @@ export interface MonitorInput {
   intervalSeconds?: number;
 }
 
+/**
+ * Mutations resolve a DNS lookup inside the server's target guard, so they are
+ * legitimately slower than a plain write. The previous 2.5 s budget expired on
+ * ordinary requests and silently diverted them to a fallback path.
+ */
+const MUTATION_TIMEOUT_MS = 15_000;
+
+export interface HistorySample {
+  t: number;
+  ms: number;
+  ok: boolean;
+  code?: number;
+}
+
+/** One bar: an hour or a day, depending on the range. */
+export interface Bucket {
+  /** Start of the bucket, epoch ms. */
+  t: number;
+  up: number;
+  down: number;
+  avgMs: number;
+  uptimeRatio: number;
+}
+
+/** One point on the response-time line. */
+export interface Point {
+  t: number;
+  ms: number;
+  ok: boolean;
+  /** Only on hourly ranges — a daily average has no single status code. */
+  code?: number;
+}
+
+export interface DayRollup {
+  day: string;
+  up: number;
+  down: number;
+  avgMs: number;
+  uptimeRatio: number;
+  downtimeSeconds: number;
+}
+
+export interface HistoryIncident {
+  id: string;
+  startedAt: number;
+  resolvedAt?: number | null;
+  durationSeconds?: number;
+  cause: string;
+  status: "open" | "resolved";
+}
+
+export interface MonitorHistory {
+  monitor: {
+    id: string;
+    name: string;
+    type: string;
+    target: string;
+    status: string;
+    enabled: boolean;
+    intervalSeconds: number;
+    lastCheckedAt: number | null;
+    lastResponseTimeMs: number | null;
+    lastError: string | null;
+    uptime24h: number | null;
+    uptime7d: number | null;
+    uptime30d: number | null;
+    certExpiresAt: number | null;
+  };
+  range: RangeKey;
+  granularity: "hour" | "day";
+  buckets: Bucket[];
+  points: Point[];
+  incidents: HistoryIncident[];
+  /** Scoped to `range`, not all-time. */
+  summary: { checks: number; up: number; down: number; avgMs: number };
+
+  /** @deprecated Superseded by `buckets` / `points`; kept so a tab holding an
+   *  older bundle keeps rendering until it reloads. */
+  days: DayRollup[];
+  /** @deprecated See `days`. */
+  samples: HistorySample[];
+  /** @deprecated See `days`. */
+  window: { hours: number; days: number };
+}
+
 export const api = {
-  createMonitor: async (input: MonitorInput) => {
-    const user = auth.currentUser;
-    if (!user) throw new ApiError("Sign in to continue", 401);
+  createMonitor: (input: MonitorInput) =>
+    request<{ id: string }>("/v1/monitors", {
+      method: "POST",
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
 
-    try {
-      const res = await request<{ id: string }>("/v1/monitors", {
-        method: "POST",
-        body: JSON.stringify(input),
-        signal: AbortSignal.timeout(2500),
-      });
-      return res;
-    } catch (apiErr) {
-      console.warn("API createMonitor fallback to direct Firestore:", apiErr);
+  updateMonitor: (id: string, input: Partial<MonitorInput>) =>
+    request<{ id: string }>(`/v1/monitors/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
 
-      // Resolve orgId from user claim or user profile
-      let token = await user.getIdTokenResult();
-      let orgId = (token.claims.orgId as string) ?? null;
-      if (!orgId) {
-        const uSnap = await getDoc(doc(db, "users", user.uid));
-        orgId = uSnap.data()?.orgId ?? null;
-      }
-      if (!orgId) {
-        // Self-bootstrap if orgId was not present
-        const b = await api.bootstrap();
-        orgId = b.orgId;
-      }
+  togglePause: (id: string) =>
+    request<{ id: string; enabled: boolean }>(`/v1/monitors/${id}/pause`, {
+      method: "POST",
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
 
-      const intervalSeconds = Math.max(60, Number(input.intervalSeconds) || 300);
-      const cleanData: Record<string, unknown> = {
-        orgId,
-        type: input.type,
-        name: input.name?.trim() || input.target || "Untitled Monitor",
-        target: input.target?.trim() ?? "",
-        intervalSeconds,
-        timeoutSeconds: 10,
-        confirmationThreshold: 2,
-        enabled: true,
-        status: "pending",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
+  deleteMonitor: (id: string) =>
+    request<void>(`/v1/monitors/${id}`, {
+      method: "DELETE",
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
 
-      if (input.port) cleanData.port = Number(input.port);
-      if (input.keyword) cleanData.keyword = input.keyword.trim();
+  /**
+   * Creates the workspace for a new account. Backend-only by necessity: it
+   * sets the custom claim that every security rule reads for tenancy, which a
+   * client cannot do. Idempotent — a retry after a dropped response is normal.
+   */
+  bootstrap: () =>
+    request<{ orgId: string; created: boolean }>("/v1/bootstrap", {
+      method: "POST",
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
 
-      const docRef = await addDoc(collection(db, "monitors"), cleanData);
-      return { id: docRef.id };
-    }
-  },
-
-  updateMonitor: async (id: string, input: Partial<MonitorInput>) => {
-    try {
-      const res = await request<{ id: string }>(`/v1/monitors/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(input),
-        signal: AbortSignal.timeout(2500),
-      });
-      return res;
-    } catch (apiErr) {
-      console.warn("API updateMonitor fallback to direct Firestore:", apiErr);
-      const monRef = doc(db, "monitors", id);
-      const cleanUpdates: Record<string, unknown> = {
-        updatedAt: serverTimestamp(),
-      };
-      if (input.name !== undefined) cleanUpdates.name = input.name;
-      if (input.target !== undefined) cleanUpdates.target = input.target;
-      if (input.intervalSeconds !== undefined) {
-        cleanUpdates.intervalSeconds = Math.max(60, Number(input.intervalSeconds));
-      }
-      if (input.port !== undefined) cleanUpdates.port = Number(input.port);
-      if (input.keyword !== undefined) cleanUpdates.keyword = input.keyword;
-
-      await updateDoc(monRef, cleanUpdates);
-      return { id };
-    }
-  },
-
-  togglePause: async (id: string, currentEnabled?: boolean) => {
-    try {
-      const res = await request<{ id: string; enabled: boolean }>(`/v1/monitors/${id}/pause`, {
-        method: "POST",
-        signal: AbortSignal.timeout(2500),
-      });
-      return res;
-    } catch (apiErr) {
-      console.warn("API togglePause fallback to direct Firestore:", apiErr);
-      const monRef = doc(db, "monitors", id);
-      const newEnabled = currentEnabled !== undefined ? !currentEnabled : false;
-      await updateDoc(monRef, {
-        enabled: newEnabled,
-        updatedAt: serverTimestamp(),
-      });
-      return { id, enabled: newEnabled };
-    }
-  },
-
-  deleteMonitor: async (id: string) => {
-    try {
-      await request<void>(`/v1/monitors/${id}`, {
-        method: "DELETE",
-        signal: AbortSignal.timeout(2500),
-      });
-    } catch (apiErr) {
-      console.warn("API deleteMonitor fallback to direct Firestore:", apiErr);
-      await deleteDoc(doc(db, "monitors", id));
-    }
-  },
-
-  bootstrap: async () => {
-    const user = auth.currentUser;
-    if (!user) throw new ApiError("Sign in to continue", 401);
-
-    try {
-      const res = await request<{ orgId: string; created: boolean }>("/v1/bootstrap", {
-        method: "POST",
-        signal: AbortSignal.timeout(2500),
-      });
-      return res;
-    } catch (apiErr) {
-      console.warn("API bootstrap fallback to direct Firestore:", apiErr);
-      const uSnap = await getDoc(doc(db, "users", user.uid));
-      if (uSnap.exists() && uSnap.data()?.orgId) {
-        return { orgId: uSnap.data().orgId, created: false };
-      }
-
-      const orgRef = doc(collection(db, "orgs"));
-      const orgId = orgRef.id;
-      const emailName = user.email ? user.email.split("@")[0] : "My workspace";
-
-      await setDoc(orgRef, {
-        name: emailName,
-        ownerUid: user.uid,
-        plan: "free",
-        createdAt: serverTimestamp(),
-      });
-
-      await setDoc(doc(db, "users", user.uid), {
-        email: user.email ?? null,
-        orgId,
-        role: "owner",
-        createdAt: serverTimestamp(),
-      });
-
-      return { orgId, created: true };
-    }
+  /** Everything the detail view needs, served from the worker's SQLite. */
+  history: (id: string, opts: { hours?: number; days?: number; range?: RangeKey } = {}) => {
+    const q = new URLSearchParams();
+    if (opts.range) q.set("range", opts.range);
+    if (opts.hours) q.set("hours", String(opts.hours));
+    if (opts.days) q.set("days", String(opts.days));
+    const qs = q.toString();
+    return request<MonitorHistory>(`/v1/monitors/${id}/history${qs ? `?${qs}` : ""}`);
   },
 
   me: async () => {
     const user = auth.currentUser;
     if (!user) throw new ApiError("Sign in to continue", 401);
-    const token = await user.getIdTokenResult();
-    let orgId = token.claims.orgId as string;
-    let role = token.claims.role as string;
-    if (!orgId) {
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      orgId = userDoc.data()?.orgId;
-      role = userDoc.data()?.role ?? "owner";
-    }
-    return { uid: user.uid, orgId, role };
+    return request<{
+      uid: string;
+      orgId: string;
+      role: string;
+      plan: string;
+      limits: { label: string; minIntervalSeconds: number; maxMonitors: number };
+    }>("/v1/me");
   },
 
   version: async () => {

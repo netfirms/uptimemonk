@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import {
-  onAuthStateChanged,
-  signInWithPopup,
-  GoogleAuthProvider,
-  signOut,
-  type User,
-} from "firebase/auth";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { api, ApiError } from "@/lib/api";
-import NewMonitorForm, { MonitorTypeIcon, type MonitorType } from "./NewMonitorForm";
+import NewMonitorForm, {
+  MonitorTypeIcon,
+  protocolTag,
+  type MonitorType,
+} from "./NewMonitorForm";
+import MonitorDetail from "./MonitorDetail";
+import Landing from "@/components/Landing";
+import { events, identify } from "@/lib/analytics";
 
 type Status = "up" | "down" | "pending" | "paused";
 
@@ -22,6 +23,10 @@ interface MonitorConfig {
   type: MonitorType | string;
   intervalSeconds?: number;
   enabled?: boolean;
+  // Needed so the edit form opens pre-filled rather than blank.
+  port?: number;
+  keyword?: string;
+  publicOnStatusPage?: boolean;
 }
 
 interface LiveState {
@@ -39,9 +44,10 @@ export default function Dashboard() {
   const [live, setLive] = useState<Record<string, LiveState>>({});
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [isSigningIn, setIsSigningIn] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editing, setEditing] = useState<MonitorConfig | null>(null);
+  const publicCount = monitors.filter((m) => m.publicOnStatusPage).length;
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "up" | "down" | "paused">("all");
 
@@ -63,6 +69,7 @@ export default function Dashboard() {
         if (!id) {
           try {
             const { orgId: created } = await api.bootstrap();
+            void events.signUpBootstrapped();
             await u.getIdToken(true);
             id = created;
           } catch (err) {
@@ -75,6 +82,7 @@ export default function Dashboard() {
           }
         }
         setOrgId(id);
+        if (id) void identify(id);
       }),
     []
   );
@@ -108,8 +116,10 @@ export default function Dashboard() {
     setBusyId(m.id);
     setError(null);
     try {
-      await api.togglePause(m.id, m.enabled !== false);
+      await api.togglePause(m.id);
+      void events.monitorPaused(m.enabled !== false);
     } catch (err) {
+      void events.actionFailed("toggle_pause", err instanceof ApiError ? err.status : undefined);
       setError(err instanceof ApiError ? err.message : "Could not update that monitor.");
     } finally {
       setBusyId(null);
@@ -122,34 +132,15 @@ export default function Dashboard() {
     setError(null);
     try {
       await api.deleteMonitor(m.id);
+      void events.monitorDeleted(String(m.type));
     } catch (err) {
+      void events.actionFailed("delete_monitor", err instanceof ApiError ? err.status : undefined);
       setError(err instanceof ApiError ? err.message : "Could not delete that monitor.");
     } finally {
       setBusyId(null);
     }
   }
 
-  async function handleGoogleSignIn() {
-    setAuthError(null);
-    setIsSigningIn(true);
-    try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-    } catch (err: unknown) {
-      console.error("Sign in failed:", err);
-      const code = (err as { code?: string })?.code;
-      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-        // User closed popup intentionally, no error needed
-      } else if (code === "auth/popup-blocked") {
-        setAuthError("Sign-in popup was blocked by your browser. Please allow popups for this site and try again.");
-      } else if (code === "auth/unauthorized-domain") {
-        setAuthError("This domain is not authorized for sign-in. Please contact support.");
-      } else {
-        setAuthError((err as Error)?.message || "Failed to sign in with Google.");
-      }
-    } finally {
-      setIsSigningIn(false);
-    }
-  }
 
   const statusOf = (m: MonitorConfig): Status => {
     if (m.enabled === false) return "paused";
@@ -208,193 +199,16 @@ export default function Dashboard() {
   }, [monitors, live, activeTab, searchQuery]);
 
   // --- 1. UNAUTHENTICATED LANDING SCREEN (UPTIMEROBOT THEME) ---
+  // Signed out: send them to the public page, which is where the marketing
+  // copy lives and the only page meant to be indexed.
   if (!currentUser) {
     return (
       <main className="wrap">
-        {/* Minimal Navigation Bar */}
-        <header className="topbar">
-          <div className="brand-badge">
-            <span className="brand-robot">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2a2 2 0 0 1 2 2v1h1a3 3 0 0 1 3 3v2h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1v4a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3v-4H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h1V8a3 3 0 0 1 3-3h1V4a2 2 0 0 1 2-2zM9 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-6 6h6v-1.5H9V16z" />
-              </svg>
-            </span>
-            <span>UptimeMonk</span>
-          </div>
-
-          <div className="row">
-            <span className="status-pill up" style={{ fontSize: "0.72rem" }}>
-              <span className="status-dot up" />
-              Probes Live
-            </span>
-            <button className="primary" onClick={handleGoogleSignIn} disabled={isSigningIn}>
-              {isSigningIn ? "Connecting…" : "Sign In with Google"}
-            </button>
-          </div>
-        </header>
-
-        {/* Lightweight Hero */}
-        <section className="hero-wrap">
-          <div className="hero-tag">
-            <span className="status-dot up" />
-            Free Website &amp; Infrastructure Monitoring
-          </div>
-          <h1 className="hero-title">
-            Keep your websites &amp; APIs online.
-          </h1>
-          <p className="hero-desc">
-            Continuous HTTP, SSL, ping, and cron heartbeat monitoring with sub-minute checks and instant alerts before your users notice.
-          </p>
-
-          {/* Direct CTA */}
-          <div className="hero-cta-wrap">
-            {authError && (
-              <div
-                style={{
-                  background: "rgba(239, 68, 68, 0.12)",
-                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                  borderRadius: "8px",
-                  padding: "10px 14px",
-                  color: "#ef4444",
-                  fontSize: "0.85rem",
-                  maxWidth: "400px",
-                  textAlign: "center",
-                }}
-              >
-                {authError}
-              </div>
-            )}
-
-            <button className="google-btn-light" onClick={handleGoogleSignIn} disabled={isSigningIn}>
-              {isSigningIn ? (
-                <span>Connecting to Google…</span>
-              ) : (
-                <>
-                  <svg width="18" height="18" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                    />
-                  </svg>
-                  <span>Continue with Google</span>
-                </>
-              )}
-            </button>
-            <p className="dim" style={{ fontSize: "0.78rem" }}>
-              50 monitors free · No credit card required · Instant setup
-            </p>
-          </div>
-
-          {/* Horizontal Feature Badges */}
-          <div className="features-strip">
-            <div className="feature-pill">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z" />
-              </svg>
-              <span>Website &amp; API (HTTP)</span>
-            </div>
-            <div className="feature-pill">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-              </svg>
-              <span>SSL Expiry Alerts</span>
-            </div>
-            <div className="feature-pill">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-              </svg>
-              <span>Ping (ICMP)</span>
-            </div>
-            <div className="feature-pill">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
-                <rect width="18" height="18" x="3" y="3" rx="2" />
-              </svg>
-              <span>Port &amp; DNS Checks</span>
-            </div>
-            <div className="feature-pill">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-              <span>Cron Heartbeats</span>
-            </div>
-            <div className="feature-pill">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
-                <rect width="18" height="18" x="3" y="3" rx="2" />
-                <path d="M7 8h10" />
-                <path d="M7 12h10" />
-              </svg>
-              <span>Public Status Pages</span>
-            </div>
-          </div>
-
-          {/* Compact Live Check Preview */}
-          <div className="preview-box">
-            <div className="preview-topbar">
-              <div className="preview-dots">
-                <span className="preview-dot-mac" />
-                <span className="preview-dot-mac" />
-                <span className="preview-dot-mac" />
-              </div>
-              <span>Live Edge Probes — Active Checks</span>
-              <span className="status-dot up" />
-            </div>
-            <div className="preview-rows">
-              <div className="preview-row">
-                <div className="row">
-                  <span className="status-dot up" />
-                  <span className="preview-target">https://api.example.com/health</span>
-                </div>
-                <div className="row">
-                  <span className="dim">200 OK</span>
-                  <span className="latency-val latency-fast">28 ms</span>
-                </div>
-              </div>
-              <div className="preview-row">
-                <div className="row">
-                  <span className="status-dot up" />
-                  <span className="preview-target">https://example.com</span>
-                </div>
-                <div className="row">
-                  <span className="dim">SSL Valid (82d)</span>
-                  <span className="latency-val latency-fast">44 ms</span>
-                </div>
-              </div>
-              <div className="preview-row">
-                <div className="row">
-                  <span className="status-dot up" />
-                  <span className="preview-target">db.internal:5432</span>
-                </div>
-                <div className="row">
-                  <span className="dim">TCP Open</span>
-                  <span className="latency-val latency-fast">12 ms</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Minimal Footer */}
-        <footer className="app-footer">
-          <span>UptimeMonk · Lightweight Infrastructure Monitoring</span>
-          <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
-        </footer>
+        <Landing />
       </main>
     );
   }
+
 
   // --- 2. AUTHENTICATED DASHBOARD (UPTIMEROBOT THEME) ---
   return (
@@ -403,11 +217,11 @@ export default function Dashboard() {
       <header className="topbar">
         <div className="brand-badge">
           <span className="brand-robot">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2a2 2 0 0 1 2 2v1h1a3 3 0 0 1 3 3v2h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1v4a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3v-4H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h1V8a3 3 0 0 1 3-3h1V4a2 2 0 0 1 2-2zM9 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-6 6h6v-1.5H9V16z" />
-            </svg>
-          </span>
-          <span>UptimeMonk</span>
+              {/* The mascot, not an inline glyph — a brand mark should be
+                  the brand mark. 128px source for retina at 20-28px. */}
+              <img src="/mascot-128.png" alt="UptimeMonke" width={56} height={56} />
+            </span>
+          <span>UptimeMonke</span>
           <span className="workspace-pill">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20 7h-9" />
@@ -553,6 +367,27 @@ export default function Dashboard() {
             />
           </div>
 
+          {orgId && (
+            <a
+              className="btn-status-page"
+              href={`/status/${orgId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={
+                publicCount > 0
+                  ? `${publicCount} of your monitors are on this page`
+                  : "Nothing is published yet — tick “Show on public status page” on a monitor"
+              }
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18" />
+              </svg>
+              Status page
+              {publicCount > 0 && <span className="badge-count">{publicCount}</span>}
+            </a>
+          )}
+
           <button className="primary" onClick={() => setIsCreateModalOpen(true)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
               <line x1="12" y1="5" x2="12" y2="19" />
@@ -599,7 +434,7 @@ export default function Dashboard() {
               </span>
 
               {/* Protocol Icon */}
-              <div className="monitor-type-badge">
+              <div className="monitor-type-badge" title={protocolTag(m.type)}>
                 <MonitorTypeIcon type={m.type} size={18} />
               </div>
 
@@ -607,7 +442,13 @@ export default function Dashboard() {
               <div className="grow">
                 <div className="monitor-name">
                   <span>{m.name}</span>
+                  <span className={`protocol-tag ${m.type}`}>{protocolTag(m.type)}</span>
                   <span className="interval-tag">{intervalText}</span>
+                  {m.publicOnStatusPage && (
+                    <span className="interval-tag public" title="Shown on your public status page">
+                      Public
+                    </span>
+                  )}
                 </div>
                 <div className="monitor-target">
                   {m.target ? (
@@ -637,6 +478,36 @@ export default function Dashboard() {
 
               {/* Action Buttons */}
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <button
+                  className="btn-sm"
+                  onClick={() => {
+                    setDetailId(m.id);
+                    void events.historyViewed(String(m.type));
+                  }}
+                  title="View history"
+                  aria-label={`View history for ${m.name}`}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 3v18h18" />
+                    <polyline points="19 9 13 15 9 11 5 15" />
+                  </svg>
+                  History
+                </button>
+
+                <button
+                  className="btn-sm"
+                  onClick={() => setEditing(m)}
+                  disabled={busyId === m.id}
+                  title="Edit monitor"
+                  aria-label={`Edit ${m.name}`}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Edit
+                </button>
+
                 <button
                   className="btn-sm"
                   onClick={() => togglePause(m)}
@@ -719,6 +590,18 @@ export default function Dashboard() {
       </div>
 
       {/* Add New Monitor Modal */}
+      <MonitorDetail monitorId={detailId} onClose={() => setDetailId(null)} />
+
+      {/* Same dialog, edit mode. Keyed by id so reopening for a different
+          monitor remounts with that monitor's values. */}
+      <NewMonitorForm
+        key={editing?.id ?? "edit"}
+        isOpen={!!editing}
+        monitor={editing}
+        onClose={() => setEditing(null)}
+        onCreated={() => setEditing(null)}
+      />
+
       <NewMonitorForm
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
@@ -727,7 +610,7 @@ export default function Dashboard() {
 
       {/* Footer */}
       <footer className="app-footer">
-        <span>UptimeMonk · Free Website &amp; Infrastructure Monitoring</span>
+        <span>UptimeMonke · Free Website &amp; Infrastructure Monitoring</span>
         <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
       </footer>
     </main>
