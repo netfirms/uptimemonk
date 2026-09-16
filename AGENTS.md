@@ -132,8 +132,10 @@ replaced the plan paywall. A 5-second monitor is 12x the load of a 1-minute
 one and the old per-monitor cap charged the same for both, which also made a
 free workspace unable to run one fast monitor at any price despite it costing
 the same as ten slow ones. Free is 14,400 checks/day forever; a donation adds
-100,000/day per $1, derived from a measured 41.5 bytes per check rather than
-from competitor pricing. **Grants are in cents** — `Math.round(usd)` granted
+10,000/day per $1. That rate is set by **depletion**, not by capacity — a grant
+must run out inside a month for a real workload, or one $2.99 funds years. And
+credit pays for *every* check a donor runs, not only those above the free
+allowance: discounting it made eleven monitors at 59s last fourteen years. **Grants are in cents** — `Math.round(usd)` granted
 nothing for $0.49 and over-granted $1.50 by a third. There is no per-plan interval floor any more — the
 only floor left is the scheduler's own, and `assertFitsBudget` is what refuses,
 with a number rather than a tier name.

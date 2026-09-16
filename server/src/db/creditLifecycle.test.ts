@@ -67,14 +67,14 @@ describe("adding credit", () => {
       reason: "grant",
       ref: "evt_1",
     });
-    assert.equal(balance(), 8_970_000);
+    assert.equal(balance(), 897_000);
     assertReconciles();
   });
 
   test("two donations accumulate", () => {
     repo.postCredit({ orgId: ORG, delta: monthlyGrantCents(299), reason: "grant", ref: "e1" });
     repo.postCredit({ orgId: ORG, delta: monthlyGrantCents(299), reason: "grant", ref: "e2" });
-    assert.equal(balance(), 17_940_000);
+    assert.equal(balance(), 1_794_000);
     assertReconciles();
   });
 
@@ -87,24 +87,17 @@ describe("adding credit", () => {
 });
 
 describe("deducting credit", () => {
-  test("usage inside the free allowance costs nothing", () => {
+  test("credit pays for every check a donor runs", () => {
     repo.postCredit({ orgId: ORG, delta: 1_000_000, reason: "grant", ref: "e1" });
-    runDay("20260901", FREE_CHECKS_PER_DAY);
-    assert.equal(balance(), 1_000_000);
-    assertReconciles();
-  });
-
-  test("only the excess over free is charged", () => {
-    repo.postCredit({ orgId: ORG, delta: 1_000_000, reason: "grant", ref: "e1" });
-    runDay("20260901", FREE_CHECKS_PER_DAY + 50_000);
+    runDay("20260901", 50_000);
     assert.equal(balance(), 950_000);
     assertReconciles();
   });
 
   test("charging the same day twice is impossible", () => {
     repo.postCredit({ orgId: ORG, delta: 1_000_000, reason: "grant", ref: "e1" });
-    runDay("20260901", FREE_CHECKS_PER_DAY + 50_000);
-    runDay("20260901", FREE_CHECKS_PER_DAY + 50_000);
+    runDay("20260901", 50_000);
+    runDay("20260901", 50_000);
     assert.equal(balance(), 950_000);
     assertReconciles();
   });
@@ -118,8 +111,8 @@ describe("deducting credit", () => {
 
 describe("a donor's month, day by day", () => {
   test("credit drains at the advertised rate and lands in grace, not darkness", () => {
-    // $2.99 buys 8.97M. Running 207 monitors at one minute costs ~298k/day,
-    // of which the free allowance covers 14.4k.
+    // $2.99 buys 897,000 checks. Twenty monitors at 45s costs 38,400/day,
+    // and credit pays for all of it.
     repo.postCredit({
       orgId: ORG,
       delta: monthlyGrantCents(299),
@@ -127,7 +120,7 @@ describe("a donor's month, day by day", () => {
       ref: "evt_1",
     });
 
-    const dailyUse = 207 * checksPerDay(60);
+    const dailyUse = 20 * checksPerDay(45);
     let daysServed = 0;
 
     for (let d = 1; d <= 45; d++) {
@@ -139,8 +132,10 @@ describe("a donor's month, day by day", () => {
 
     assertReconciles();
     assert.equal(balance(), 0, "the month's credit should be spent");
-    assert.ok(daysServed >= 28, `only served ${daysServed} days, expected ~31`);
-    assert.ok(daysServed <= 35, `served ${daysServed} days, more than sold`);
+    // The whole point of the rate: a real workload exhausts a grant inside a
+    // month, so the donation is worth repeating.
+    assert.ok(daysServed <= 31, `served ${daysServed} days, longer than sold`);
+    assert.ok(daysServed >= 20, `only served ${daysServed} days`);
 
     // Out of credit is not out of service.
     const credit = repo.getOrgCredit(ORG);
@@ -157,9 +152,9 @@ describe("a donor's month, day by day", () => {
     );
     const daily = budgetFor(donor);
 
-    assert.ok(daily < 400_000, `daily budget ${daily} is far above the 299k sold`);
-    assert.ok(daily > 250_000, `daily budget ${daily} is below what was sold`);
-    assert.equal(daily, FREE_CHECKS_PER_DAY + 299_000);
+    assert.ok(daily < 60_000, `daily budget ${daily} is far above the 29,900 sold`);
+    assert.ok(daily > 25_000, `daily budget ${daily} is below what was sold`);
+    assert.equal(daily, FREE_CHECKS_PER_DAY + 29_900);
   });
 
   test("that budget is what the create path actually enforces", () => {
@@ -169,7 +164,7 @@ describe("a donor's month, day by day", () => {
     );
     const at1min = (n: number) => Array(n).fill({ intervalSeconds: 60, enabled: true });
 
-    assert.equal(fitsBudget(donor, at1min(207)).ok, true, "207 monitors were sold");
-    assert.equal(fitsBudget(donor, at1min(1_000)).ok, false, "1,000 was not");
+    assert.equal(fitsBudget(donor, at1min(30)).ok, true, "30 monitors fit what was sold");
+    assert.equal(fitsBudget(donor, at1min(200)).ok, false, "200 does not");
   });
 });

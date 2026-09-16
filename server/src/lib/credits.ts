@@ -39,11 +39,18 @@ export const FREE_CHECKS_PER_DAY = 14_400;
  * a 10 GB database budget sustains roughly 4M checks/day. Half of that is the
  * safe committed figure, so one $5 worker carries about 2M checks/day.
  *
- * At this rate a $0.99 donation buys ~99,000 checks/day, so ~20 donors fill a
- * worker and cover its cost about four times over. If the storage figure or
- * the box changes, this is the number to re-derive.
+ * Capacity is not the binding constraint on this number, though — depletion
+ * is. A grant has to run out inside a month for someone actually using the
+ * product, or a single $2.99 funds years of service: at ten times this rate,
+ * eleven monitors at 59s lasted fourteen years. So the rate is set from how
+ * fast a real workload burns, and the result is a comfortable margin rather
+ * than a tight one — roughly 66 donors to a worker, about forty times its
+ * cost.
+ *
+ * $2.99 buys 897,000 checks: 29,900 a day for a month, or about twenty
+ * monitors at one minute.
  */
-export const CHECKS_PER_DAY_PER_USD = 100_000;
+export const CHECKS_PER_DAY_PER_USD = 10_000;
 
 /** Days of full service after the balance empties, before free limits apply. */
 export const GRACE_DAYS = 7;
@@ -222,9 +229,21 @@ export function applyGrant(c: OrgCredit, cents: number): OrgCredit {
  * Hitting zero opens the grace window rather than cutting service instantly.
  */
 export function burnDay(c: OrgCredit, checksUsed: number, now = Date.now()): OrgCredit {
-  const chargeable = Math.max(0, checksUsed - baseOf(c));
-  if (chargeable === 0) return c;
+  // Nothing to take. A workspace on the free allowance has no balance, so it
+  // can neither be charged nor driven negative.
+  if (c.credits <= 0 || checksUsed <= 0) return c;
 
+  /**
+   * Credit pays for **every** check, not just the ones above the free
+   * allowance.
+   *
+   * The free allowance is what a workspace gets when it has no credit — not a
+   * standing discount on top of one. Subtracting it meant a donor only a
+   * little above the free tier barely burned anything: eleven monitors at 59
+   * seconds consumed 1,715 checks a day against a balance sized for 299,000,
+   * which is fourteen years of service for $2.99.
+   */
+  const chargeable = checksUsed;
   const credits = Math.max(0, c.credits - chargeable);
   return {
     ...c,

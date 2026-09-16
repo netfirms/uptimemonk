@@ -278,12 +278,12 @@ export default function Landing({
 
             <div className="donate-card accent">
               <span className="donate-label">One $2.99 coffee adds</span>
-              <strong className="donate-figure">8.97M</strong>
+              <strong className="donate-figure">897,000</strong>
               <span className="dim">checks</span>
               <p className="dim">
-                About two hundred monitors at one minute, for a month. Unused
-                capacity rolls over, and there is no subscription — it is a
-                one-off, buy another whenever you like.
+                Around a month of twenty monitors at one minute, or ten at
+                thirty seconds. Unused capacity rolls over, and there is no
+                subscription — buy another whenever you run low.
               </p>
               <button
                 type="button"

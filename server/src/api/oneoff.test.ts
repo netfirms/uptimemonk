@@ -80,7 +80,7 @@ describe("a one-off $2.99 Payment Link donation", () => {
     const res = await deliver(sessionEvent());
     assert.equal(res.statusCode, 200);
     assert.equal(balance(), monthlyGrantCents(299));
-    assert.equal(balance(), 8_970_000);
+    assert.equal(balance(), 897_000);
   });
 
   test("leaves an auditable ledger entry", async () => {
@@ -94,7 +94,7 @@ describe("a one-off $2.99 Payment Link donation", () => {
   test("a redelivery does not grant twice", async () => {
     await deliver(sessionEvent());
     await deliver(sessionEvent());
-    assert.equal(balance(), 8_970_000);
+    assert.equal(balance(), 897_000);
     assert.equal(repo.creditLedger(ORG).length, 1);
   });
 

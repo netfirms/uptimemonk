@@ -69,7 +69,7 @@ The unit is a **check**, not a monitor. A 5-second monitor is 12x the load of a
 | | |
 |---|---|
 | Free, forever | 14,400 checks/day — exactly the old free plan, ten monitors at one minute |
-| A donation adds | 100,000 checks/day per $1 — the $2.99 one-off link buys 8,970,000 checks |
+| A donation adds | 10,000 checks/day per $1 — the $2.99 one-off link buys 897,000 checks |
 | Roll-over | Unused credit carries over, capped at two cycles |
 | Running out | A 7-day grace window at full service, then back to the free allowance |
 

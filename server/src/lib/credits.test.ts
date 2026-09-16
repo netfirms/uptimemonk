@@ -116,8 +116,11 @@ describe("fitting the budget", () => {
     assert.match(v.reason!, /support the project/);
   });
 
-  test("$5 a month buys real headroom", () => {
-    assert.equal(fitsBudget(donor(5), Array(100).fill(mon(60))).ok, true);
+  test("a donation buys real headroom over the free allowance", () => {
+    // $5 of credit allows ~50,000 checks/day on top of free: about 44
+    // monitors at one minute, against the free tier's ten.
+    assert.equal(fitsBudget(donor(5), Array(40).fill(mon(60))).ok, true);
+    assert.equal(fitsBudget(donor(5), Array(200).fill(mon(60))).ok, false);
   });
 });
 
@@ -136,13 +139,38 @@ describe("granting and burning", () => {
     assert.equal(monthlyGrantCents(0), 0);
   });
 
-  test("a $0.99 donation buys about a month of real use", () => {
-    // 99,000 checks/day. A donor running 69 monitors at one minute burns
-    // ~85k/day above the free allowance, so the block lasts roughly a month.
-    const grant = monthlyGrantCents(99);
-    assert.equal(grant, 2_970_000);
-    const dailyBurn = 69 * checksPerDay(60) - FREE_CHECKS_PER_DAY;
-    assert.ok(grant / dailyBurn > 28, `lasted only ${(grant / dailyBurn).toFixed(0)} days`);
+  test("a $2.99 donation runs out inside a month for a real workload", () => {
+    // The point of the rate. Credit pays for every check, so a workspace
+    // actually using the product exhausts a grant in about a month and comes
+    // back — rather than one $2.99 funding years of service.
+    const grant = monthlyGrantCents(299);
+    assert.equal(grant, 897_000);
+
+    // The target: more than ten monitors, meaningfully faster than a minute.
+    for (const [count, interval] of [
+      [11, 30],
+      [15, 30],
+      [20, 45],
+      [30, 30],
+      [50, 60],
+    ] as const) {
+      const days = grant / (count * checksPerDay(interval));
+      assert.ok(
+        days <= 31,
+        `${count} monitors at ${interval}s lasted ${days.toFixed(1)} days`
+      );
+    }
+  });
+
+  test("even the lightest paying workload is bounded in months, not years", () => {
+    // Eleven monitors at 59s is only 12% above the free tier's own load, so
+    // it cannot deplete as fast as a real workload — and it should not, since
+    // that workspace is barely costing anything. What matters is that it is
+    // finite: before the rate was fixed this same case ran for fourteen years
+    // on one $2.99 donation.
+    const grant = monthlyGrantCents(299);
+    const days = grant / (11 * checksPerDay(59));
+    assert.ok(days < 60, `lightest workload lasted ${days.toFixed(0)} days`);
   });
 
   test("a grant clears any grace window — coming back is just coming back", () => {
@@ -156,15 +184,17 @@ describe("granting and burning", () => {
     assert.equal(c.credits, rolloverCap(5));
   });
 
-  test("usage inside the free rate never touches credits", () => {
+  test("credit pays for every check, not only those above the free rate", () => {
+    // Discounting the free allowance off a donor's burn made a light donor's
+    // grant last years: eleven monitors at 59s burned 1,715 a day against a
+    // balance sized for hundreds of thousands.
     const before = donor();
-    assert.equal(burnDay(before, FREE_CHECKS_PER_DAY).credits, before.credits);
+    const after = burnDay(before, 10_000);
+    assert.equal(before.credits - after.credits, 10_000);
   });
 
-  test("only the excess over free is charged", () => {
-    const before = donor();
-    const after = burnDay(before, FREE_CHECKS_PER_DAY + 1_000);
-    assert.equal(before.credits - after.credits, 1_000);
+  test("a workspace with no credit is not charged at all", () => {
+    assert.equal(burnDay(free(), 500_000).credits, 0);
   });
 
   test("a free workspace can never go negative", () => {
@@ -201,14 +231,16 @@ describe("grandfathered plans", () => {
     assert.equal(fitsBudget(legacy, Array(61).fill(mon(60))).ok, false);
   });
 
-  test("their burn is charged above their own allowance, not the standard one", () => {
+  test("their raised allowance widens the budget, not the burn", () => {
     const legacy: OrgCredit = {
       credits: 1_000,
       donationUsdMonthly: 0,
       graceUntil: null,
       baseChecksPerDay: FREE_CHECKS_PER_DAY * 2,
     };
-    // Usage inside the raised allowance must not eat donated credit.
-    assert.equal(burnDay(legacy, FREE_CHECKS_PER_DAY * 2).credits, 1_000);
+    // The bonus is free capacity to configure against...
+    assert.ok(budgetFor(legacy) >= FREE_CHECKS_PER_DAY * 2);
+    // ...but any credit they also hold is still spent per check.
+    assert.equal(burnDay(legacy, 400).credits, 600);
   });
 });
