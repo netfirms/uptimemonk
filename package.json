@@ -9,6 +9,7 @@
     "seed": "FIRESTORE_EMULATOR_HOST=localhost:8080 GOOGLE_CLOUD_PROJECT=demo-uptimemonk node scripts/seed.mjs",
     "test": "npm --prefix server test && node scripts/test-monitoring-features.mjs && node scripts/test-all-features.mjs",
     "test:monitoring": "node scripts/test-monitoring-features.mjs",
+    "test:live": "node scripts/test-live-web.mjs",
     "test:features": "node scripts/test-all-features.mjs",
     "test:rules": "node --test scripts/rules.test.mjs",
     "deploy": "bash deploy/deploy-all.sh",

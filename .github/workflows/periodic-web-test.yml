@@ -1,0 +1,55 @@
+name: Periodic Live Web Production SLA Test
+
+on:
+  schedule:
+    # Runs periodically every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      target_host:
+        description: 'Target Host URL to test'
+        required: false
+        default: 'https://www.uptimemonke.com'
+      max_latency_ms:
+        description: 'Maximum acceptable latency SLA in ms'
+        required: false
+        default: '2000'
+  push:
+    branches:
+      - main
+    paths:
+      - 'web/**'
+      - 'scripts/test-live-web.mjs'
+      - '.github/workflows/periodic-web-test.yml'
+
+concurrency:
+  group: live-web-test-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke-test:
+    name: Live Web SLA & Integrity Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Production Smoke & SLA Tests
+        env:
+          LIVE_HOST: ${{ github.event.inputs.target_host || 'https://www.uptimemonke.com' }}
+          MAX_LATENCY_MS: ${{ github.event.inputs.max_latency_ms || '2000' }}
+        run: |
+          echo "Testing live production deployment at $LIVE_HOST..."
+          node scripts/test-live-web.mjs
+
+      - name: Status Notification on Failure
+        if: failure()
+        run: |
+          echo "::error title=Production Outage Alert::UptimeMonk live web SLA verification failed! Check the step summary for details."
