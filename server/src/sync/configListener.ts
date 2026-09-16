@@ -66,6 +66,7 @@ function toMonitor(id: string, d: Record<string, unknown>): Monitor {
     // Absent means private: a monitor written before this field existed must
     // not appear on a public page just because the flag is missing.
     publicOnStatusPage: d.publicOnStatusPage === true,
+    muteAlerts: d.muteAlerts === true,
     maintenanceWindows: (d.maintenanceWindows as Monitor["maintenanceWindows"]) ?? [],
     alertContactIds: (d.alertContactIds as string[]) ?? [],
     status: "pending",

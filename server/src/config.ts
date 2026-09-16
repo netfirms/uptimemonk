@@ -102,6 +102,22 @@ export const USER_AGENT = optional(
 
 // ---- secrets ----
 export const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
+
+/**
+ * Mailgun, the preferred email transport when configured.
+ *
+ * Two providers rather than one because email is the channel that matters
+ * most and the one most likely to be mid-migration. `sendEmail` picks Mailgun
+ * when it has a key and falls back to Resend, so swapping providers is an env
+ * change and a restart, not a deploy.
+ *
+ * The domain is the *sending* domain registered with Mailgun — usually a
+ * subdomain like `mg.example.com`, not the bare apex.
+ */
+export const MAILGUN_API_KEY = process.env.MAILGUN_API_KEY ?? "";
+export const MAILGUN_DOMAIN = optional("MAILGUN_DOMAIN", "mg.uptimemonke.com");
+/** `https://api.eu.mailgun.net` for an EU-region account. */
+export const MAILGUN_BASE_URL = optional("MAILGUN_BASE_URL", "https://api.mailgun.net");
 export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "";
 export const ALERT_FROM_EMAIL = optional("ALERT_FROM_EMAIL", "alerts@uptimemonke.com");

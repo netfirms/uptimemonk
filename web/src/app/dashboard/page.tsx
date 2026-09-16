@@ -5,6 +5,7 @@ import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { api, ApiError } from "@/lib/api";
+import AlertContacts from "./AlertContacts";
 import NewMonitorForm, {
   MonitorTypeIcon,
   protocolTag,
@@ -27,6 +28,8 @@ interface MonitorConfig {
   port?: number;
   keyword?: string;
   publicOnStatusPage?: boolean;
+  muteAlerts?: boolean;
+  alertContactIds?: string[];
 }
 
 interface LiveState {
@@ -47,6 +50,7 @@ export default function Dashboard() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editing, setEditing] = useState<MonitorConfig | null>(null);
   const publicCount = monitors.filter((m) => m.publicOnStatusPage).length;
+  const [contactsOpen, setContactsOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "up" | "down" | "paused">("all");
@@ -239,6 +243,17 @@ export default function Dashboard() {
               {currentUser.email}
             </span>
           )}
+          <button
+            className="btn-sm"
+            onClick={() => setContactsOpen(true)}
+            title="Choose who gets paged when a monitor goes down"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            Alerts
+          </button>
           <button className="btn-sm" onClick={() => signOut(auth)} title="Sign out">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -449,6 +464,11 @@ export default function Dashboard() {
                       Public
                     </span>
                   )}
+                  {m.muteAlerts && (
+                    <span className="interval-tag muted" title="Incidents are recorded but nobody is paged">
+                      Muted
+                    </span>
+                  )}
                 </div>
                 <div className="monitor-target">
                   {m.target ? (
@@ -594,6 +614,8 @@ export default function Dashboard() {
 
       {/* Same dialog, edit mode. Keyed by id so reopening for a different
           monitor remounts with that monitor's values. */}
+      <AlertContacts isOpen={contactsOpen} onClose={() => setContactsOpen(false)} />
+
       <NewMonitorForm
         key={editing?.id ?? "edit"}
         isOpen={!!editing}

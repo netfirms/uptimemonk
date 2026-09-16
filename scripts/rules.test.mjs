@@ -170,25 +170,18 @@ describe("status mirror", () => {
 });
 
 describe("alert contacts", () => {
-  test("a new contact must start unverified", async () => {
-    await assertSucceeds(
+  // Writes are backend-only, for the same reason as monitors: a Slack,
+  // Discord or webhook destination is a URL the server POSTs to from inside
+  // our network, and only `targetGuard` can vet it.
+  test("a client cannot create a contact directly", async () => {
+    await assertFails(
       setDoc(doc(asOrg(ORG_A), "alertContacts/c2"), {
         orgId: ORG_A,
-        channel: "slack",
-        name: "Eng",
-        destination: "https://hooks.slack.com/services/x",
+        channel: "webhook",
+        name: "Metadata",
+        destination: "http://169.254.169.254/latest/meta-data/",
         enabled: true,
         verified: false,
-      })
-    );
-    await assertFails(
-      setDoc(doc(asOrg(ORG_A), "alertContacts/c3"), {
-        orgId: ORG_A,
-        channel: "email",
-        name: "Self-verified",
-        destination: "someone-elses@example.com",
-        enabled: true,
-        verified: true,
       })
     );
   });
@@ -207,17 +200,21 @@ describe("alert contacts", () => {
         verificationTokenHash: "a".repeat(64),
       })
     );
-    await assertFails(
-      updateDoc(doc(asOrg(ORG_A), "alertContacts/c1"), {
-        verificationExpiresAt: new Date(Date.now() + 86_400_000),
-      })
-    );
   });
 
-  test("renaming a contact is fine", async () => {
-    await assertSucceeds(
+  test("a client cannot rename or delete one either — that is what the API is for", async () => {
+    await assertFails(
       updateDoc(doc(asOrg(ORG_A), "alertContacts/c1"), { name: "Ops rota" })
     );
+    await assertFails(deleteDoc(doc(asOrg(ORG_A), "alertContacts/c1")));
+  });
+
+  test("but an org can still read its own contacts", async () => {
+    await assertSucceeds(getDoc(doc(asOrg(ORG_A), "alertContacts/c1")));
+  });
+
+  test("and cannot read another org's", async () => {
+    await assertFails(getDoc(doc(asOrg(ORG_B), "alertContacts/c1")));
   });
 });
 

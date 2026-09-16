@@ -62,6 +62,7 @@ export interface MonitorInput {
   confirmationThreshold?: number;
   regions?: string[];
   publicOnStatusPage?: boolean;
+  muteAlerts?: boolean;
   alertContactIds?: string[];
   maintenanceWindows?: Monitor["maintenanceWindows"];
 }
@@ -134,6 +135,7 @@ export async function buildMonitor(
     alertContactIds: input.alertContactIds ?? existing?.alertContactIds ?? [],
     publicOnStatusPage:
       input.publicOnStatusPage ?? existing?.publicOnStatusPage ?? false,
+    muteAlerts: input.muteAlerts ?? existing?.muteAlerts ?? false,
     maintenanceWindows: input.maintenanceWindows ?? existing?.maintenanceWindows ?? [],
     updatedAt: now,
   };

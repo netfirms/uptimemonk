@@ -90,17 +90,17 @@ service cloud.firestore {
 
     match /alertContacts/{id} {
       allow read: if inOrg(resource.data.orgId);
-      allow create: if inOrg(request.resource.data.orgId)
-        && request.resource.data.verified == false; // verification is backend-only
-      // The verification token fields are as sensitive as `verified` itself:
-      // a client that could write the hash could verify a contact it does not
-      // control. sendContactVerification owns all of them.
-      allow update: if inOrg(resource.data.orgId)
-        && !request.resource.data.diff(resource.data).affectedKeys()
-             .hasAny(['verified', 'verifiedAt', 'orgId',
-                      'verificationTokenHash', 'verificationSentAt',
-                      'verificationExpiresAt']);
-      allow delete: if inOrg(resource.data.orgId);
+
+      // Backend-only, for the same reason as `monitors`: a Slack, Discord or
+      // webhook destination is a URL this server will POST to from inside our
+      // network, so it has to clear `targetGuard` first. A rule cannot resolve
+      // a hostname, so a client write here would be an SSRF hole with a
+      // different door on it. Everything goes through /v1/contacts.
+      //
+      // The verification fields were already backend-only — a client that
+      // could write the token hash could confirm a contact it does not own,
+      // and page a stranger.
+      allow create, update, delete: if false;
     }
 
     match /statusPages/{id} {

@@ -71,6 +71,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export interface MonitorInput {
+  alertContactIds?: string[];
+  muteAlerts?: boolean;
   name?: string;
   type: string;
   target?: string;
@@ -164,7 +166,61 @@ export interface MonitorHistory {
   window: { hours: number; days: number };
 }
 
+export type AlertChannel = "email" | "slack" | "discord" | "telegram" | "webhook";
+
+export interface AlertContact {
+  id: string;
+  channel: AlertChannel;
+  name: string;
+  destination: string;
+  telegramChatId?: string | null;
+  enabled: boolean;
+  /** Nothing is delivered to a contact that has not confirmed. */
+  verified: boolean;
+  verificationSentAt?: number | null;
+}
+
 export const api = {
+  contacts: () =>
+    request<{
+      contacts: AlertContact[];
+      /** Channels needing a server credential report "unconfigured". */
+      channels: Record<AlertChannel, "ready" | "unconfigured">;
+    }>("/v1/contacts"),
+
+  createContact: (input: {
+    channel: AlertChannel;
+    name?: string;
+    destination: string;
+    telegramChatId?: string;
+  }) =>
+    request<AlertContact>("/v1/contacts", {
+      method: "POST",
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
+
+  updateContact: (id: string, input: { name?: string; enabled?: boolean }) =>
+    request<{ id: string }>(`/v1/contacts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
+
+  deleteContact: (id: string) =>
+    request<{ deleted: boolean; detachedFrom: number }>(`/v1/contacts/${id}`, {
+      method: "DELETE",
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
+
+  /** Sends the confirmation over the contact's own channel — the only proof
+   *  the destination is reachable and wanted. */
+  verifyContact: (id: string) =>
+    request<{ sent?: boolean; alreadyVerified?: boolean; channel?: string }>(
+      `/v1/contacts/${id}/verify`,
+      { method: "POST", signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS) }
+    ),
+
   createMonitor: (input: MonitorInput) =>
     request<{ id: string }>("/v1/monitors", {
       method: "POST",

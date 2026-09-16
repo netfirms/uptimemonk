@@ -1,4 +1,7 @@
 import {
+  ALERT_FROM_EMAIL,
+  MAILGUN_API_KEY,
+  MAILGUN_DOMAIN,
   HEARTBEAT_URL,
   RESEND_API_KEY,
   TELEGRAM_BOT_TOKEN,
@@ -31,14 +34,34 @@ export interface ReadinessIssue {
 export function readinessIssues(): ReadinessIssue[] {
   const issues: ReadinessIssue[] = [];
 
-  if (!RESEND_API_KEY) {
+  if (!MAILGUN_API_KEY && !RESEND_API_KEY) {
     issues.push({
-      key: "RESEND_API_KEY",
+      key: "MAILGUN_API_KEY / RESEND_API_KEY",
       severity: "critical",
       detail:
-        "No email alerts can be delivered. Checks still run and incidents are " +
-        "still recorded, but nobody is told about them.",
+        "No email provider is configured, so no email alert can be delivered. " +
+        "Checks still run and incidents are still recorded, but nobody is told " +
+        "about them.",
     });
+  }
+
+  // A From address off the Mailgun sending domain authenticates as a different
+  // domain, so SPF and DKIM do not cover it and DMARC-enforcing receivers bin
+  // it. Mail that silently lands in spam is the same failure as mail that is
+  // never sent, and harder to notice.
+  if (MAILGUN_API_KEY && MAILGUN_DOMAIN) {
+    const fromDomain = ALERT_FROM_EMAIL.split("@")[1]?.toLowerCase() ?? "";
+    const sending = MAILGUN_DOMAIN.toLowerCase();
+    if (fromDomain && fromDomain !== sending && !fromDomain.endsWith(`.${sending}`)) {
+      issues.push({
+        key: "ALERT_FROM_EMAIL",
+        severity: "warning",
+        detail:
+          `ALERT_FROM_EMAIL is ${ALERT_FROM_EMAIL} but Mailgun sends as ` +
+          `${MAILGUN_DOMAIN}. Alerts may be rejected or filtered as spam. ` +
+          `Use an address on ${MAILGUN_DOMAIN}.`,
+      });
+    }
   }
 
   if (!HEARTBEAT_URL) {

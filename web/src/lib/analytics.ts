@@ -73,6 +73,10 @@ export const events = {
 
   historyViewed: (type: string) => track("history_viewed", { monitor_type: type }),
 
+  /** Channel only — never the destination, which is a real address. */
+  contactAdded: (channel: string) => track("contact_added", { channel }),
+  contactVerified: (channel: string) => track("contact_verified", { channel }),
+
   /** The failure the user actually saw — how we learn which errors are common. */
   actionFailed: (action: string, status?: number) =>
     track("action_failed", { action, status }),

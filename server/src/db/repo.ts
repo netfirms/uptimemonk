@@ -74,6 +74,7 @@ const CONFIG_KEYS = [
   "sslExpiryWarningDays",
   "heartbeatGraceSeconds",
   "publicOnStatusPage",
+  "muteAlerts",
 ] as const;
 
 function configBlob(m: Partial<Monitor>): string {
@@ -378,18 +379,37 @@ export function resolveOpenIncident(
   return open.id;
 }
 
-/** Must be called inside an open transaction — see openIncident. */
+/**
+ * Fan an incident out to the contacts that should hear about it.
+ *
+ * An empty `alertContactIds` means **everyone verified in the org**, not
+ * nobody. That distinction is the whole feature: every monitor was created
+ * with an empty list, so the previous reading — iterate the list, send to
+ * whoever is in it — meant two real incidents passed with zero alerts queued
+ * while a verified contact sat unused. Silence is the one failure mode a
+ * monitoring product cannot have, so it is not the default.
+ *
+ * Deliberate silence is `muteAlerts`, which is explicit and visible in the UI.
+ * A non-empty list is honoured exactly as given.
+ *
+ * Must be called inside an open transaction — see openIncident.
+ */
 function queueAlerts(
   incidentId: string,
   monitor: Monitor,
   event: "down" | "up",
   now: number
 ): void {
+  if (monitor.muteAlerts) return;
+
+  const explicit = monitor.alertContactIds ?? [];
+  const contactIds = explicit.length ? explicit : deliverableContactIds(monitor.orgId);
+
   const insert = getDb().prepare(
     `INSERT INTO alert_outbox (incident_id, contact_id, event, next_attempt_at, created_at)
      VALUES (?, ?, ?, ?, ?)`
   );
-  for (const contactId of monitor.alertContactIds ?? []) {
+  for (const contactId of contactIds) {
     insert.run(incidentId, contactId, event, now, now);
   }
 }
@@ -497,9 +517,7 @@ export function upsertContact(c: AlertContact): void {
     });
 }
 
-export function getContact(id: string): AlertContact | null {
-  const r: any = getDb().prepare("SELECT * FROM alert_contacts WHERE id = ?").get(id);
-  if (!r) return null;
+function rowToContact(r: any): AlertContact {
   return {
     id: r.id,
     orgId: r.org_id,
@@ -512,8 +530,32 @@ export function getContact(id: string): AlertContact | null {
   };
 }
 
+export function getContact(id: string): AlertContact | null {
+  const r: any = getDb().prepare("SELECT * FROM alert_contacts WHERE id = ?").get(id);
+  return r ? rowToContact(r) : null;
+}
+
 export function deleteContact(id: string): void {
   getDb().prepare("DELETE FROM alert_contacts WHERE id = ?").run(id);
+}
+
+export function listContacts(orgId: string): AlertContact[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM alert_contacts WHERE org_id = ? ORDER BY name")
+    .all(orgId) as any[];
+  return rows.map(rowToContact);
+}
+
+/** Everyone in the org who could actually receive an alert right now. */
+export function deliverableContactIds(orgId: string): string[] {
+  return (
+    getDb()
+      .prepare(
+        `SELECT id FROM alert_contacts
+         WHERE org_id = ? AND enabled = 1 AND verified = 1`
+      )
+      .all(orgId) as any[]
+  ).map((r) => r.id);
 }
 
 // ------------------------------------------------------------------- orgs

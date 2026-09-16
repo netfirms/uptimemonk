@@ -59,6 +59,7 @@ export async function monitorRoutes(app: FastifyInstance): Promise<void> {
       regions: { type: "array", items: { type: "string" }, maxItems: 3 },
       alertContactIds: { type: "array", items: { type: "string" }, maxItems: 50 },
       publicOnStatusPage: { type: "boolean" },
+      muteAlerts: { type: "boolean" },
       maintenanceWindows: { type: "array", maxItems: 20 },
     },
   } as const;

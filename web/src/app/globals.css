@@ -1309,3 +1309,100 @@ button.btn-outline-red {
     flex: 1;
   }
 }
+
+/* --- Alert contacts --- */
+
+.banner {
+  padding: 9px 13px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  margin-bottom: 12px;
+  border: 1px solid transparent;
+}
+
+.banner.ok {
+  background: rgba(59, 214, 113, 0.1);
+  border-color: rgba(59, 214, 113, 0.3);
+  color: #3BD671;
+}
+
+/* Unconfirmed contacts are the quiet failure this panel exists to surface,
+   so they get a standing warning rather than a one-off toast. */
+.banner.warn {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.32);
+  color: #f59e0b;
+}
+
+.banner.err {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.3);
+  color: #fb7185;
+}
+
+.contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.contact-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.contact-add {
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.contact-add h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.contact-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.btn-sm.danger:hover:not(:disabled) {
+  color: #fb7185;
+  border-color: rgba(244, 63, 94, 0.4);
+}
+
+/* A muted monitor still runs; the badge is the only thing that says nobody
+   is being told. Amber, not green — it is a caveat, not a feature. */
+.interval-tag.muted {
+  background: rgba(245, 158, 11, 0.13);
+  border-color: rgba(245, 158, 11, 0.32);
+  color: #f59e0b;
+}
+
+/* Channel colours for a contact's tag, reusing the protocol-tag shape. */
+.protocol-tag.email { background: rgba(59,214,113,.12); border-color: rgba(59,214,113,.3); color: #3BD671; }
+.protocol-tag.slack,
+.protocol-tag.discord { background: rgba(167,139,250,.14); border-color: rgba(167,139,250,.32); color: #a78bfa; }
+.protocol-tag.telegram { background: rgba(56,189,248,.12); border-color: rgba(56,189,248,.3); color: #38bdf8; }
+.protocol-tag.webhook { background: rgba(148,163,184,.12); border-color: rgba(148,163,184,.3); color: #94a3b8; }

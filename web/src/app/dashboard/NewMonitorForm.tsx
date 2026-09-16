@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type AlertContact } from "@/lib/api";
 import { events } from "@/lib/analytics";
 
 export type MonitorType = "http" | "keyword" | "tcp" | "dns" | "ssl" | "icmp" | "heartbeat";
@@ -166,6 +166,8 @@ export interface EditableMonitor {
   port?: number;
   keyword?: string;
   publicOnStatusPage?: boolean;
+  muteAlerts?: boolean;
+  alertContactIds?: string[];
 }
 
 export default function NewMonitorForm({
@@ -195,6 +197,10 @@ export default function NewMonitorForm({
   const [port, setPort] = useState("443");
   const [intervalSeconds, setIntervalSeconds] = useState("300");
   const [isPublic, setIsPublic] = useState(false);
+  const [muteAlerts, setMuteAlerts] = useState(false);
+  const [contacts, setContacts] = useState<AlertContact[] | null>(null);
+  /** Empty means "everyone verified", which is what the server does too. */
+  const [contactIds, setContactIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   // The plan's floor, so the form never offers a value the server would clamp.
   const [minInterval, setMinInterval] = useState(60);
@@ -214,6 +220,8 @@ export default function NewMonitorForm({
       setPort(monitor.port != null ? String(monitor.port) : "443");
       setIntervalSeconds(String(monitor.intervalSeconds ?? 300));
       setIsPublic(monitor.publicOnStatusPage === true);
+      setMuteAlerts(monitor.muteAlerts === true);
+      setContactIds(monitor.alertContactIds ?? []);
     } else {
       setType("http");
       setName("");
@@ -223,6 +231,8 @@ export default function NewMonitorForm({
       setIntervalSeconds("300");
       // A new monitor is private until someone says otherwise.
       setIsPublic(false);
+      setMuteAlerts(false);
+      setContactIds([]);
     }
     setError(null);
   }, [open, monitor?.id]);
@@ -265,6 +275,22 @@ export default function NewMonitorForm({
   const needsPort = type === "tcp";
   const needsKeyword = type === "keyword";
 
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    api
+      .contacts()
+      .then((r) => !cancelled && setContacts(r.contacts))
+      // Non-fatal: the picker falls back to "alert everyone", which is the
+      // default anyway, so a failed load must not block saving a monitor.
+      .catch(() => !cancelled && setContacts([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const verified = (contacts ?? []).filter((c) => c.verified && c.enabled);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -275,6 +301,8 @@ export default function NewMonitorForm({
       target,
       intervalSeconds: Number(intervalSeconds),
       publicOnStatusPage: isPublic,
+      muteAlerts,
+      alertContactIds: contactIds,
       ...(needsKeyword ? { keyword } : {}),
       ...(needsPort ? { port: Number(port) } : {}),
     };
@@ -523,6 +551,75 @@ export default function NewMonitorForm({
                   </span>
                 </span>
               </label>
+            </div>
+
+            <div className="field">
+              <label>Alerts</label>
+              {verified.length === 0 ? (
+                <p className="dim">
+                  No confirmed contacts yet — nothing can be paged. Add one
+                  under <strong>Alerts</strong> in the header.
+                </p>
+              ) : (
+                <>
+                  <div className="contact-picker">
+                    <label className="check-row" htmlFor="nm-all">
+                      <input
+                        id="nm-all"
+                        type="checkbox"
+                        checked={contactIds.length === 0}
+                        onChange={(e) => setContactIds(e.target.checked ? [] : verified.map((c) => c.id))}
+                      />
+                      <span>
+                        Alert everyone
+                        <span className="dim" style={{ display: "block", marginTop: "2px" }}>
+                          All {verified.length} confirmed contact
+                          {verified.length === 1 ? "" : "s"}, including any added later.
+                        </span>
+                      </span>
+                    </label>
+
+                    {contactIds.length > 0 &&
+                      verified.map((c) => (
+                        <label key={c.id} className="check-row" htmlFor={`nm-c-${c.id}`}>
+                          <input
+                            id={`nm-c-${c.id}`}
+                            type="checkbox"
+                            checked={contactIds.includes(c.id)}
+                            onChange={(e) =>
+                              setContactIds((ids) =>
+                                e.target.checked
+                                  ? [...ids, c.id]
+                                  : ids.filter((id) => id !== c.id)
+                              )
+                            }
+                          />
+                          <span>
+                            {c.name}
+                            <span className="dim" style={{ display: "block" }}>
+                              {c.channel} · {c.destination}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+
+                  <label className="check-row" htmlFor="nm-mute" style={{ marginTop: "10px" }}>
+                    <input
+                      id="nm-mute"
+                      type="checkbox"
+                      checked={muteAlerts}
+                      onChange={(e) => setMuteAlerts(e.target.checked)}
+                    />
+                    <span>
+                      <strong>Mute alerts</strong>
+                      <span className="dim" style={{ display: "block", marginTop: "2px" }}>
+                        Keep checking and recording incidents, but page nobody.
+                      </span>
+                    </span>
+                  </label>
+                </>
+              )}
             </div>
 
             {error && (

@@ -74,7 +74,13 @@ export interface Monitor {
    */
   publicOnStatusPage?: boolean;
   maintenanceWindows?: MaintenanceWindow[];
+  /**
+   * Who to tell. **Empty means every verified contact in the org**, not
+   * nobody — see `queueAlerts`. Deliberate silence is `muteAlerts`.
+   */
   alertContactIds: string[];
+  /** Record incidents but page no one. Explicit, and shown in the UI. */
+  muteAlerts?: boolean;
 
   // ---- live state, owned by the worker ----
   status: MonitorStatus;

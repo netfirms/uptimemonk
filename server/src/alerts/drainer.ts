@@ -8,7 +8,12 @@ import {
   markOutboxSent,
 } from "../db/repo.js";
 import { log } from "../lib/log.js";
-import { RESEND_API_KEY, TELEGRAM_BOT_TOKEN } from "../config.js";
+import {
+  ALERT_FROM_EMAIL,
+  MAILGUN_API_KEY,
+  MAILGUN_BASE_URL,
+  MAILGUN_DOMAIN, RESEND_API_KEY, TELEGRAM_BOT_TOKEN,
+} from "../config.js";
 
 /**
  * Drains the alert outbox.
@@ -60,6 +65,10 @@ async function drainOnce(): Promise<void> {
 
       try {
         await deliver(contact, payload, {
+          mailgunKey: MAILGUN_API_KEY,
+          mailgunDomain: MAILGUN_DOMAIN,
+          mailgunBaseUrl: MAILGUN_BASE_URL,
+          from: ALERT_FROM_EMAIL,
           resendKey: RESEND_API_KEY,
           telegramToken: TELEGRAM_BOT_TOKEN,
         });

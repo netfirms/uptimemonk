@@ -64,7 +64,48 @@ async function postJsonToUserUrl(
 }
 
 /** Resend — swap for SendGrid/Postmark by changing this one function. */
-export async function sendEmail(
+/**
+ * Mailgun's send endpoint.
+ *
+ * Form-encoded, not JSON — the v3 messages API does not accept a JSON body,
+ * and posting one gets a 400 that reads like an auth failure. Auth is HTTP
+ * Basic with the literal username `api` and the private key as the password.
+ */
+export async function sendEmailMailgun(
+  to: string,
+  p: AlertPayload,
+  opts: { apiKey: string; domain: string; baseUrl: string; from: string }
+): Promise<void> {
+  const form = new URLSearchParams({
+    from: opts.from,
+    to,
+    subject: subjectFor(p),
+    text: bodyFor(p),
+  });
+
+  const res = await fetch(
+    `${opts.baseUrl.replace(/\/$/, "")}/v3/${encodeURIComponent(opts.domain)}/messages`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Basic ${Buffer.from(`api:${opts.apiKey}`).toString("base64")}`,
+        "content-type": "application/x-www-form-urlencoded",
+        "user-agent": USER_AGENT,
+      },
+      body: form,
+      signal: AbortSignal.timeout(15_000),
+    }
+  );
+
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 200);
+    // Never include the key: this string ends up in `alert_outbox.last_error`
+    // and in the logs.
+    throw new Error(`Mailgun responded ${res.status}: ${detail}`);
+  }
+}
+
+export async function sendEmailResend(
   to: string,
   p: AlertPayload,
   apiKey: string
@@ -79,6 +120,31 @@ export async function sendEmail(
     },
     { authorization: `Bearer ${apiKey}` }
   );
+}
+
+/**
+ * Send an alert email through whichever provider is configured.
+ *
+ * Mailgun wins when it has a key. Neither being configured is a clear error
+ * rather than a silent no-op — an alert that is not sent must fail loudly
+ * enough to land in the outbox's `last_error`.
+ */
+export async function sendEmail(
+  to: string,
+  p: AlertPayload,
+  secrets: { mailgunKey?: string; mailgunDomain?: string; mailgunBaseUrl?: string;
+             from?: string; resendKey?: string }
+): Promise<void> {
+  if (secrets.mailgunKey) {
+    return sendEmailMailgun(to, p, {
+      apiKey: secrets.mailgunKey,
+      domain: secrets.mailgunDomain || "",
+      baseUrl: secrets.mailgunBaseUrl || "https://api.mailgun.net",
+      from: secrets.from || ALERT_FROM_EMAIL,
+    });
+  }
+  if (secrets.resendKey) return sendEmailResend(to, p, secrets.resendKey);
+  throw new Error("No email provider configured (set MAILGUN_API_KEY or RESEND_API_KEY)");
 }
 
 export async function sendSlack(webhookUrl: string, p: AlertPayload): Promise<void> {
@@ -160,15 +226,25 @@ export async function sendWebhook(url: string, p: AlertPayload): Promise<void> {
   });
 }
 
+/** Everything the channels need that does not belong in a module import, so
+ *  a test can drive delivery without touching process env. */
+export interface AlertSecrets {
+  mailgunKey?: string;
+  mailgunDomain?: string;
+  mailgunBaseUrl?: string;
+  from?: string;
+  resendKey?: string;
+  telegramToken?: string;
+}
+
 export async function deliver(
   contact: AlertContact,
   p: AlertPayload,
-  secrets: { resendKey?: string; telegramToken?: string }
+  secrets: AlertSecrets
 ): Promise<void> {
   switch (contact.channel) {
     case "email":
-      if (!secrets.resendKey) throw new Error("RESEND_API_KEY not configured");
-      return sendEmail(contact.destination, p, secrets.resendKey);
+      return sendEmail(contact.destination, p, secrets);
     case "slack":
       return sendSlack(contact.destination, p);
     case "discord":
