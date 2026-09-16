@@ -51,8 +51,14 @@ export default function Dashboard() {
         setCurrentUser(u);
         if (!u) return setOrgId(null);
 
-        const token = await u.getIdTokenResult();
+        let token = await u.getIdTokenResult();
         let id = (token.claims.orgId as string) ?? null;
+
+        if (!id) {
+          // Force refresh token to pick up newly assigned claims from backend or bootstrap
+          token = await u.getIdTokenResult(true);
+          id = (token.claims.orgId as string) ?? null;
+        }
 
         if (!id) {
           try {
@@ -60,10 +66,11 @@ export default function Dashboard() {
             await u.getIdToken(true);
             id = created;
           } catch (err) {
+            console.error("Workspace setup error:", err);
             setError(
               err instanceof ApiError
                 ? err.message
-                : "Could not set up your workspace. Try reloading."
+                : "Could not set up your workspace automatically. Try reloading or contact support."
             );
           }
         }
@@ -117,7 +124,13 @@ export default function Dashboard() {
     } catch (err: unknown) {
       console.error("Sign in failed:", err);
       const code = (err as { code?: string })?.code;
-      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        // User closed popup intentionally, no error needed
+      } else if (code === "auth/popup-blocked") {
+        setAuthError("Sign-in popup was blocked by your browser. Please allow popups for this site and try again.");
+      } else if (code === "auth/unauthorized-domain") {
+        setAuthError("This domain is not authorized for sign-in. Please contact support.");
+      } else {
         setAuthError((err as Error)?.message || "Failed to sign in with Google.");
       }
     } finally {
