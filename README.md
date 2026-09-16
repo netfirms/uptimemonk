@@ -153,7 +153,7 @@ lock, and both are load-bearing.
 
 ```bash
 # Tests — no emulator, no network needed
-npm --prefix server test          # 65 tests
+npm --prefix server test          # 91 tests
 
 # Security rules, against the Firestore emulator
 npx firebase-tools@14 emulators:start --only firestore --project demo-uptimemonk
@@ -174,12 +174,30 @@ Note: `firebase-tools@15` requires Java 21; pin `@14` if you are on Java 17.
 |---|---|---|---|---|
 | `sg-1` | `uptimemonk-worker-1` (47.129.253.94) | ap-southeast-1a | 0/1 | $5 · 2 vCPU · 414 MB |
 
-Provisioned with systemd services; held by `ConditionPathExists` until
-`/etc/uptimemonk/sa.json` exists. IMDSv2 is already enforced on this instance.
+**Live.** Both units active, Firestore listener syncing, one monitor scheduled,
+scheduler lag 0 ms. Memory in use: worker 49 MB, API 43 MB against 220/110
+limits. Deployed as plain Node under systemd — see Deploying below.
 
 Note the RAM: the $5 plan is 414 MB, not the 1 GB the defaults assume, so
 `PROBE_CONCURRENCY=50` and the systemd `MemoryMax` values are tuned down, and
-provisioning added a 1 GB swap file. Moving to the $7 plan means raising both.
+provisioning adds a 1 GB swap file. Moving to the $7 plan means raising both.
+
+### Open port 443
+
+`api.uptimemonke.com` resolves here and Caddy holds a valid Let's Encrypt
+certificate, but **443 is closed in the Lightsail console firewall**, so the
+API is not publicly reachable. Port 80 is open, which is the only reason the
+certificate could be issued at all (HTTP-01 succeeded after `tls-alpn-01`
+timed out).
+
+```bash
+aws lightsail open-instance-public-ports --region ap-southeast-1 \
+  --instance-name uptimemonk-worker-1 \
+  --port-info fromPort=443,toPort=443,protocol=TCP
+```
+
+Or open it in the console. Until then, HTTPS works only from the instance
+itself — verified with `curl --resolve api.uptimemonke.com:443:127.0.0.1`.
 
 ## Deploying
 
@@ -255,6 +273,12 @@ identical, so the same design just starts costing cents.
 - **Rebalancing does not transfer state.** Orgs moving between workers restart
   at `pending`, and incidents open on the old owner are orphaned. The fix is to
   read last-known status from the `orgStatus` mirror when adopting an org.
+- **Port 443 is closed in the Lightsail firewall** — see above. Nothing public
+  works until it is opened.
+- **`RESEND_API_KEY` is empty, so no alert can be delivered.** Monitoring that
+  cannot page anyone is the worst failure this product has.
+- **No dead-man's switch** (`UPTIMEMONK_HEARTBEAT_URL` empty). With one worker,
+  nothing notices if this box dies.
 - Litestream backups are not yet wired into `provision.sh`.
 - Stripe billing routes have not been ported from `functions/`.
 - Status pages lose SSR on Spark; serve them from a worker to keep SEO.

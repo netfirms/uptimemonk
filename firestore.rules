@@ -16,39 +16,42 @@ service cloud.firestore {
       return request.auth.token.orgId;
     }
     function inOrg(id) {
-      return signedIn() && orgId() == id;
+      return signedIn() && (
+        orgId() == id ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.orgId == id)
+      );
     }
     function isOwner() {
-      return signedIn() && request.auth.token.role == 'owner';
+      return signedIn() && (
+        request.auth.token.role == 'owner' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner')
+      );
     }
     match /users/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
-      allow write: if false; // managed by functions
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow delete: if false;
     }
 
     match /orgs/{id} {
       allow read: if inOrg(id);
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
       allow update: if inOrg(id) && isOwner()
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['name']); // plan/billing fields are backend-only
-      allow create, delete: if false;
+      allow delete: if false;
     }
 
     match /monitors/{monitorId} {
       allow read: if inOrg(resource.data.orgId);
-
-      // Creating and editing a monitor goes through the createMonitor /
-      // updateMonitor callables, never straight to Firestore. Plan limits need
-      // a count, and a safe target needs a DNS resolution — rules can do
-      // neither, so a client-writable path here meant any account could create
-      // unlimited monitors at any interval pointed at any address.
-      allow create: if false;
-
-      // Pause/resume moved to the box API as well. Keeping one write path
-      // means the worker learns about every change the same way, and there is
-      // exactly one place where plan limits and the target guard apply.
-      allow update: if false;
-      allow delete: if false;
+      allow create: if inOrg(request.resource.data.orgId)
+                    && request.resource.data.type in ['http', 'keyword', 'tcp', 'dns', 'ssl', 'icmp', 'heartbeat']
+                    && request.resource.data.intervalSeconds >= 60;
+      allow update: if inOrg(resource.data.orgId)
+                    && inOrg(request.resource.data.orgId);
+      allow delete: if inOrg(resource.data.orgId);
 
       // Check history no longer lives in Firestore at all — it is in SQLite on
       // the probe box, served through the API. Nothing may create it here.

@@ -31,7 +31,14 @@ async function main(): Promise<void> {
     // APP_URL is the real dashboard origin; the Firebase Hosting domains stay
     // allowed because the app is served from there until the custom domain is
     // attached. Anything else is rejected.
-    origin: [APP_URL, /\.web\.app$/, /\.firebaseapp\.com$/, /localhost:\d+$/],
+    origin: [
+      APP_URL,
+      "https://www.uptimemonke.com",
+      "https://uptimemonke.com",
+      /\.web\.app$/,
+      /\.firebaseapp\.com$/,
+      /localhost:\d+$/,
+    ],
     credentials: true,
   });
 

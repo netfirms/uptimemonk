@@ -108,9 +108,22 @@ export default function Dashboard() {
     setBusyId(m.id);
     setError(null);
     try {
-      await api.togglePause(m.id);
+      await api.togglePause(m.id, m.enabled !== false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not update that monitor.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDelete(m: MonitorConfig) {
+    if (!window.confirm(`Are you sure you want to delete monitor "${m.name}"?`)) return;
+    setBusyId(m.id);
+    setError(null);
+    try {
+      await api.deleteMonitor(m.id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not delete that monitor.");
     } finally {
       setBusyId(null);
     }
@@ -622,32 +635,52 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Action Toggle */}
-              <button
-                className="btn-sm"
-                onClick={() => togglePause(m)}
-                disabled={busyId === m.id}
-                title={isPaused ? "Resume" : "Pause"}
-              >
-                {busyId === m.id ? (
-                  "Updating…"
-                ) : isPaused ? (
-                  <>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                      <polygon points="5 3 19 12 5 21 5 3" />
-                    </svg>
-                    Resume
-                  </>
-                ) : (
-                  <>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                      <rect x="6" y="4" width="4" height="16" />
-                      <rect x="14" y="4" width="4" height="16" />
-                    </svg>
-                    Pause
-                  </>
-                )}
-              </button>
+              {/* Action Buttons */}
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <button
+                  className="btn-sm"
+                  onClick={() => togglePause(m)}
+                  disabled={busyId === m.id}
+                  title={isPaused ? "Resume" : "Pause"}
+                >
+                  {busyId === m.id ? (
+                    "Updating…"
+                  ) : isPaused ? (
+                    <>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                      Resume
+                    </>
+                  ) : (
+                    <>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16" />
+                        <rect x="14" y="4" width="4" height="16" />
+                      </svg>
+                      Pause
+                    </>
+                  )}
+                </button>
+
+                <button
+                  className="btn-sm"
+                  onClick={() => handleDelete(m)}
+                  disabled={busyId === m.id}
+                  title="Delete monitor"
+                  style={{
+                    padding: "6px 8px",
+                    color: "#f43f5e",
+                    borderColor: "rgba(244, 63, 94, 0.2)",
+                  }}
+                  aria-label="Delete monitor"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </button>
+              </div>
             </div>
           );
         })}
