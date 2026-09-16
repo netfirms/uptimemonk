@@ -213,6 +213,14 @@ export const api = {
       signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
     }),
 
+  /** Sends a real alert now, through the same path the drainer uses, and
+   *  waits for the provider so a failure comes back with its reason. */
+  testContact: (id: string) =>
+    request<{ delivered: boolean; channel: string; destination: string }>(
+      `/v1/contacts/${id}/test`,
+      { method: "POST", signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS) }
+    ),
+
   /** Sends the confirmation over the contact's own channel — the only proof
    *  the destination is reachable and wanted. */
   verifyContact: (id: string) =>

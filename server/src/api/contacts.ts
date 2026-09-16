@@ -5,6 +5,7 @@ import { col } from "../sync/firebase.js";
 import { requireAuth } from "./auth.js";
 import { assertSafeUrl, BlockedTargetError } from "../lib/targetGuard.js";
 import { validateContact, InvalidContactError } from "../alerts/validateContact.js";
+import { deliver, type AlertPayload } from "../alerts/channels.js";
 import { log } from "../lib/log.js";
 import {
   ALERT_FROM_EMAIL,
@@ -37,6 +38,36 @@ const EMAIL_READY = Boolean(MAILGUN_API_KEY || RESEND_API_KEY);
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 /** A ceiling, so one org cannot turn this into a bulk mailer. */
 const MAX_CONTACTS = 20;
+/** Same idea for the test button — it sends real mail to a real inbox. */
+const TEST_COOLDOWN_MS = 30_000;
+const lastTestAt = new Map<string, number>();
+
+/**
+ * A synthetic incident, worded so nobody mistakes it for a real outage.
+ *
+ * It goes through `deliver()` — the same function the drainer calls, with the
+ * same secrets and the same per-channel formatting — because a test that took
+ * its own shortcut could pass while real alerts fail, which is worse than no
+ * test at all.
+ */
+function testPayload(): AlertPayload {
+  const now = Date.now();
+  return {
+    event: "down",
+    monitorId: "test",
+    incidentId: "test",
+    monitor: {
+      id: "test",
+      name: "UptimeMonke test notification",
+      target: APP_URL,
+    },
+    incident: {
+      id: "test",
+      startedAt: now,
+      cause: "This is a test. No monitor is down — you are checking that alerts reach you.",
+    },
+  } as unknown as AlertPayload;
+}
 /** Stops the endpoint being used to send someone repeated mail. */
 const RESEND_COOLDOWN_MS = 60_000;
 
@@ -283,6 +314,82 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
 
       await ref.update(patch);
       return { id: req.params.id, ...patch };
+    }
+  );
+
+  /**
+   * Send a real alert to one contact, on demand.
+   *
+   * Only to a *verified* contact: an unverified one already has the
+   * confirmation flow for proving the destination, and allowing arbitrary
+   * test sends to unconfirmed addresses would make this an open relay with
+   * extra steps.
+   *
+   * Delivery is awaited rather than queued, so the response carries the
+   * provider's actual error. "Sent" followed by silence is the exact failure
+   * this button exists to rule out.
+   */
+  app.post<{ Params: { id: string } }>(
+    "/v1/contacts/:id/test",
+    { preHandler: requireAuth() },
+    async (req, reply) => {
+      const ref = col.alertContacts().doc(req.params.id);
+      const snap = await ref.get();
+      const c = snap.data();
+
+      if (!snap.exists || c?.orgId !== req.user!.orgId) {
+        return reply.code(404).send({ error: "No such alert contact" });
+      }
+      if (c.verified !== true) {
+        return reply.code(409).send({
+          error: "Confirm this contact first — use Resend confirmation.",
+        });
+      }
+      if (c.enabled === false) {
+        return reply.code(409).send({ error: "This contact is paused. Resume it first." });
+      }
+
+      const since = Date.now() - (lastTestAt.get(req.params.id) ?? 0);
+      if (since < TEST_COOLDOWN_MS) {
+        return reply.code(429).send({
+          error: `Just sent one. Try again in ${Math.ceil((TEST_COOLDOWN_MS - since) / 1000)}s.`,
+        });
+      }
+      lastTestAt.set(req.params.id, Date.now());
+
+      try {
+        await deliver(
+          {
+            id: snap.id,
+            orgId: c.orgId,
+            channel: c.channel,
+            name: c.name,
+            destination: c.destination,
+            telegramChatId: c.telegramChatId,
+            enabled: true,
+            verified: true,
+          },
+          testPayload(),
+          {
+            mailgunKey: MAILGUN_API_KEY,
+            mailgunDomain: MAILGUN_DOMAIN,
+            mailgunBaseUrl: MAILGUN_BASE_URL,
+            from: ALERT_FROM_EMAIL,
+            resendKey: RESEND_API_KEY,
+            telegramToken: TELEGRAM_BOT_TOKEN,
+          }
+        );
+      } catch (err) {
+        // Let them retry immediately after a failure — the cooldown is there
+        // to stop repeat *deliveries*, not to punish a misconfiguration.
+        lastTestAt.delete(req.params.id);
+        const detail = (err as Error).message || "Delivery failed";
+        log.warn({ err, contactId: snap.id, channel: c.channel }, "test notification failed");
+        return reply.code(400).send({ error: detail });
+      }
+
+      log.info({ contactId: snap.id, channel: c.channel }, "test notification delivered");
+      return { delivered: true, channel: c.channel, destination: c.destination };
     }
   );
 

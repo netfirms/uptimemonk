@@ -76,6 +76,8 @@ export const events = {
   /** Channel only — never the destination, which is a real address. */
   contactAdded: (channel: string) => track("contact_added", { channel }),
   contactVerified: (channel: string) => track("contact_verified", { channel }),
+  contactTested: (channel: string, ok: boolean) =>
+    track("contact_tested", { channel, ok }),
 
   /** The failure the user actually saw — how we learn which errors are common. */
   actionFailed: (action: string, status?: number) =>

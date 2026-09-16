@@ -127,6 +127,15 @@ hour of downtime replays for free. Nothing on the Firebase side can speak Redis
 anyway — Firestore's only push mechanism is a Cloud Function trigger, and Spark
 has none, so the only possible publisher is a worker, which makes it a loop.
 
+**The test-notification button uses `deliver()`, not a shortcut.** It is the
+same function the drainer calls, with the same secrets and per-channel
+formatting, because a test that took its own path could pass while real alerts
+fail — worse than having no test. Delivery is awaited rather than queued so the
+response carries the provider's actual error; "sent" followed by silence is the
+failure the button exists to rule out. Verified contacts only: an unverified one
+already has the confirmation flow, and arbitrary test sends to unconfirmed
+addresses would make this an open relay with extra steps.
+
 **Email has two providers and picks at runtime.** `sendEmail` uses Mailgun
 when `MAILGUN_API_KEY` is set and falls back to Resend, so changing provider is
 an env edit and a restart rather than a deploy. Mailgun's v3 messages API is

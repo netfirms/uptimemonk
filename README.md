@@ -52,6 +52,10 @@ of false alarms — a network blip between one probe and the target. It needs
 peer, so it returns `unavailable` and the decision falls back to
 `confirmationThreshold` alone. It starts working when a second worker exists.
 
+Each contact has a **Send test** button that pushes a real alert through the
+production delivery path and waits for the provider, so a misconfiguration
+comes back as the provider's own error rather than as silence hours later.
+
 ### Plans
 
 | Plan | Monitors | Fastest check |

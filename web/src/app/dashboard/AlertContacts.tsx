@@ -168,6 +168,29 @@ export default function AlertContacts({
     }
   }
 
+  async function sendTest(c: AlertContact) {
+    setBusyId(c.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await api.testContact(c.id);
+      setNotice(
+        `Test alert sent to ${c.destination}. If it does not arrive, check spam — ` +
+          `the delivery itself succeeded.`
+      );
+      void events.contactTested(c.channel, true);
+    } catch (err) {
+      // The provider's own words, not a generic failure: "domain not verified"
+      // or "channel archived" is what actually tells someone what to fix.
+      setError(
+        err instanceof ApiError ? err.message : "Could not send the test notification."
+      );
+      void events.contactTested(c.channel, false);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function toggle(c: AlertContact) {
     setBusyId(c.id);
     try {
@@ -251,6 +274,17 @@ export default function AlertContacts({
                     onClick={() => sendVerification(c.id)}
                   >
                     {busyId === c.id ? "Sending…" : "Resend confirmation"}
+                  </button>
+                )}
+
+                {c.verified && c.enabled && channels[c.channel] !== "unconfigured" && (
+                  <button
+                    className="btn-sm"
+                    disabled={busyId === c.id}
+                    onClick={() => sendTest(c)}
+                    title="Send a real alert now, the same way an outage would"
+                  >
+                    {busyId === c.id ? "Sending…" : "Send test"}
                   </button>
                 )}
 
