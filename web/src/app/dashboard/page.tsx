@@ -48,6 +48,8 @@ export default function Dashboard() {
   const [live, setLive] = useState<Record<string, LiveState>>({});
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   useEffect(
     () =>
@@ -116,12 +118,33 @@ export default function Dashboard() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    setAuthError(null);
+    setIsSigningIn(true);
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (err: unknown) {
+      console.error("Sign in failed:", err);
+      const code = (err as { code?: string })?.code;
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+        setAuthError((err as Error)?.message || "Failed to sign in with Google.");
+      }
+    } finally {
+      setIsSigningIn(false);
+    }
+  }
+
   if (!uid) {
     return (
       <main className="wrap">
         <h1>UptimeMonk</h1>
-        <button className="primary" onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}>
-          Sign in with Google
+        {authError && (
+          <p style={{ color: "#e53e3e", marginBottom: "1rem", fontSize: "0.9rem" }}>
+            {authError}
+          </p>
+        )}
+        <button className="primary" onClick={handleGoogleSignIn} disabled={isSigningIn}>
+          {isSigningIn ? "Signing in…" : "Sign in with Google"}
         </button>
       </main>
     );
