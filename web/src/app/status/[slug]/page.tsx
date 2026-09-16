@@ -11,6 +11,11 @@ import { adminDb } from "@/lib/admin";
  * cannot afford a surprise bill.
  */
 export const revalidate = 60;
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return [{ slug: "_default" }];
+}
 
 interface DayDoc {
   day: string;
@@ -26,20 +31,24 @@ interface MonitorDoc {
 }
 
 async function loadPage(slug: string) {
-  const snap = await adminDb
-    .collection("statusPages")
-    .where("slug", "==", slug)
-    .where("published", "==", true)
-    .limit(1)
-    .get();
-  if (snap.empty) return null;
-  return { id: snap.docs[0].id, ...(snap.docs[0].data() as Record<string, unknown>) } as {
-    id: string;
-    title: string;
-    description?: string;
-    monitorIds: string[];
-    showResponseTimes: boolean;
-  };
+  try {
+    const snap = await adminDb
+      .collection("statusPages")
+      .where("slug", "==", slug)
+      .where("published", "==", true)
+      .limit(1)
+      .get();
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...(snap.docs[0].data() as Record<string, unknown>) } as {
+      id: string;
+      title: string;
+      description?: string;
+      monitorIds: string[];
+      showResponseTimes: boolean;
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function generateMetadata({

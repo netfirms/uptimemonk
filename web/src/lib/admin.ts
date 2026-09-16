@@ -10,11 +10,21 @@ import { getFirestore } from "firebase-admin/firestore";
  * search engines, and doing it server-side means one cached render serves
  * everyone instead of every visitor paying for their own Firestore reads.
  */
+const projectId =
+  process.env.GOOGLE_CLOUD_PROJECT ||
+  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+  "uptimemonk";
+
 if (!getApps().length) {
   const json = process.env.FIREBASE_SERVICE_ACCOUNT;
-  initializeApp({
-    credential: json ? cert(JSON.parse(json)) : applicationDefault(),
-  });
+  try {
+    initializeApp({
+      projectId,
+      credential: json ? cert(JSON.parse(json)) : applicationDefault(),
+    });
+  } catch {
+    initializeApp({ projectId });
+  }
 }
 
 export const adminDb = getFirestore();

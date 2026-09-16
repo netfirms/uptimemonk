@@ -70,6 +70,11 @@ else
   echo "==> [1/3] Skipping rules checks (--skip-tests)"
 fi
 
+if [[ "$TARGETS" == *"hosting"* ]]; then
+  echo "==> Building web frontend (static export)..."
+  npm --prefix web run build
+fi
+
 # 2. Determine target project
 FIREBASE_ARGS=(deploy --only "$TARGETS")
 if [[ -n "$PROJECT" ]]; then

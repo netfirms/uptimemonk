@@ -21,7 +21,8 @@
     "singleProjectMode": true
   },
   "hosting": {
-    "public": "public",
+    "public": "web/out",
+    "cleanUrls": true,
     "ignore": [
       "firebase.json",
       "**/.*",
