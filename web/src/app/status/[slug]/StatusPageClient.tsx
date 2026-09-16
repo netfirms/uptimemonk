@@ -120,7 +120,7 @@ export default function StatusPageClient() {
 
   return (
     <main className="wrap">
-      <header className="topbar">
+      <header className="topbar status-page-topbar">
         <div className="brand-badge">
           <span className="brand-robot">
             {/* eslint-disable-next-line @next/next/no-img-element */}

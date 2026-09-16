@@ -543,7 +543,7 @@ export default function Dashboard() {
               </div>
 
               {/* Response Time & 30d Uptime */}
-              <div style={{ textAlign: "right", minWidth: "120px" }}>
+              <div className="monitor-metrics" style={{ textAlign: "right", minWidth: "120px" }}>
                 <div className={`latency-val ${latencyClass}`}>
                   {latency != null ? `${latency} ms` : "—"}
                 </div>
@@ -553,7 +553,7 @@ export default function Dashboard() {
               </div>
 
               {/* Action Buttons */}
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div className="monitor-actions" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <button
                   className="btn-sm"
                   onClick={() => {
