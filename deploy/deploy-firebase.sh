@@ -18,7 +18,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
 PROJECT=""
-TARGETS="firestore:rules,firestore:indexes"
+TARGETS="firestore,hosting"
 RUN_TESTS=true
 
 while [[ $# -gt 0 ]]; do

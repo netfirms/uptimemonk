@@ -5,7 +5,7 @@
   "description": "Root workspace: tooling for scripts/ and the emulator. App code lives in functions/ and web/.",
   "type": "module",
   "scripts": {
-    "emulators": "firebase emulators:start --only functions,firestore,auth,tasks --project demo-uptimemonk",
+    "emulators": "firebase emulators:start --only firestore,auth,hosting --project demo-uptimemonk",
     "seed": "FIRESTORE_EMULATOR_HOST=localhost:8080 GOOGLE_CLOUD_PROJECT=demo-uptimemonk node scripts/seed.mjs",
     "test:rules": "node --test scripts/rules.test.mjs",
     "deploy": "bash deploy/deploy-all.sh",
