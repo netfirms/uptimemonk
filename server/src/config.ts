@@ -144,9 +144,14 @@ export const DONATION_LINK_URL = optional(
  */
 export const DONATION_LINK_CENTS = int("DONATION_LINK_CENTS", 299);
 
-/** The link is a monthly subscription, not a one-off — it changes the copy. */
-export const DONATION_LINK_RECURRING =
-  (process.env.DONATION_LINK_RECURRING ?? "true") !== "false";
+/**
+ * Whether the link is a monthly subscription. It only changes the copy — the
+ * grant always comes from what Stripe says was paid — but getting it wrong
+ * promises a donor something the link does not do.
+ *
+ * The current link is a one-off "Pay" link, so this defaults to false.
+ */
+export const DONATION_LINK_RECURRING = process.env.DONATION_LINK_RECURRING === "true";
 
 export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "";
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";

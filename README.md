@@ -69,7 +69,7 @@ The unit is a **check**, not a monitor. A 5-second monitor is 12x the load of a
 | | |
 |---|---|
 | Free, forever | 14,400 checks/day — exactly the old free plan, ten monitors at one minute |
-| A donation adds | 100,000 checks/day per $1 — the $2.99/month link buys 299,000/day |
+| A donation adds | 100,000 checks/day per $1 — the $2.99 one-off link buys 8,970,000 checks |
 | Roll-over | Unused credit carries over, capped at two cycles |
 | Running out | A 7-day grace window at full service, then back to the free allowance |
 
@@ -89,7 +89,7 @@ The rate is derived from measurement, not from competitors: a check costs
 41.5 bytes of sample JSON on the live box, ~70 bytes with SQLite overhead, and
 at 35 days' bucket retention a 10 GB database budget sustains ~4M checks/day.
 Half of that is the safe committed figure, so one $5 worker carries ~2M
-checks/day and about seven $2.99 donors cover its cost four times over.
+checks/day and about seven $2.99 donations a month cover its cost four times over.
 
 Grants are computed in **cents**. Rounding to whole dollars granted nothing at
 all for $0.49 and gave $1.50 a third more than it paid for.
