@@ -12,3 +12,4 @@ ui-debug.log*
 .env
 .env.local
 .env*.local
+creds/
