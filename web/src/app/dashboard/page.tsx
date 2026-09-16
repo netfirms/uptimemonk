@@ -247,7 +247,7 @@ export default function Dashboard() {
   if (!currentUser) {
     return (
       <main className="wrap">
-        <Landing />
+        <Landing onSignedIn={(u) => u && setCurrentUser(u)} />
       </main>
     );
   }

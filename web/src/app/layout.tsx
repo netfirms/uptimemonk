@@ -13,9 +13,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://uptimemonke.com"),
   title: "UptimeMonke — High-Frequency Infrastructure Monitoring",
   description: "Real-time uptime monitoring, SSL tracking, heartbeat pings, and elegant public status pages.",
-  // Icons come from the app/icon.png and app/apple-icon.png file conventions.
-  // public/favicon.ico still serves the bare /favicon.ico path that browsers
-  // and crawlers request regardless of the link tags.
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/apple-icon.png",
+  },
   alternates: {
     canonical: "https://uptimemonke.com",
   },
@@ -68,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
       <body>
         <div className="ambient-glow" aria-hidden="true" />
