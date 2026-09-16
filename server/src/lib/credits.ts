@@ -126,13 +126,34 @@ export function standingOf(c: OrgCredit, now = Date.now()): Standing {
  * the balance is what limits them, and it is drawn down by actual usage rather
  * than predicted usage. Out of credit, they are held to the free rate.
  */
+/** A grant is quoted and sold as a month's worth, so a balance spreads over
+ *  that many days when it is turned into a daily rate. */
+export const GRANT_DAYS = 30;
+
 export function budgetFor(c: OrgCredit, now = Date.now()): number {
   const standing = standingOf(c, now);
-  if (standing === "donor" || standing === "grace") {
-    // Their own daily grant, plus the free allowance on top.
-    return baseOf(c) + Math.max(c.credits, monthlyGrant(c.donationUsdMonthly) / 30);
-  }
-  return baseOf(c);
+  if (standing !== "donor" && standing !== "grace") return baseOf(c);
+
+  /**
+   * The balance spread over a month, **not** the balance itself.
+   *
+   * `credits` is a total — $2.99 buys 8,970,000 checks — while this function
+   * returns a per-day figure. Returning the balance directly was a unit error
+   * that let one donor configure 8.98M checks a day: thirty times the rate
+   * they were sold, four times the whole box's safe capacity, and their entire
+   * month's credit burnt in a single day.
+   *
+   * Spreading it also tapers naturally. As credit depletes the allowed rate
+   * falls with it, so there is no cliff at zero — and monitors already running
+   * are never touched, because the budget is only checked when something is
+   * created or edited.
+   */
+  const fromBalance = c.credits / GRANT_DAYS;
+  // A recurring donor is entitled to their cycle's rate even if the balance is
+  // momentarily low, having committed to the next top-up.
+  const fromPledge = monthlyGrant(c.donationUsdMonthly) / GRANT_DAYS;
+
+  return Math.floor(baseOf(c) + Math.max(fromBalance, fromPledge));
 }
 
 export interface BudgetCheck {
