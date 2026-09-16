@@ -2,11 +2,16 @@ import type { FastifyInstance } from "fastify";
 import { Timestamp } from "firebase-admin/firestore";
 import { col } from "../sync/firebase.js";
 import { requireAuth } from "./auth.js";
-import { buildMonitor, ValidationError, type MonitorInput } from "../monitors/validate.js";
-import { limitsFor } from "../lib/plans.js";
+import {
+  assertFitsBudget,
+  buildMonitor,
+  ValidationError,
+  type MonitorInput,
+} from "../monitors/validate.js";
 import {
   dayRollupsFor,
   getMonitor,
+  getOrgCredit,
   getOrgPlan,
   historySummary,
   incidentsFor,
@@ -74,18 +79,15 @@ export async function monitorRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const { orgId } = req.user!;
       const plan = getOrgPlan(orgId) as Plan;
-      const limits = limitsFor(plan);
-
-      // Count against the local mirror: it is authoritative enough for a quota
-      // check and avoids a Firestore read on every create.
-      const existing = listMonitors(orgId).length;
-      if (existing >= limits.maxMonitors) {
-        return reply.code(402).send({
-          error: `You've reached the ${limits.maxMonitors}-monitor limit on the ${limits.label} plan`,
-        });
-      }
 
       const monitor = await buildMonitor(req.body, orgId, plan);
+
+      // Against the local mirror: authoritative enough for a budget check, and
+      // it avoids a Firestore read on every create.
+      assertFitsBudget(getOrgCredit(orgId), listMonitors(orgId), {
+        intervalSeconds: monitor.intervalSeconds!,
+        enabled: true,
+      });
       const now = Timestamp.now();
       const ref = await col.monitors().add({
         ...monitor,
@@ -173,6 +175,18 @@ export async function monitorRoutes(app: FastifyInstance): Promise<void> {
 
       const plan = getOrgPlan(orgId) as Plan;
       const monitor = await buildMonitor(req.body, orgId, plan, current as never);
+
+      // Editing is the other way to overspend: speeding an existing monitor up
+      // costs exactly as much as adding a fast new one.
+      assertFitsBudget(
+        getOrgCredit(orgId),
+        listMonitors(orgId),
+        {
+          intervalSeconds: monitor.intervalSeconds!,
+          enabled: current?.enabled !== false,
+        },
+        req.params.id
+      );
       await snap.ref.update({ ...monitor, updatedAt: Timestamp.now() });
       return { id: req.params.id, ...monitor };
     }

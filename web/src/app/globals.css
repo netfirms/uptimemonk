@@ -1406,3 +1406,216 @@ button.btn-outline-red {
 .protocol-tag.discord { background: rgba(167,139,250,.14); border-color: rgba(167,139,250,.32); color: #a78bfa; }
 .protocol-tag.telegram { background: rgba(56,189,248,.12); border-color: rgba(56,189,248,.3); color: #38bdf8; }
 .protocol-tag.webhook { background: rgba(148,163,184,.12); border-color: rgba(148,163,184,.3); color: #94a3b8; }
+
+/* --- Capacity & donations --- */
+
+.capacity {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.capacity-bar {
+  height: 8px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.capacity-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #3BD671;
+  transition: width 0.3s ease;
+}
+
+/* Over budget is a state to notice, not a punishment — amber, not red: the
+   monitors are all still running. */
+.capacity-bar span[data-over] {
+  background: #f59e0b;
+}
+
+.donate .amounts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.donate .primary {
+  margin-top: 10px;
+  width: 100%;
+}
+
+/* --- Landing: how it is paid for --- */
+
+.donate-strip {
+  max-width: 980px;
+  margin: 56px auto 0;
+  padding: 0 16px;
+  text-align: center;
+}
+
+.donate-strip h2 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.donate-lede,
+.donate-why {
+  max-width: 62ch;
+  margin: 12px auto 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.donate-why {
+  margin-top: 26px;
+  font-size: 0.85rem;
+}
+
+.donate-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.donate-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 22px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* The middle card is the ask, so it is the one that carries the brand colour.
+   One accent, not three — three would be none. */
+.donate-card.accent {
+  border-color: rgba(59, 214, 113, 0.35);
+  background: rgba(59, 214, 113, 0.06);
+}
+
+.donate-card.accent .donate-figure {
+  color: #3BD671;
+}
+
+.donate-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.donate-figure {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 6px;
+}
+
+.donate-card p {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .donate-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The one-click donation.
+   An <a>, not a <button>, because it navigates to Stripe — middle-click and
+   "open in new tab" should behave like any other link. That means it cannot
+   borrow `button.primary`, which is scoped to the element, so it carries the
+   full treatment itself rather than widening that selector app-wide. */
+.coffee-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #3BD671;
+  color: #09141f;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(59, 214, 113, 0.28);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.coffee-btn:hover {
+  background: #34c765;
+  box-shadow: 0 6px 20px rgba(59, 214, 113, 0.4);
+  transform: translateY(-1px);
+  color: #09141f;
+}
+
+.coffee-btn span[aria-hidden] {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+/* --- Who is signed in, and what they have left --- */
+
+.who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+  max-width: 200px;
+}
+
+.who-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Only rendered when there is credit, so it is a small reward rather than a
+   permanent "0" reminding free accounts of what they do not have. */
+.who-credit {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  color: #3BD671;
+}
+
+/* The nav variant of the coffee button: the widest thing in the bar after the
+   brand, because asking quietly is the same as not asking. */
+.coffee-btn-nav {
+  width: auto;
+  padding: 9px 18px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .who {
+    display: none;
+  }
+
+  .coffee-btn-nav {
+    padding: 9px 12px;
+  }
+}

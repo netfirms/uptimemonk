@@ -1,6 +1,6 @@
 {
   "name": "uptimemonk-server",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "UptimeMonk probe + API service for AWS Lightsail",
@@ -23,6 +23,7 @@
     "fastify": "^5.2.1",
     "firebase-admin": "^13.0.2",
     "pino": "^9.6.0",
+    "stripe": "^17.7.0",
     "undici": "^7.2.0"
   },
   "devDependencies": {

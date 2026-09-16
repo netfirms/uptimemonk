@@ -25,12 +25,38 @@ export default function Landing({
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
 
-  async function handleGoogleSignIn() {
+  /**
+   * Donating requires being signed in — always.
+   *
+   * The payment link carries no workspace of its own; the id has to be
+   * appended as `client_reference_id`, and this page has no id to append. An
+   * untagged donation is the worst outcome available: the money arrives, the
+   * webhook has nothing to credit, and the donor gets no capacity and no
+   * explanation. So sign-in comes first, and the tagged link is only ever
+   * handed out by the API to an authenticated caller.
+   *
+   * It deliberately does not open Stripe automatically after sign-in. Being
+   * redirected to a payment page you did not just ask for is alarming, so it
+   * lands on the dashboard with the Support panel open instead.
+   */
+  async function handleDonate() {
+    if (auth.currentUser) {
+      window.location.href = "/dashboard?donate=1";
+      return;
+    }
+    await handleGoogleSignIn("/dashboard?donate=1");
+  }
+
+  async function handleGoogleSignIn(next?: string) {
     setAuthError(null);
     setIsSigningIn(true);
     try {
       await signInWithPopup(auth, new GoogleAuthProvider());
       void events.signIn("google");
+      if (next) {
+        window.location.href = next;
+        return;
+      }
       onSignedIn?.();
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
@@ -68,7 +94,7 @@ export default function Landing({
               <span className="status-dot up" />
               Probes Live
             </span>
-            <button className="primary" onClick={handleGoogleSignIn} disabled={isSigningIn}>
+            <button className="primary" onClick={() => handleGoogleSignIn()} disabled={isSigningIn}>
               {isSigningIn ? "Connecting…" : "Sign In with Google"}
             </button>
           </div>
@@ -106,7 +132,7 @@ export default function Landing({
               </div>
             )}
 
-            <button className="google-btn-light" onClick={handleGoogleSignIn} disabled={isSigningIn}>
+            <button className="google-btn-light" onClick={() => handleGoogleSignIn()} disabled={isSigningIn}>
               {isSigningIn ? (
                 <span>Connecting to Google…</span>
               ) : (
@@ -134,7 +160,7 @@ export default function Landing({
               )}
             </button>
             <p className="dim" style={{ fontSize: "0.78rem" }}>
-              50 monitors free · No credit card required · Instant setup
+              Free forever · No credit card · No feature locked behind a plan
             </p>
           </div>
 
@@ -226,6 +252,71 @@ export default function Landing({
               </div>
             </div>
           </div>
+        </section>
+
+        {/* How it is paid for */}
+        <section className="donate-strip" id="support">
+          <h2>There is no paid plan</h2>
+          <p className="donate-lede">
+            Every feature works on a free account — every check type, sub-minute
+            intervals, status pages, alerting, the API. What a donation pays for
+            is <strong>capacity</strong>, because that is the only part that
+            actually costs money: each check is a real request from a real
+            machine.
+          </p>
+
+          <div className="donate-grid">
+            <div className="donate-card">
+              <span className="donate-label">Free, forever</span>
+              <strong className="donate-figure">14,400</strong>
+              <span className="dim">checks a day</span>
+              <p className="dim">
+                Ten monitors at one minute. Or fifty at five minutes. Or one at
+                six seconds — it is the same load, so it is the same price.
+              </p>
+            </div>
+
+            <div className="donate-card accent">
+              <span className="donate-label">$2.99 a month adds</span>
+              <strong className="donate-figure">299,000</strong>
+              <span className="dim">checks a day</span>
+              <p className="dim">
+                About two hundred monitors at one minute. Unused capacity rolls
+                over, and cancelling keeps whatever you have already given.
+              </p>
+              <button
+                type="button"
+                className="coffee-btn"
+                style={{ marginTop: 14 }}
+                onClick={handleDonate}
+                disabled={isSigningIn}
+              >
+                <span aria-hidden>☕</span>
+                {isSigningIn ? "Signing in…" : "Buy me a coffee"}
+              </button>
+              <p className="dim" style={{ marginTop: 8, fontSize: "0.72rem" }}>
+                Sign-in first, so the capacity lands on your workspace rather
+                than disappearing.
+              </p>
+            </div>
+
+            <div className="donate-card">
+              <span className="donate-label">If you stop</span>
+              <strong className="donate-figure">Nothing</strong>
+              <span className="dim">is deleted</span>
+              <p className="dim">
+                A week of grace at full capacity, then back to the free
+                allowance. Your monitors keep checking throughout.
+              </p>
+            </div>
+          </div>
+
+          <p className="donate-why">
+            Why checks and not monitors? A five-second check is twelve times the
+            work of a one-minute one. Charging per monitor would price those the
+            same — and it would stop a free account running a single fast check
+            that costs no more than ten slow ones.
+          </p>
         </section>
 
         {/* Minimal Footer */}

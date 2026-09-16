@@ -56,20 +56,46 @@ Each contact has a **Send test** button that pushes a real alert through the
 production delivery path and waits for the provider, so a misconfiguration
 comes back as the provider's own error rather than as silence hours later.
 
-### Plans
+### Donations, not a paywall
 
-| Plan | Monitors | Fastest check |
-|---|---|---|
-| free | 10 | 60 s |
-| solo | 50 | 5 s |
-| team | 200 | 5 s |
-| scale | 1,000 | 5 s |
+There are no paid plans. Every feature — every check type, sub-minute
+intervals, status pages, multi-region, the API — works on a free workspace.
+What a donation buys is **capacity**, because capacity is the only part that
+genuinely costs money: a probe, a row, a sample in a bucket.
 
-Defined in one place, `server/src/lib/plans.ts`, and enforced in
-`monitors/validate.ts` — the single write path. The free tier's 60 s floor is a
-product decision, not a technical one: the old 300 s floor existed because
-Firestore writes cost money per check, and that constraint disappeared when
-history moved to SQLite.
+The unit is a **check**, not a monitor. A 5-second monitor is 12x the load of a
+1-minute one, and the old per-monitor cap charged the same for both:
+
+| | |
+|---|---|
+| Free, forever | 14,400 checks/day — exactly the old free plan, ten monitors at one minute |
+| A donation adds | 100,000 checks/day per $1 — the $2.99/month link buys 299,000/day |
+| Roll-over | Unused credit carries over, capped at two cycles |
+| Running out | A 7-day grace window at full service, then back to the free allowance |
+
+Spend it however suits: 14,400 checks/day is ten 1-minute monitors, or fifty
+5-minute ones, or a single 6-second one. The old model forbade that last option
+at any price on free, despite it costing exactly the same.
+
+**Nothing is ever deleted for running out of credit.** Monitoring that silently
+stops is the failure this product exists to prevent; doing it to someone
+because their card expired would be the worst version of it. Existing monitors
+keep running — there is just no room to add or speed up.
+
+Legacy paid plans are grandfathered: `plans.ts` turns each old tier into a
+raised free allowance, so nobody who bought one ends up worse off.
+
+The rate is derived from measurement, not from competitors: a check costs
+41.5 bytes of sample JSON on the live box, ~70 bytes with SQLite overhead, and
+at 35 days' bucket retention a 10 GB database budget sustains ~4M checks/day.
+Half of that is the safe committed figure, so one $5 worker carries ~2M
+checks/day and about seven $2.99 donors cover its cost four times over.
+
+Grants are computed in **cents**. Rounding to whole dollars granted nothing at
+all for $0.49 and gave $1.50 a third more than it paid for.
+
+The model lives in `server/src/lib/credits.ts` and is enforced by
+`assertFitsBudget` on the create and edit paths.
 
 ### Public status pages
 
@@ -355,6 +381,84 @@ The key is **440 root:uptimemonk**. systemd's `LoadCredential` reads it as
 root and hands the path to the process, which runs as the `uptimemonk` user.
 The service account needs `roles/datastore.user` and nothing else.
 
+## Turning donations on
+
+The code is deployed and inert: both routes register, `/v1/billing/checkout`
+returns 503 and the dashboard hides the donate button until Stripe is
+configured. Three steps.
+
+### 1. Keys
+
+In the Stripe dashboard, **Developers → API keys**, copy the *secret* key
+(`sk_live_…`, or `sk_test_…` while you are trying it out). The publishable key
+is not used — this integration never renders a card form, because Stripe's
+hosted page is what keeps card details out of this codebase entirely.
+
+### 2. Webhook
+
+**Developers → Webhooks → Add endpoint**, pointing at:
+
+```
+https://api.uptimemonke.com/v1/billing/webhook
+```
+
+Select exactly these five events. Each one is handled; anything else is
+ignored, and subscribing to everything just makes the log noisy:
+
+| Event | Why |
+|---|---|
+| `checkout.session.completed` | One-off donations — a Payment Link never produces an invoice, so without this a "buy me a coffee" grants nothing |
+| `invoice.paid` | Recurring donations, including every renewal |
+| `charge.refunded` | Takes the capacity back with the money |
+| `charge.dispute.created` | Same, for a chargeback — the funds leave either way |
+| `customer.subscription.deleted` | Stops the recurring top-up; credit already given is kept |
+
+Copy the **signing secret** (`whsec_…`) it shows after creating the endpoint.
+That secret is the *only* thing distinguishing Stripe from anyone who finds
+the URL, so it is not optional.
+
+### 3. Install and restart
+
+```bash
+ssh uptimemonk-worker-1 'sudo tee -a /etc/uptimemonk/env >/dev/null' <<'EOF'
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+EOF
+ssh uptimemonk-worker-1 'sudo systemctl restart uptimemonk-api uptimemonk-worker'
+```
+
+Confirm with `curl -s https://api.uptimemonke.com/healthz` — and in the
+dashboard, **Support** should now offer amounts instead of saying donations
+are not set up.
+
+### Testing it
+
+Use a `sk_test_…` key and Stripe's test mode first. Card `4242 4242 4242 4242`
+with any future expiry completes a donation; **Developers → Webhooks → Send
+test webhook** replays an event against the live endpoint. A grant shows up in
+the `credit_ledger` table:
+
+```bash
+ssh uptimemonk-worker-1 'cd /opt/uptimemonk/server && sudo -u uptimemonk node -e "
+  const db = require(\"better-sqlite3\")(\"/var/lib/uptimemonk/uptimemonk.db\", { readonly: true });
+  console.log(db.prepare(\"select * from credit_ledger order by id desc limit 5\").all());
+"'
+```
+
+### Using an existing Payment Link instead
+
+A pre-made link works, but it carries no workspace id, so it has to be
+appended — otherwise the payment arrives with nothing tying it to an account
+and the handler logs it and skips rather than crediting a guess:
+
+```
+https://buy.stripe.com/<link>?client_reference_id=<orgId>
+```
+
+Check the statement descriptor on that account too. Donors who do not
+recognise the name on their card statement raise disputes, and a dispute costs
+more than the donation was worth.
+
 ## Free-tier budget
 
 Firestore gives 20,000 writes/day. The mirror spends 288 per organisation per
@@ -377,8 +481,10 @@ identical, so the same design just starts costing cents.
   unconfigured channel *undeliverable* rather than letting it fail quietly.
 - **No dead-man's switch** (`UPTIMEMONK_HEARTBEAT_URL` empty). With one worker,
   nothing notices if this box dies.
+- **Donations need `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`.** Without
+  them the routes register but refuse, and the UI hides the donate button
+  rather than offering one that cannot work. Capacity limits apply either way.
 - Litestream backups are not yet wired into `provision.sh`.
-- Stripe billing routes have not been ported from `functions/`.
 - **Public status pages have no server-rendered content** and are `noindex` as
   a result. Static export on Spark has no Node runtime. Moving to App Hosting
   (Blaze) restores SSR without changing anything else about the page.

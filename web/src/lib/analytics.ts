@@ -79,6 +79,10 @@ export const events = {
   contactTested: (channel: string, ok: boolean) =>
     track("contact_tested", { channel, ok }),
 
+  /** Amount only — no customer or payment identifiers. */
+  donateStarted: (usd: number) => track("donate_started", { usd }),
+  capacityBlocked: () => track("capacity_blocked"),
+
   /** The failure the user actually saw — how we learn which errors are common. */
   actionFailed: (action: string, status?: number) =>
     track("action_failed", { action, status }),

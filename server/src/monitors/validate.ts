@@ -7,6 +7,13 @@ import {
   sanitizeHeaders,
 } from "../lib/targetGuard.js";
 import { limitsFor, type PlanLimits } from "../lib/plans.js";
+import {
+  HARD_MAX_MONITORS,
+  HARD_MIN_INTERVAL_SECONDS,
+  checksPerDay,
+  fitsBudget,
+  type OrgCredit,
+} from "../lib/credits.js";
 import { REGION } from "../config.js";
 import type { Monitor, MonitorType, Plan, ProbeRegion } from "../types.js";
 
@@ -100,9 +107,18 @@ export async function buildMonitor(
     await validateTarget(type, target);
   }
 
+  /**
+   * The only floor is the scheduler's own.
+   *
+   * Frequency used to be gated by plan — free accounts were clamped to 60s no
+   * matter what they asked for. Under donation credits it is paid for out of
+   * the daily budget instead, so a free org may run one 10-second monitor if
+   * that is how it wants to spend its allowance. `assertFitsBudget` is what
+   * says no, and it says so with a number rather than a tier name.
+   */
   const interval = Math.max(
-    limits.minIntervalSeconds,
-    Number(input.intervalSeconds ?? existing?.intervalSeconds) || limits.minIntervalSeconds
+    HARD_MIN_INTERVAL_SECONDS,
+    Number(input.intervalSeconds ?? existing?.intervalSeconds) || 60
   );
 
   let regions = ((input.regions as ProbeRegion[]) ??
@@ -111,11 +127,10 @@ export async function buildMonitor(
   if (!regions.length) regions = [REGION];
   // Say so rather than silently downgrading — a hidden plan limit reads as a
   // broken feature.
-  if (!limits.multiRegion && regions.length > 1) {
-    throw new ValidationError(
-      `Multi-region checks are not available on the ${limits.label} plan`,
-      403
-    );
+  // Multi-region doubles the checks, so the budget already prices it. Only the
+  // fleet size limits it now.
+  if (regions.length > KNOWN_REGIONS.length) {
+    throw new ValidationError("More regions were requested than the fleet has", 400);
   }
 
   const now = Date.now();
@@ -218,3 +233,42 @@ export function stripUndefined<T extends Record<string, unknown>>(obj: T): Parti
   }
   return out as Partial<T>;
 }
+
+/**
+ * Does this workspace have the daily check budget for the monitor set it is
+ * asking for?
+ *
+ * Replaces the plan paywall's two separate gates — a monitor count and an
+ * interval floor — with the single thing that actually costs money. A donor
+ * can spend their budget on many slow monitors or a few fast ones; the old
+ * model charged the same for a 5-second check and a daily one, which differ
+ * by a factor of 17,280.
+ *
+ * `prospective` is the set *after* the change, so create and edit are the same
+ * question. Pass the existing monitor's id in `replacing` on an edit, or its
+ * old cost is counted twice.
+ */
+export function assertFitsBudget(
+  credit: OrgCredit,
+  existingMonitors: Monitor[],
+  incoming: { intervalSeconds: number; enabled: boolean },
+  replacing?: string,
+  now = Date.now()
+): void {
+  const others = existingMonitors.filter((m) => m.id !== replacing);
+
+  if (others.length + 1 > HARD_MAX_MONITORS) {
+    throw new ValidationError(
+      `A workspace is capped at ${HARD_MAX_MONITORS.toLocaleString()} monitors`,
+      403
+    );
+  }
+
+  const verdict = fitsBudget(credit, [...others, incoming], now);
+  if (!verdict.ok) {
+    throw new ValidationError(verdict.reason!, 402);
+  }
+}
+
+/** What one monitor costs, for showing the price before it is saved. */
+export const monitorCostPerDay = checksPerDay;

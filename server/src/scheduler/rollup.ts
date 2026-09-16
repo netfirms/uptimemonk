@@ -1,9 +1,15 @@
+import { burnDay } from "../lib/credits.js";
 import {
   bucketsForDay,
+  checksOnDay,
   getMonitor,
+  getOrgCredit,
   listMonitors,
+  orgsWithUsageOn,
+  postCredit,
   pruneBuckets,
   pruneIncidents,
+  setDonationState,
   setUptimes,
   trailingUptime,
   writeDayRollup,
@@ -21,6 +27,46 @@ import { INCIDENT_RETENTION_DAYS, RETENTION_DAYS } from "../config.js";
  * window are deleted. Day rollups are a few dozen bytes each and are kept
  * indefinitely — they are what a 90-day status bar reads.
  */
+
+/**
+ * Charge each org for yesterday's checks.
+ *
+ * Runs off `day_rollups`, which the compaction above has just written, so the
+ * figure charged is what was actually probed rather than what was configured —
+ * a monitor paused halfway through the day costs half a day.
+ *
+ * Idempotent by construction: the movement is posted to the ledger with the
+ * day as its `ref`, and `UNIQUE (reason, ref)` means a second run inserts
+ * nothing. A worker restart between the rollup and the burn used to be able to
+ * charge the same day twice, and a donor would lose credit to an operational
+ * accident with no record of why.
+ */
+function burnYesterday(day: string): number {
+  let charged = 0;
+
+  for (const orgId of orgsWithUsageOn(day)) {
+    const before = getOrgCredit(orgId);
+    const after = burnDay(before, checksOnDay(orgId, day));
+    const delta = after.credits - before.credits;
+    if (delta === 0) continue;
+
+    const posted = postCredit({ orgId, delta, reason: "burn", ref: day });
+    if (!posted) continue;
+    charged++;
+
+    // Opening the window is state, not a movement, so it is set alongside.
+    if (posted.balance === 0 && before.credits > 0) {
+      setDonationState(orgId, { graceUntil: after.graceUntil });
+      log.warn(
+        { orgId, graceUntil: after.graceUntil },
+        "org is out of donation credit — grace period started"
+      );
+    }
+  }
+
+  return charged;
+}
+
 export function runDailyRollup(now = Date.now()): void {
   const yesterday = now - 86_400_000;
   const day = dayKey(yesterday);
@@ -56,6 +102,9 @@ export function runDailyRollup(now = Date.now()): void {
     markOrgDirty(monitor.orgId, false);
   }
 
+  // `yesterday` is a timestamp here; the burn is keyed by day string.
+  const burned = burnYesterday(dayKey(yesterday));
+
   const cutoff = `${dayKey(now - RETENTION_DAYS * 86_400_000)}00`;
   const pruned = pruneBuckets(cutoff);
 
@@ -73,7 +122,7 @@ export function runDailyRollup(now = Date.now()): void {
   }
 
   log.info(
-    { day, monitors: totals.size, prunedBuckets: pruned, prunedIncidents, cutoffHour: cutoff },
+    { day, monitors: totals.size, orgsCharged: burned, prunedBuckets: pruned, prunedIncidents, cutoffHour: cutoff },
     "daily rollup complete"
   );
 }

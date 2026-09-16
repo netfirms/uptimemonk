@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { getDb } from "./index.js";
 import { hourKey } from "../lib/time.js";
+import type { OrgCredit } from "../lib/credits.js";
+import { baseChecksPerDay } from "../lib/plans.js";
 import type {
   AlertContact,
   CheckResult,
@@ -567,6 +569,144 @@ export function upsertOrg(id: string, name: string, plan: string, ownerUid?: str
        ON CONFLICT(id) DO UPDATE SET name = excluded.name, plan = excluded.plan`
     )
     .run(id, name, plan, ownerUid ?? null);
+}
+
+export function getOrgCredit(id: string): OrgCredit {
+  const r: any = getDb()
+    .prepare(
+      `SELECT credits, donation_usd_monthly, grace_until, plan FROM orgs WHERE id = ?`
+    )
+    .get(id);
+  return {
+    credits: r?.credits ?? 0,
+    donationUsdMonthly: r?.donation_usd_monthly ?? 0,
+    graceUntil: r?.grace_until ?? null,
+    // A legacy paid plan raises the free allowance rather than gating
+    // anything, so grandfathered orgs keep the capacity they paid for.
+    baseChecksPerDay: baseChecksPerDay(r?.plan),
+  };
+}
+
+/**
+ * Post a credit movement, once.
+ *
+ * The whole operation is one transaction, and the ledger's
+ * `UNIQUE (reason, ref)` is what makes it idempotent: a replayed Stripe
+ * delivery or a restarted rollup inserts nothing and changes no balance. That
+ * is a database guarantee rather than a check the caller has to remember, and
+ * it holds under concurrency, which a read-then-write never did.
+ *
+ * Returns the applied movement, or null when this `(reason, ref)` had already
+ * been posted.
+ */
+export function postCredit(entry: {
+  orgId: string;
+  delta: number;
+  reason: "grant" | "burn" | "refund" | "dispute" | "adjust";
+  ref: string;
+  note?: string;
+  now?: number;
+}): { balance: number; delta: number } | null {
+  const db = getDb();
+  const now = entry.now ?? Date.now();
+
+  return db.transaction(() => {
+    const claimed = db
+      .prepare(
+        `INSERT OR IGNORE INTO credit_ledger
+           (org_id, at, delta, reason, ref, balance_after, note)
+         VALUES (?, ?, ?, ?, ?, 0, ?)`
+      )
+      .run(entry.orgId, now, entry.delta, entry.reason, entry.ref, entry.note ?? null);
+
+    // Already posted. Not an error — Stripe retries by design.
+    if (claimed.changes === 0) return null;
+
+    // Clamped at zero: a balance may be exhausted but never owed. An overdraft
+    // would quietly become a debt the customer never agreed to.
+    db.prepare(
+      `UPDATE orgs SET credits = MAX(0, credits + ?) WHERE id = ?`
+    ).run(entry.delta, entry.orgId);
+
+    const balance: number =
+      (db.prepare("SELECT credits FROM orgs WHERE id = ?").get(entry.orgId) as any)
+        ?.credits ?? 0;
+
+    db.prepare("UPDATE credit_ledger SET balance_after = ? WHERE id = ?").run(
+      balance,
+      claimed.lastInsertRowid
+    );
+
+    return { balance, delta: entry.delta };
+  })();
+}
+
+/** The movements behind a balance, newest first — the audit trail. */
+export function creditLedger(orgId: string, limit = 50) {
+  return getDb()
+    .prepare(
+      `SELECT at, delta, reason, ref, balance_after, note FROM credit_ledger
+       WHERE org_id = ? ORDER BY at DESC, id DESC LIMIT ?`
+    )
+    .all(orgId, limit) as {
+    at: number;
+    delta: number;
+    reason: string;
+    ref: string;
+    balance_after: number;
+    note: string | null;
+  }[];
+}
+
+/** Grace and the recurring amount are state, not movements, so they stay
+ *  here rather than in the ledger. */
+export function setDonationState(
+  id: string,
+  s: { donationUsdMonthly?: number; graceUntil?: number | null }
+): void {
+  if (s.donationUsdMonthly !== undefined) {
+    getDb()
+      .prepare("UPDATE orgs SET donation_usd_monthly = ? WHERE id = ?")
+      .run(s.donationUsdMonthly, id);
+  }
+  if (s.graceUntil !== undefined) {
+    getDb().prepare("UPDATE orgs SET grace_until = ? WHERE id = ?").run(s.graceUntil, id);
+  }
+}
+
+export function setOrgCredit(id: string, c: OrgCredit): void {
+  getDb()
+    .prepare(
+      `UPDATE orgs SET credits = ?, donation_usd_monthly = ?, grace_until = ?
+       WHERE id = ?`
+    )
+    .run(c.credits, c.donationUsdMonthly, c.graceUntil, id);
+}
+
+/**
+ * Orgs that actually ran checks on `day`.
+ *
+ * No "needs burning" marker any more: the ledger's unique (reason, ref)
+ * decides whether a day has been charged, so this only has to find candidates
+ * and can be re-run freely.
+ */
+export function orgsWithUsageOn(day: string): string[] {
+  return (
+    getDb()
+      .prepare("SELECT DISTINCT org_id FROM day_rollups WHERE day = ?")
+      .all(day) as any[]
+  ).map((r) => r.org_id);
+}
+
+/** Checks actually performed by an org on a day, from the rollups. */
+export function checksOnDay(orgId: string, day: string): number {
+  const r: any = getDb()
+    .prepare(
+      `SELECT COALESCE(SUM(up + down), 0) n FROM day_rollups
+       WHERE org_id = ? AND day = ?`
+    )
+    .get(orgId, day);
+  return r?.n ?? 0;
 }
 
 export function getOrgPlan(id: string): string {

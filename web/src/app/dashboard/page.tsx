@@ -4,8 +4,9 @@ import { useEffect, useState, useMemo } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, checksPerDay, type Billing } from "@/lib/api";
 import AlertContacts from "./AlertContacts";
+import Support from "./Support";
 import NewMonitorForm, {
   MonitorTypeIcon,
   protocolTag,
@@ -40,6 +41,13 @@ interface LiveState {
   uptime30d?: number | null;
 }
 
+/** Big numbers, short. "8.97M checks left" reads; "8,970,000" fills the bar. */
+function compactChecks(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 2)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return String(n);
+}
+
 export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
@@ -51,6 +59,37 @@ export default function Dashboard() {
   const [editing, setEditing] = useState<MonitorConfig | null>(null);
   const publicCount = monitors.filter((m) => m.publicOnStatusPage).length;
   const [contactsOpen, setContactsOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
+
+  const [billing, setBilling] = useState<Billing | null>(null);
+
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    // Non-fatal: the header simply omits the balance if this fails. A billing
+    // hiccup must never stop the monitor list rendering.
+    api
+      .billing()
+      .then((b) => !cancelled && setBilling(b))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
+
+  // Arriving from the landing page's donate button, which signs in first so
+  // the payment can be tagged with a workspace.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("donate") !== "1") return;
+    setSupportOpen(true);
+    // Drop the parameter so a refresh does not reopen the panel.
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+  // What this workspace's monitors cost per day, mirroring the server's sum.
+  const usedChecksPerDay = monitors
+    .filter((m) => m.enabled !== false)
+    .reduce((sum, m) => sum + checksPerDay(m.intervalSeconds ?? 60), 0);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "up" | "down" | "paused">("all");
@@ -238,11 +277,28 @@ export default function Dashboard() {
         </div>
 
         <div className="row">
-          {currentUser.email && (
-            <span className="dim" style={{ fontSize: "0.8rem", maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {currentUser.email}
+          {/* Name first, falling back to the email local-part rather than the
+              whole address — the full address crowds the bar and the person
+              already knows which account they are in. */}
+          <div className="who">
+            <span className="who-name">
+              {currentUser.displayName || currentUser.email?.split("@")[0] || "Signed in"}
             </span>
-          )}
+            {!!billing?.credits && (
+              <span className="who-credit" title="Donated capacity remaining">
+                {compactChecks(billing.credits)} checks left
+              </span>
+            )}
+          </div>
+
+          <button
+            className="coffee-btn coffee-btn-nav"
+            onClick={() => setSupportOpen(true)}
+            title="Capacity used, and how to add more"
+          >
+            <span aria-hidden>☕</span>
+            Buy me a coffee
+          </button>
           <button
             className="btn-sm"
             onClick={() => setContactsOpen(true)}
@@ -615,6 +671,12 @@ export default function Dashboard() {
       {/* Same dialog, edit mode. Keyed by id so reopening for a different
           monitor remounts with that monitor's values. */}
       <AlertContacts isOpen={contactsOpen} onClose={() => setContactsOpen(false)} />
+
+      <Support
+        isOpen={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        usedChecksPerDay={usedChecksPerDay}
+      />
 
       <NewMonitorForm
         key={editing?.id ?? "edit"}

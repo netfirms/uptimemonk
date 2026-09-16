@@ -75,16 +75,26 @@ describe("Monitor Input Validation & Plan Limits", () => {
     );
   });
 
-  test("enforces minimum interval for free plan (60 seconds)", async () => {
-    const input: MonitorInput = {
-      name: "Frequent check",
-      type: "http",
-      target: "https://example.com",
-      intervalSeconds: 30, // below the free floor
-    };
+  test("honours a sub-minute interval — frequency is budgeted, not tiered", async () => {
+    // Under donation credits there is no per-plan interval floor. A free
+    // workspace may run one fast monitor if that is how it spends its daily
+    // allowance; `assertFitsBudget` is what says no, and it says so with a
+    // number rather than a tier name.
+    const monitor = await buildMonitor(
+      { name: "Frequent check", type: "http", target: "https://example.com", intervalSeconds: 30 },
+      orgId,
+      "free"
+    );
+    assert.equal(monitor.intervalSeconds, 30);
+  });
 
-    const monitor = await buildMonitor(input, orgId, "free");
-    assert.equal(monitor.intervalSeconds, 60, "raised to the free plan's one-minute floor");
+  test("still refuses to go below the scheduler's own floor", async () => {
+    const monitor = await buildMonitor(
+      { name: "Too fast", type: "http", target: "https://example.com", intervalSeconds: 1 },
+      orgId,
+      "free"
+    );
+    assert.equal(monitor.intervalSeconds, 5, "clamped to MIN_INTERVAL_SECONDS");
   });
 
   test("allows 60-second interval for solo or team plan", async () => {
@@ -206,13 +216,11 @@ describe("editing an existing monitor", () => {
     );
   });
 
-  test("plan limits still apply when editing the interval", async () => {
-    // Editing must not be a way around the floor that creation enforces.
-    const monitor = await buildMonitor({ intervalSeconds: 5 }, orgId, "free", existing as never);
-    assert.ok(
-      (monitor.intervalSeconds ?? 0) >= 60,
-      `free plan floor should hold on edit, got ${monitor.intervalSeconds}`
-    );
+  test("the scheduler floor still holds when editing the interval", async () => {
+    // Editing must not be a way around the one floor that remains. The budget
+    // gate is enforced by the route, not here — see assertFitsBudget.
+    const monitor = await buildMonitor({ intervalSeconds: 1 }, orgId, "free", existing as never);
+    assert.equal(monitor.intervalSeconds, 5);
   });
 
   test("a heartbeat monitor keeps its token across an edit", async () => {
@@ -358,20 +366,26 @@ describe("keyword monitors must request a body", () => {
 });
 
 /**
- * The plan floors are a pricing decision, so assert them directly. They were
- * 300s/60s when checks ran on Firebase and every check cost writes; on a
- * flat-rate probe box the constraint is gone.
+ * Interval is no longer a pricing lever.
+ *
+ * The floors were 300s/60s when checks ran on Firebase and every check cost
+ * writes; then 60s free / 5s paid on a flat-rate box. Under donation credits
+ * the interval is bought out of the daily check budget instead, so the only
+ * floor left is the scheduler's own. `credits.test.ts` covers what the budget
+ * refuses.
  */
-describe("plan interval floors", () => {
+describe("interval floors", () => {
   const orgId = "org-test-123";
 
-  test("free is capped at one minute", async () => {
-    const m = await buildMonitor(
-      { type: "http", target: "https://example.com", intervalSeconds: 5 },
-      orgId,
-      "free"
-    );
-    assert.equal(m.intervalSeconds, 60, "a free account cannot buy sub-minute checks");
+  test("any plan may ask for five seconds — the budget decides, not the tier", async () => {
+    for (const plan of ["free", "solo", "team", "scale"] as const) {
+      const m = await buildMonitor(
+        { type: "http", target: "https://example.com", intervalSeconds: 5 },
+        orgId,
+        plan
+      );
+      assert.equal(m.intervalSeconds, 5, plan);
+    }
   });
 
   test("free can still choose a slower interval", async () => {
@@ -382,17 +396,6 @@ describe("plan interval floors", () => {
     );
     assert.equal(m.intervalSeconds, 900);
   });
-
-  for (const plan of ["solo", "team", "scale"] as const) {
-    test(`${plan} reaches five seconds`, async () => {
-      const m = await buildMonitor(
-        { type: "http", target: "https://example.com", intervalSeconds: 5 },
-        orgId,
-        plan
-      );
-      assert.equal(m.intervalSeconds, 5, "this is what Cloud Scheduler could never do");
-    });
-  }
 
   test("nothing goes below five seconds, on any plan", async () => {
     const m = await buildMonitor(

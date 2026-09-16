@@ -114,12 +114,48 @@ export const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
  * The domain is the *sending* domain registered with Mailgun — usually a
  * subdomain like `mg.example.com`, not the bare apex.
  */
+/**
+ * Stripe, for donations.
+ *
+ * Inert until both are set, like the email providers — the routes register but
+ * refuse, so a worker without keys starts cleanly instead of crashing.
+ * `STRIPE_WEBHOOK_SECRET` is not optional when the webhook is reachable: it is
+ * the only thing distinguishing Stripe from anyone who knows the URL.
+ */
+/**
+ * A pre-made Stripe Payment Link, used instead of creating a Checkout Session
+ * per donation.
+ *
+ * Simpler to operate — no secret key needed just to take money — but the link
+ * carries no workspace id of its own, so `?client_reference_id=<orgId>` is
+ * appended before it is handed to the browser. Without that the webhook has
+ * nothing tying the payment to an account.
+ */
+export const DONATION_LINK_URL = optional(
+  "DONATION_LINK_URL",
+  "https://buy.stripe.com/9B69AU4lc2uh83Fc9Z9sk02"
+);
+/**
+ * What that link charges, in cents — for the button label and the preview.
+ *
+ * Must match the Payment Link. It is only used for display: the grant itself
+ * comes from what Stripe says was actually paid, so a mismatch misleads the
+ * button rather than mis-crediting the donor.
+ */
+export const DONATION_LINK_CENTS = int("DONATION_LINK_CENTS", 299);
+
+/** The link is a monthly subscription, not a one-off — it changes the copy. */
+export const DONATION_LINK_RECURRING =
+  (process.env.DONATION_LINK_RECURRING ?? "true") !== "false";
+
+export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "";
+export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+
 export const MAILGUN_API_KEY = process.env.MAILGUN_API_KEY ?? "";
 export const MAILGUN_DOMAIN = optional("MAILGUN_DOMAIN", "mg.uptimemonke.com");
 /** `https://api.eu.mailgun.net` for an EU-region account. */
 export const MAILGUN_BASE_URL = optional("MAILGUN_BASE_URL", "https://api.mailgun.net");
 export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
-export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "";
 export const ALERT_FROM_EMAIL = optional("ALERT_FROM_EMAIL", "alerts@uptimemonke.com");
 
 /**

@@ -180,7 +180,47 @@ export interface AlertContact {
   verificationSentAt?: number | null;
 }
 
+export type Standing = "free" | "donor" | "grace" | "lapsed";
+
+export interface Billing {
+  standing: Standing;
+  credits: number;
+  donationUsdMonthly: number;
+  graceUntil: number | null;
+  checksPerDayBudget: number;
+  suggestedUsd: number[];
+  /** The one-click Payment Link, already tagged with this workspace. */
+  link?: {
+    url: string;
+    cents: number;
+    checks: number;
+    /** A monthly subscription rather than a one-off. */
+    recurring?: boolean;
+    /** False means a donation would be taken but never credited — the
+     *  webhook secret is missing. */
+    credited: boolean;
+  };
+  /** False when the server has no Stripe secret key. Only custom amounts
+   *  need it; the Payment Link works without one. */
+  enabled: boolean;
+  preview: { usd: number; checks: number }[];
+}
+
+/** Checks per day a monitor at this interval performs — the price of a
+ *  monitor, mirroring `checksPerDay` on the server. */
+export const checksPerDay = (intervalSeconds: number) =>
+  Math.ceil(86_400 / Math.max(5, intervalSeconds));
+
 export const api = {
+  billing: () => request<Billing>("/v1/billing"),
+
+  donate: (usd: number) =>
+    request<{ url: string }>("/v1/billing/checkout", {
+      method: "POST",
+      body: JSON.stringify({ usd }),
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
+
   contacts: () =>
     request<{
       contacts: AlertContact[];

@@ -44,4 +44,15 @@ export const col = {
   incidents: () => db().collection("incidents"),
   alertContacts: () => db().collection("alertContacts"),
   statusPages: () => db().collection("statusPages"),
+  /** Applied Stripe event ids, so a retry cannot grant twice. */
+  stripeEvents: () => db().collection("stripeEvents"),
+  /**
+   * subscription id -> orgId, captured from a Checkout session.
+   *
+   * A Payment Link puts the workspace in `client_reference_id` on the
+   * *session*; it never reaches the subscription, and later renewals only
+   * carry the subscription. Without this mapping a recurring donation is
+   * received every month and credited to nobody.
+   */
+  stripeSubs: () => db().collection("stripeSubs"),
 };

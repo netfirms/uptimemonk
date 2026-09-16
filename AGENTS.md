@@ -127,6 +127,36 @@ hour of downtime replays for free. Nothing on the Firebase side can speak Redis
 anyway — Firestore's only push mechanism is a Cloud Function trigger, and Spark
 has none, so the only possible publisher is a worker, which makes it a loop.
 
+**Capacity is priced per check, not per monitor** (`lib/credits.ts`). This
+replaced the plan paywall. A 5-second monitor is 12x the load of a 1-minute
+one and the old per-monitor cap charged the same for both, which also made a
+free workspace unable to run one fast monitor at any price despite it costing
+the same as ten slow ones. Free is 14,400 checks/day forever; a donation adds
+100,000/day per $1, derived from a measured 41.5 bytes per check rather than
+from competitor pricing. **Grants are in cents** — `Math.round(usd)` granted
+nothing for $0.49 and over-granted $1.50 by a third. There is no per-plan interval floor any more — the
+only floor left is the scheduler's own, and `assertFitsBudget` is what refuses,
+with a number rather than a tier name.
+
+**Running out of credit never stops monitoring.** Zero opens a 7-day grace
+window at full service, then the workspace falls back to the *free* allowance —
+not to nothing. Existing monitors keep checking; only adding and speeding up
+are blocked. Silently stopping someone's monitoring because a card expired
+would be the worst version of the failure this product exists to prevent.
+
+**The nightly burn is idempotent via `credits_burned_day`.** A restart between
+the rollup and the burn would otherwise charge a day twice, and a donor would
+lose credit to an operational accident. It charges from `day_rollups`, so what
+is billed is what was actually probed.
+
+**The Stripe webhook verifies against the raw body.** It lives in its own
+Fastify plugin scope with a buffer content-type parser, because re-serialising
+parsed JSON changes the bytes and the signature stops matching — which is how
+this endpoint ends up either permanently broken or quietly waved through.
+Applied event ids are recorded in Firestore, not SQLite: the API process
+serving the webhook may not be the worker that owns the org, and a grant must
+land once across the fleet. See `api/billing.test.ts`.
+
 **The test-notification button uses `deliver()`, not a shortcut.** It is the
 same function the drainer calls, with the same secrets and per-channel
 formatting, because a test that took its own path could pass while real alerts
@@ -268,7 +298,6 @@ crash-looping.
   deleted with their monitor. Small — one row per monitor per day — but it
   grows without bound.
 - Litestream off-box backup not wired into provisioning.
-- Stripe billing routes not ported from `functions/`.
 - **The public status page has no server-rendered content.** Static export on
   Spark has no Node runtime, so one shell is prerendered and a hosting rewrite
   points `/status/**` at it; the slug is read from the URL at runtime. The page
