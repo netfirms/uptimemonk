@@ -16,7 +16,7 @@ preference.
 | GCP project | `uptimemonk` (project id — unchanged by the domain rename) |
 | Naming | The product is **UptimeMonke**; the GCP project, systemd units, `UPTIMEMONK_*` env vars and the git repo stay `uptimemonk`. Renaming those buys nothing and breaks deploys. |
 | Firebase plan | **Spark (free)**. No Cloud Functions exist or can be deployed. |
-| Version | 0.4.0 — `curl https://api.uptimemonke.com/version` |
+| Version | `curl https://api.uptimemonke.com/version` — compare against `package.json` to see whether the box is behind |
 | Email | Mailgun, sending as `alerts@mg.uptimemonke.com`. Working. |
 | Donations | Stripe Payment Link, **one-off $2.99**. Webhook secret is set; there is deliberately no `STRIPE_SECRET_KEY` — a link needs none. |
 
