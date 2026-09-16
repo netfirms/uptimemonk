@@ -1,4 +1,4 @@
-# UptimeMonk — agent context
+# UptimeMonke — agent context
 
 An UptimeRobot-style uptime monitoring SaaS. **Firebase for people, a fleet of
 AWS Lightsail workers for the work.** Read this before changing anything: most
@@ -14,6 +14,7 @@ preference.
 | Worker `sg-1` | `ssh uptimemonk-worker-1` → 47.129.253.94, ap-southeast-1a |
 | Hardware | $5 Lightsail: 2 vCPU, **414 MB RAM**, 1 GB swap |
 | GCP project | `uptimemonk` (project id — unchanged by the domain rename) |
+| Naming | The product is **UptimeMonke**; the GCP project, systemd units, `UPTIMEMONK_*` env vars and the git repo stay `uptimemonk`. Renaming those buys nothing and breaks deploys. |
 | Firebase plan | **Spark (free)**. No Cloud Functions exist or can be deployed. |
 
 Live checks are running. `curl https://api.uptimemonke.com/healthz` should
@@ -23,22 +24,37 @@ wedged — that is the failure mode that matters, not process liveness.
 ## Commands
 
 ```bash
-npm --prefix server test     # 91 tests, no network or emulator needed
+npm test                     # everything below that needs no emulator: 165 server
+                             # + 33 monitoring + 23 feature tests
+npm --prefix server test     # 165 server tests alone, no network or emulator
 npm run test:rules           # 16 rules tests; needs the Firestore emulator
+npm run test:status          # 6 status-page integration tests; starts the emulator itself
 npm run emulators            # firebase-tools@14 — v15 requires Java 21, host has 17
 npm run deploy               # deploy/deploy-all.sh (Firebase + Lightsail)
-npm run deploy:lightsail     # worker only
+npm run deploy:lightsail uptimemonk-worker-1     # worker only
 ```
 
 Deploys run the test suite first and will refuse to ship a failing tree.
+
+`npm test` also runs `scripts/test-all-features.mjs`, which the server-only
+suite does not. A stale assertion has hidden there before — run the root
+`npm test` before declaring a change green.
 
 ## The two rules everything else follows from
 
 **1. One writer per field.** Hybrid systems rot when two runtimes write the
 same document. The worker fleet owns every piece of monitor *state*; the
-dashboard writes nothing but its own alert-contact names. Firestore rules
-enforce this — `scripts/rules.test.mjs` asserts it. Monitor create/edit/pause
-all go through the worker API, never direct Firestore writes.
+dashboard writes monitor *configuration* only, and only by calling the worker
+API — `firestore.rules` denies client writes to `monitors` outright
+(`allow create, update, delete: if false`), and `scripts/rules.test.mjs`
+asserts it.
+
+This has been broken once. The rules were loosened to `if inOrg(...)` and the
+client grew direct-Firestore fallbacks, which reopened the SSRF hole: `target`
+becomes an outbound request from inside our network, so it *must* pass
+`targetGuard`, and a rule cannot resolve a hostname or count monitors against a
+plan. If you find yourself adding a fallback because an API call failed, fix
+the API call.
 
 **2. Check results never reach Firestore.** They land in SQLite on the worker.
 Firestore holds only an aggregated status mirror: **one document per org**,
@@ -111,6 +127,29 @@ hour of downtime replays for free. Nothing on the Firebase side can speak Redis
 anyway — Firestore's only push mechanism is a Cloud Function trigger, and Spark
 has none, so the only possible publisher is a worker, which makes it a loop.
 
+**A chart range decides which table answers it** (`lib/ranges.ts`,
+`monitors/series.ts`). 24h and 7d read `hour_buckets`, which carry the
+individual samples but are pruned at `RETENTION_DAYS` (35). 30d and 90d read
+`day_rollups`. Pointing a long range at buckets returns a third of the window
+it claims and parses ~2,000 JSON blobs to do it. Both the dashboard and the
+public status page go through `seriesFor()` so they cannot disagree about what
+"last 7 days" means — they did diverge once, when the status page was reading a
+Firestore subcollection the dashboard had stopped writing.
+
+**Bucket timestamps are epoch ms, never formatted strings.** The keys in SQLite
+are UTC; a pre-formatted label would show the wrong hour to most of the world.
+The client formats in the viewer's own timezone.
+
+**`publicOnStatusPage` is opt-in and absence means private.** `toMonitor` maps
+it as `d.publicOnStatusPage === true` on purpose: a monitor written before the
+field existed must not become public because the value is missing.
+
+**`GET /v1/status/:slug` is unauthenticated, so its response shape is a
+security decision.** Only opted-in monitors appear; the probe target, keyword,
+alert contacts and last error are all withheld; a paused monitor reads as
+`paused`; and an unknown slug and a published-but-empty page return the *same*
+404 so orgs cannot be enumerated. `api/status.test.ts` pins each of these.
+
 **Config sync must never reset live state.** On reconnect the listener
 re-delivers every document as "added". `upsertMonitorConfig` deliberately
 excludes `status`, `due_at` and failure counts; otherwise every reconnect would
@@ -137,16 +176,31 @@ server/src/
     stateMachine.ts     pure up/down decision (heavily tested)
     recordResult.ts     buffering, incidents, outbox
     validate.ts         plan limits + SSRF guard — the single write path
+    series.ts           chart data; picks buckets or rollups per range
   alerts/
     channels.ts         email · slack · discord · telegram · webhook
     drainer.ts          transactional outbox → network, with backoff
   sync/
     configListener.ts   Firebase → worker (listener + periodic reconcile)
     mirror.ts           worker → Firebase, aggregated per org
+  api/
+    monitors.ts         CRUD + /v1/monitors/:id/history (ranged)
+    contacts.ts         alert-contact verification (send + confirm)
+    status.ts           public status page feed — unauthenticated, see above
+    misc.ts             healthz, version, heartbeat, bootstrap
+  lib/
+    targetGuard.ts      SSRF defence — read before touching a probe
+    ranges.ts           the four chart windows and which table serves each
+    readiness.ts        reports missing critical config at boot and on /healthz
+    plans.ts            plan limits — free is 10 monitors at 60s, paid 5s
   db/                   connection, pragmas, repo, numbered SQL migrations
+server/test/            emulator-backed integration tests (Firestore needed)
 
 deploy/                 systemd units, Caddyfile, provision.sh, deploy scripts
 web/                    Next.js dashboard (static export on Spark)
+  src/app/dashboard/    monitor list, create/edit form, history detail panel
+  src/app/status/       public status page — client-rendered, see below
+  src/components/       RangeTabs (shared by both charts), Landing, logo
 firestore.rules         tenancy; monitors are backend-only
 functions/              LEGACY Firebase-only build. Not deployed. Reference only.
 creds/                  gitignored. Real service-account key lives here.
@@ -169,10 +223,27 @@ crash-looping.
   SQLite history, so its monitors restart at `pending` and incidents open on the
   previous owner are orphaned. Fix is to seed from the `orgStatus` mirror on
   adoption. Not built.
+- **Cross-region confirmation is inactive.** `verifyWithPeer` needs
+  `VERIFY_PEER_URL` and `VERIFY_SECRET`; with one worker there is no peer, so
+  it returns `unavailable` and only `confirmationThreshold` guards against
+  false alarms. It begins working when a second worker is provisioned.
+- **`day_rollups` is never pruned.** `RETENTION_DAYS` prunes `hour_buckets`
+  and `INCIDENT_RETENTION_DAYS` prunes incidents, but daily rollups are only
+  deleted with their monitor. Small — one row per monitor per day — but it
+  grows without bound.
 - Litestream off-box backup not wired into provisioning.
 - Stripe billing routes not ported from `functions/`.
-- Alert-contact verification exists in `functions/` but is not yet a worker route.
-- Status pages lose SSR on Spark; serve from a worker to keep SEO.
+- **The public status page has no server-rendered content.** Static export on
+  Spark has no Node runtime, so one shell is prerendered and a hosting rewrite
+  points `/status/**` at it; the slug is read from the URL at runtime. The page
+  is marked `noindex` to match. Moving to App Hosting (Blaze) would restore
+  SSR; nothing else about the page would change.
+- **A status page cannot be titled or given a custom slug from the UI.** The
+  worker resolves a `statusPages` document if one exists and otherwise falls
+  back to the org id, so `/status/<orgId>` works with no setup — but the title
+  stays "Service status" until someone writes that document by hand. The
+  fallback deliberately does *not* borrow the org's name: bootstrap derives it
+  from the local-part of the owner's email address.
 
 ## Scaling out
 

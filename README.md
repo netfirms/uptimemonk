@@ -1,6 +1,6 @@
-# UptimeMonk — an UptimeRobot-style monitoring SaaS
+# UptimeMonke — an UptimeRobot-style monitoring SaaS
 
-Firebase for people, a fleet of $7 workers for the work.
+Firebase for people, a fleet of $5 workers for the work.
 
 ```
    Browser                Firebase (Spark)          Worker fleet (Lightsail)
@@ -8,7 +8,7 @@ Firebase for people, a fleet of $7 workers for the work.
   │dashboard│──sign in──▶│ Auth             │     │ worker sg-1  shard 0/3 │
   │         │            │                  │     │  Fastify API           │
   │         │◀─onSnapshot│ Firestore        │◀───▶│  Scheduler (min-heap)  │──▶ targets
-  │         │            │  · monitors      │     │  Probe pool (200)      │
+  │         │            │  · monitors      │     │  Probe pool (50)       │
   │         │──writes───────────────────────────▶ │  SQLite ◀ all history  │
   └─────────┘  Bearer ID │  · orgStatus     │     └────────────────────────┘
                   token  │  · incidents     │     ┌────────────────────────┐
@@ -33,6 +33,62 @@ tier.
 > carries the invariants that look like bugs but are not, and the boundaries
 > around credentials and the live worker.
 
+## What it does
+
+| | |
+|---|---|
+| Check types | HTTP · keyword · TCP port · DNS record · SSL expiry · ICMP ping · cron heartbeat |
+| Intervals | 5 s to 24 h, floored by plan |
+| Confirmation | `confirmationThreshold` consecutive failures, plus cross-region verification when a peer is configured (see below) |
+| Alerts | Email · Slack · Discord · Telegram · webhook, through a transactional outbox |
+| History | Per-check samples for 35 days, then daily rollups; charts read the last 90 days |
+| Charts | 24 h · 7 d · 30 d · 90 d, on the dashboard and the public status page |
+| Status page | Public, per-monitor opt-in, at `/status/<org-id>` |
+
+**Cross-region confirmation is currently inactive.** `verifyWithPeer` asks a
+second worker whether it sees the same failure, which kills the largest source
+of false alarms — a network blip between one probe and the target. It needs
+`VERIFY_PEER_URL` and `VERIFY_SECRET`, and with a single worker there is no
+peer, so it returns `unavailable` and the decision falls back to
+`confirmationThreshold` alone. It starts working when a second worker exists.
+
+### Plans
+
+| Plan | Monitors | Fastest check |
+|---|---|---|
+| free | 10 | 60 s |
+| solo | 50 | 5 s |
+| team | 200 | 5 s |
+| scale | 1,000 | 5 s |
+
+Defined in one place, `server/src/lib/plans.ts`, and enforced in
+`monitors/validate.ts` — the single write path. The free tier's 60 s floor is a
+product decision, not a technical one: the old 300 s floor existed because
+Firestore writes cost money per check, and that constraint disappeared when
+history moved to SQLite.
+
+### Public status pages
+
+A monitor appears on its org's status page only if someone ticks **Show on
+public status page** in the monitor form. Absence means private — a monitor
+created before the field existed does not become public because the value is
+missing.
+
+The feed is `GET /v1/status/:slug`, unauthenticated, which makes its response
+shape a security decision rather than a convenience:
+
+- only opted-in monitors appear;
+- names and health only — never the probe target, the keyword, the alert
+  contacts or the last error;
+- a paused monitor reads as `paused`, not as its stale last status;
+- an unknown slug and a published-but-empty page return the **same** 404, so
+  the endpoint cannot be walked to discover which orgs exist.
+
+The page is client-rendered: a static export on Spark has no Node runtime, so
+one shell is prerendered and a hosting rewrite points `/status/**` at it. That
+costs server-rendered content for crawlers, so the page is `noindex` to match.
+See Known gaps.
+
 ## Why this shape
 
 The product was first built entirely on Firebase. Three hard limits killed it:
@@ -50,8 +106,13 @@ regions and roughly 5,000 monitors.
 
 **One writer per field.** Hybrid systems rot when two runtimes write the same
 document. The worker fleet owns every piece of monitor *state*; the dashboard
-writes nothing but its own alert-contact names. Firestore rules enforce it —
-see `scripts/rules.test.mjs`.
+writes monitor *configuration* only, and only by calling the worker API.
+`firestore.rules` denies client writes to `monitors` outright — see
+`scripts/rules.test.mjs`.
+
+The API is not a formality. `target` becomes an outbound request from inside
+our network, so it has to clear `targetGuard`, and plan limits need a count.
+A security rule can do neither.
 
 This rule is also why work is sharded by **organisation** rather than by
 monitor: the status mirror is one document per org, so splitting an org across
@@ -114,18 +175,24 @@ server/                 one worker. This is where the product runs.
       stateMachine.ts   pure up/down decision
       recordResult.ts   buffering, incidents, outbox
       validate.ts       plan limits + SSRF guard, one place
+      series.ts         chart data — picks hour buckets or day rollups
     alerts/
       channels.ts       email · slack · discord · telegram · webhook
       drainer.ts        outbox → network, with backoff
     sync/
       configListener.ts Firebase → worker
       mirror.ts         worker → Firebase, aggregated
-    lib/targetGuard.ts  SSRF defence — read this before touching a probe
-    api/                Fastify routes
+    lib/
+      targetGuard.ts    SSRF defence — read this before touching a probe
+      ranges.ts         the four chart windows, and which table serves each
+      plans.ts          plan limits
+      readiness.ts      flags missing critical config at boot and on /healthz
+    api/                Fastify routes, incl. the public status feed
     worker.ts           probe process entrypoint
     api.ts              HTTP process entrypoint
+server/test/            emulator-backed integration tests
 deploy/                 provision.sh, deploy.sh, Caddyfile, systemd units
-web/                    Next.js dashboard (static export on Spark)
+web/                    Next.js dashboard + public status page (static export)
 firestore.rules         tenancy; monitors are backend-only
 scripts/rules.test.mjs  16 emulator tests for the above
 functions/              LEGACY — the Firebase-only build, kept for reference
@@ -136,7 +203,7 @@ functions/              LEGACY — the Firebase-only build, kept for reference
 **`better-sqlite3` is synchronous.** Every query blocks the event loop. Check
 results are therefore buffered and flushed in one transaction every 5s — a
 thousand rows costs about a millisecond. Writing per-check would hand the loop
-a syscall per probe, in the middle of 200 concurrent sockets.
+a syscall per probe, in the middle of every concurrent socket in the pool.
 
 **Advance the grid, never reset it.** `dueAt += interval`, not
 `dueAt = now + interval`. The latter lets slow probes drift until a 5-minute
@@ -149,6 +216,13 @@ invisible. We measure what a first-time visitor experiences.
 **No per-check rows.** One row per monitor per hour, counters plus a JSON
 sample array. At 5,000 monitors that is 120k inserts a day instead of 1.44M.
 
+**A chart range picks its own table.** 24h and 7d read `hour_buckets`, which
+hold the individual samples but are pruned at 35 days; 30d and 90d read
+`day_rollups`. Serving a long range from buckets returns a third of the window
+it claims. `lib/ranges.ts` is the one place that decides, and both the
+dashboard and the status page go through `monitors/series.ts` so they cannot
+drift apart.
+
 **The SSRF guard is not optional.** AWS's metadata service answers on the same
 `169.254.169.254` as Google's. `targetGuard.ts` blocks it, IMDSv2 is the second
 lock, and both are load-bearing.
@@ -157,11 +231,15 @@ lock, and both are load-bearing.
 
 ```bash
 # Tests — no emulator, no network needed
-npm --prefix server test          # 91 tests
+npm test                          # 165 server + 33 monitoring + 23 feature
+npm --prefix server test          # 165 server tests alone
 
 # Security rules, against the Firestore emulator
 npx firebase-tools@14 emulators:start --only firestore --project demo-uptimemonk
 npm run test:rules                # 16 tests
+
+# Status page, end to end — starts its own emulator
+npm run test:status               # 6 tests
 
 # Locally
 cp deploy/uptimemonk.env.example server/.env   # then fill it in
@@ -179,8 +257,14 @@ Note: `firebase-tools@15` requires Java 21; pin `@14` if you are on Java 17.
 | `sg-1` | `uptimemonk-worker-1` (47.129.253.94) | ap-southeast-1a | 0/1 | $5 · 2 vCPU · 414 MB |
 
 **Live and serving traffic.** Both units active, Firestore listener syncing,
-monitors checking, scheduler lag 0 ms. Memory in use: worker 49 MB, API 43 MB against 220/110
-limits. Deployed as plain Node under systemd — see Deploying below.
+10 monitors scheduled, queue depth 0, scheduler lag 0 ms. Memory in use: worker
+49 MB against a 220 MB cap, API 40 MB against 110 MB. Deployed as plain Node
+under systemd — see Deploying below.
+
+`/healthz` also reports readiness. It currently answers `ok: false` with two
+**critical** issues — `RESEND_API_KEY` and `UPTIMEMONK_HEARTBEAT_URL` are both
+unset — which is accurate and deliberate: checks run and incidents are
+recorded, but nobody is told about them. See Known gaps.
 
 Note the RAM: the $5 plan is 414 MB, not the 1 GB the defaults assume, so
 `PROBE_CONCURRENCY=50` and the systemd `MemoryMax` values are tuned down, and
@@ -233,10 +317,10 @@ ssh ubuntu@<ip> 'sudo bash /tmp/deploy/provision.sh'
 aws lightsail update-instance-metadata-options \
   --instance-name uptimemonk-sg --http-tokens required
 
-# Every deploy after that
-bash deploy/deploy-lightsail.sh ubuntu@<ip>
+# Every deploy after that — an ssh alias works as well as ubuntu@<ip>
+bash deploy/deploy-lightsail.sh uptimemonk-worker-1
 # Or via npm / deploy.sh
-npm run deploy:lightsail -- ubuntu@<ip>
+npm run deploy:lightsail uptimemonk-worker-1
 ```
 
 ### 3. Deploy Everything
@@ -290,5 +374,13 @@ identical, so the same design just starts costing cents.
   nothing notices if this box dies.
 - Litestream backups are not yet wired into `provision.sh`.
 - Stripe billing routes have not been ported from `functions/`.
-- Status pages lose SSR on Spark; serve them from a worker to keep SEO.
-- Alert-contact verification exists in `functions/` but is not yet a worker route.
+- **Public status pages have no server-rendered content** and are `noindex` as
+  a result. Static export on Spark has no Node runtime. Moving to App Hosting
+  (Blaze) restores SSR without changing anything else about the page.
+- **Status pages cannot be titled or given a custom slug from the UI.** The
+  worker resolves a `statusPages` document if one exists and otherwise treats
+  the slug as an org id, so `/status/<orgId>` works with no setup — but the
+  heading stays "Service status" until that document is written by hand. The
+  fallback deliberately does not borrow the org's name: bootstrap derives it
+  from the local-part of the owner's email address, and that is not ours to
+  publish.
