@@ -185,7 +185,7 @@ export default function Dashboard() {
   if (!currentUser) {
     return (
       <main className="wrap">
-        {/* Navigation Bar */}
+        {/* Minimal Navigation Bar */}
         <header className="topbar">
           <div className="brand-badge">
             <span className="brand-robot">
@@ -199,7 +199,7 @@ export default function Dashboard() {
           <div className="row">
             <span className="status-pill up" style={{ fontSize: "0.72rem" }}>
               <span className="status-dot up" />
-              All Systems Operational
+              Probes Live
             </span>
             <button className="primary" onClick={handleGoogleSignIn} disabled={isSigningIn}>
               {isSigningIn ? "Connecting…" : "Sign In with Google"}
@@ -207,27 +207,21 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Hero Section */}
+        {/* Lightweight Hero */}
         <section className="hero-wrap">
           <div className="hero-tag">
             <span className="status-dot up" />
-            Free Website &amp; Infrastructure Monitoring Service
+            Free Website &amp; Infrastructure Monitoring
           </div>
           <h1 className="hero-title">
-            Start monitoring in 30 seconds.<br />
-            Get 50 monitors for <span className="hero-green">FREE</span>.
+            Keep your websites &amp; APIs online.
           </h1>
           <p className="hero-desc">
-            Continuous HTTP checks, SSL certificate alerts, ICMP ping probes, port monitoring, and cron heartbeats. Instant notifications before your customers notice.
+            Continuous HTTP, SSL, ping, and cron heartbeat monitoring with sub-minute checks and instant alerts before your users notice.
           </p>
 
-          {/* Google Sign-in Box */}
-          <div className="auth-box">
-            <h3 style={{ marginBottom: "8px", fontWeight: 700 }}>Welcome to UptimeMonk</h3>
-            <p className="muted" style={{ marginBottom: "22px", fontSize: "0.85rem" }}>
-              Sign in with Google to create your free workspace and configure your first monitor.
-            </p>
-
+          {/* Direct CTA */}
+          <div className="hero-cta-wrap">
             {authError && (
               <div
                 style={{
@@ -237,15 +231,15 @@ export default function Dashboard() {
                   padding: "10px 14px",
                   color: "#ef4444",
                   fontSize: "0.85rem",
-                  marginBottom: "16px",
-                  textAlign: "left",
+                  maxWidth: "400px",
+                  textAlign: "center",
                 }}
               >
                 {authError}
               </div>
             )}
 
-            <button className="google-btn" onClick={handleGoogleSignIn} disabled={isSigningIn}>
+            <button className="google-btn-light" onClick={handleGoogleSignIn} disabled={isSigningIn}>
               {isSigningIn ? (
                 <span>Connecting to Google…</span>
               ) : (
@@ -268,76 +262,108 @@ export default function Dashboard() {
                       d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
                     />
                   </svg>
-                  <span>Sign In with Google</span>
+                  <span>Continue with Google</span>
                 </>
               )}
             </button>
-            <p className="dim" style={{ marginTop: "12px" }}>
-              No credit card required · Free plan on Google Cloud
+            <p className="dim" style={{ fontSize: "0.78rem" }}>
+              50 monitors free · No credit card required · Instant setup
             </p>
           </div>
-        </section>
 
-        {/* Feature Cards Grid */}
-        <section className="feature-grid">
-          <div className="feature-card">
-            <div className="feature-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          {/* Horizontal Feature Badges */}
+          <div className="features-strip">
+            <div className="feature-pill">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z" />
-                <path d="M2 12h20" />
               </svg>
+              <span>Website &amp; API (HTTP)</span>
             </div>
-            <h3 style={{ fontWeight: 700, marginBottom: "6px" }}>Website &amp; API Monitoring</h3>
-            <p className="muted" style={{ fontSize: "0.85rem" }}>
-              Continuous HTTP(s) checks verify status codes, headers, and response speed from distributed probes.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <div className="feature-pill">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-                <path d="m9 12 2 2 4-4" />
               </svg>
+              <span>SSL Expiry Alerts</span>
             </div>
-            <h3 style={{ fontWeight: 700, marginBottom: "6px" }}>SSL Certificate Tracking</h3>
-            <p className="muted" style={{ fontSize: "0.85rem" }}>
-              Get automatic advance notifications 30, 14, and 7 days before certificates expire to prevent outages.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <div className="feature-pill">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
               </svg>
+              <span>Ping (ICMP)</span>
             </div>
-            <h3 style={{ fontWeight: 700, marginBottom: "6px" }}>Ping &amp; Port Monitoring</h3>
-            <p className="muted" style={{ fontSize: "0.85rem" }}>
-              Track server reachability via ICMP ping and verify specific TCP ports like MySQL, SMTP, or custom backends.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <div className="feature-pill">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+              </svg>
+              <span>Port &amp; DNS Checks</span>
+            </div>
+            <div className="feature-pill">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>Cron Heartbeats</span>
+            </div>
+            <div className="feature-pill">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
                 <rect width="18" height="18" x="3" y="3" rx="2" />
                 <path d="M7 8h10" />
                 <path d="M7 12h10" />
-                <path d="M7 16h10" />
               </svg>
+              <span>Public Status Pages</span>
             </div>
-            <h3 style={{ fontWeight: 700, marginBottom: "6px" }}>Public Status Pages</h3>
-            <p className="muted" style={{ fontSize: "0.85rem" }}>
-              Share real-time status and 90-day historical reliability graphs on a branded public status page.
-            </p>
+          </div>
+
+          {/* Compact Live Check Preview */}
+          <div className="preview-box">
+            <div className="preview-topbar">
+              <div className="preview-dots">
+                <span className="preview-dot-mac" />
+                <span className="preview-dot-mac" />
+                <span className="preview-dot-mac" />
+              </div>
+              <span>Live Edge Probes — Active Checks</span>
+              <span className="status-dot up" />
+            </div>
+            <div className="preview-rows">
+              <div className="preview-row">
+                <div className="row">
+                  <span className="status-dot up" />
+                  <span className="preview-target">https://api.example.com/health</span>
+                </div>
+                <div className="row">
+                  <span className="dim">200 OK</span>
+                  <span className="latency-val latency-fast">28 ms</span>
+                </div>
+              </div>
+              <div className="preview-row">
+                <div className="row">
+                  <span className="status-dot up" />
+                  <span className="preview-target">https://example.com</span>
+                </div>
+                <div className="row">
+                  <span className="dim">SSL Valid (82d)</span>
+                  <span className="latency-val latency-fast">44 ms</span>
+                </div>
+              </div>
+              <div className="preview-row">
+                <div className="row">
+                  <span className="status-dot up" />
+                  <span className="preview-target">db.internal:5432</span>
+                </div>
+                <div className="row">
+                  <span className="dim">TCP Open</span>
+                  <span className="latency-val latency-fast">12 ms</span>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
-        {/* Footer */}
+        {/* Minimal Footer */}
         <footer className="app-footer">
-          <span>UptimeMonk · Inspired by UptimeRobot</span>
+          <span>UptimeMonk · Lightweight Infrastructure Monitoring</span>
           <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
         </footer>
       </main>
