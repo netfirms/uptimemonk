@@ -2774,10 +2774,13 @@ button.btn-outline-red {
   white-space: nowrap;
 }
 
+/* Green past 30 days: comfortably valid is a state worth seeing, not just the
+   absence of a warning. The three colours then line up with the alert
+   thresholds — green, amber at 30, red at 7. */
 .cert-tag.ok {
-  background: rgba(148, 163, 184, 0.12);
-  border-color: rgba(148, 163, 184, 0.28);
-  color: #94a3b8;
+  background: rgba(59, 214, 113, 0.12);
+  border-color: rgba(59, 214, 113, 0.3);
+  color: #3BD671;
 }
 
 /* Amber at 30 days, the same moment the first warning email goes out. */
@@ -2807,7 +2810,7 @@ button.btn-outline-red {
   font-weight: 700;
 }
 
-.cert-left.ok { color: #e2e8f0; }
+.cert-left.ok { color: #3BD671; }
 .cert-left.warn { color: #f59e0b; }
 .cert-left.down { color: #f87171; }
 
