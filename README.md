@@ -444,6 +444,25 @@ Confirm with `curl -s https://api.uptimemonke.com/healthz` — and in the
 dashboard, **Support** should now offer amounts instead of saying donations
 are not set up.
 
+### End-to-end against the live system
+
+`npm run test:e2e` signs in as a real account, bootstraps a workspace,
+creates one monitor of every type, waits for the worker to actually probe
+them, pings the heartbeat, and deletes everything it made. Nothing is mocked
+— it is the same HTTP the browser sends to the deployed API.
+
+It needs credentials, which are never committed. Without them it skips, so a
+fresh checkout still runs green:
+
+```bash
+UPTIMEMONK_E2E_EMAIL=you@example.com \
+UPTIMEMONK_E2E_PASSWORD=... \
+  npm run test:e2e
+```
+
+The account must already exist **and be verified** — the API refuses an
+unconfirmed address, which the suite asserts rather than works around.
+
 ### Testing it
 
 Use a `sk_test_…` key and Stripe's test mode first. Card `4242 4242 4242 4242`

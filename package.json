@@ -18,7 +18,8 @@
     "deploy:lightsail": "bash deploy/deploy-lightsail.sh",
     "build:admin": "npm --prefix admin run build",
     "deploy:admin": "npx --no-install firebase-tools deploy --only hosting:uptimemonke-admin",
-    "test:status": "npm --prefix server run build && firebase emulators:exec --only firestore --project demo-uptimemonk \"node --test server/test/status-page.test.mjs\""
+    "test:status": "npm --prefix server run build && firebase emulators:exec --only firestore --project demo-uptimemonk \"node --test server/test/status-page.test.mjs\"",
+    "test:e2e": "node --test scripts/e2e-account.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
