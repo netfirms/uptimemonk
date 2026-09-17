@@ -4,6 +4,7 @@ import { checkHttp, describeNetworkError } from "./http.js";
 import { checkTcp } from "./tcp.js";
 import { checkDns } from "./dns.js";
 import { checkSsl } from "./ssl.js";
+import { checkIcmp } from "./icmp.js";
 import { runProbe } from "./index.js";
 import type { Monitor, ProbeRegion } from "../types.js";
 
@@ -425,5 +426,98 @@ describe("Advanced Monitoring Features", () => {
       assert.equal(res.ok, true);
       assert.ok(Array.isArray(res.meta?.values) && (res.meta.values as string[]).length > 0);
     });
+
+    test("resolves AAAA, MX, TXT, and NS records", async () => {
+      for (const rec of ["AAAA", "MX", "TXT", "NS"] as const) {
+        const monitor = makeMonitor({
+          id: `m-dns-${rec.toLowerCase()}`,
+          type: "dns",
+          target: "google.com",
+          dnsRecordType: rec,
+        });
+        const res = await checkDns(monitor, region);
+        assert.equal(res.ok, true, `resolves ${rec}`);
+        assert.ok(Array.isArray(res.meta?.values), `values array returned for ${rec}`);
+      }
+    });
+  });
+
+  describe("ICMP Ping Checks", () => {
+    test("blocks SSRF targets from checkIcmp", async () => {
+      const monitor = makeMonitor({
+        id: "m-icmp-ssrf",
+        type: "icmp",
+        target: "127.0.0.1",
+      });
+      const res = await checkIcmp(monitor, region);
+      assert.equal(res.ok, false);
+      assert.match(res.error || "", /private or link-local address|internal hostname/i);
+    });
+
+    test("blocks cloud metadata address from checkIcmp", async () => {
+      const monitor = makeMonitor({
+        id: "m-icmp-meta",
+        type: "icmp",
+        target: "169.254.169.254",
+      });
+      const res = await checkIcmp(monitor, region);
+      assert.equal(res.ok, false);
+      assert.match(res.error || "", /private or link-local address|internal hostname/i);
+    });
+
+    test("executes ping check against public DNS (1.1.1.1)", async () => {
+      const monitor = makeMonitor({
+        id: "m-icmp-pub",
+        type: "icmp",
+        target: "1.1.1.1",
+        icmpPacketCount: 2,
+        icmpMaxLossPercent: 50,
+      });
+      const res = await checkIcmp(monitor, region);
+      assert.equal(res.ok, true);
+      assert.equal(res.error, undefined);
+      assert.ok(typeof res.meta?.packetLossPercent === "number");
+      assert.ok(res.responseTimeMs > 0);
+    });
+
+    test("runProbe dispatches ICMP monitor", async () => {
+      const monitor = makeMonitor({
+        id: "m-probe-icmp",
+        type: "icmp",
+        target: "1.1.1.1",
+      });
+      const res = await runProbe(monitor, region);
+      assert.equal(res.ok, true);
+    });
+  });
+
+  describe("HTTP Authentication Headers", () => {
+    test("sends Basic Auth header", async () => {
+      const monitor = makeMonitor({
+        id: "m-http-basic",
+        type: "http",
+        target: "https://example.com",
+        httpAuthType: "basic",
+        authUsername: "admin",
+        authPassword: "secretpassword",
+        timeoutSeconds: 10,
+      });
+      const res = await checkHttp(monitor, region);
+      assert.equal(res.ok, true);
+    });
+
+    test("sends Bearer Auth header", async () => {
+      const monitor = makeMonitor({
+        id: "m-http-bearer",
+        type: "http",
+        target: "https://example.com",
+        httpAuthType: "bearer",
+        authToken: "test-token-12345",
+        timeoutSeconds: 10,
+      });
+      const res = await checkHttp(monitor, region);
+      assert.equal(res.ok, true);
+    });
   });
 });
+

@@ -59,8 +59,8 @@ export function requireAuth(options: AuthOptions = {}) {
   };
 }
 
-export function requireOwner(req: FastifyRequest, reply: FastifyReply): void {
+export async function requireOwner(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   if (req.user?.role !== "owner") {
-    void reply.code(403).send({ error: "Only the workspace owner can do that" });
+    return reply.code(403).send({ error: "Only the workspace owner can do that" });
   }
 }

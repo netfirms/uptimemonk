@@ -46,6 +46,9 @@ export interface Monitor {
   followRedirects?: boolean;
   maxResponseTimeMs?: number;
   httpAuthType?: "none" | "basic" | "bearer";
+  authUsername?: string;
+  authPassword?: string;
+  authToken?: string;
 
   keyword?: string;
   keywordInverted?: boolean;

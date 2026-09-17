@@ -32,7 +32,14 @@ export function db(): Firestore {
   return getFirestore(ensureApp());
 }
 
+let customAuth: Auth | null = null;
+
+export function setCustomAuth(mock: Auth | null): void {
+  customAuth = mock;
+}
+
 export function auth(): Auth {
+  if (customAuth) return customAuth;
   return getAuth(ensureApp());
 }
 

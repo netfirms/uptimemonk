@@ -11,6 +11,7 @@
     "build": "tsc && node --eval \"fs.cpSync('src/db/migrations', 'dist/db/migrations', {recursive:true})\"",
     "typecheck": "tsc --noEmit",
     "test": "tsc && node --eval \"fs.cpSync('src/db/migrations', 'dist/db/migrations', {recursive:true})\" && node --test \"dist/**/*.test.js\"",
+    "test:coverage": "tsc && node --eval \"fs.cpSync('src/db/migrations', 'dist/db/migrations', {recursive:true})\" && node --test --experimental-test-coverage \"dist/**/*.test.js\"",
     "worker": "node dist/worker.js",
     "api": "node dist/api.js",
     "dev:worker": "tsc && node dist/worker.js",

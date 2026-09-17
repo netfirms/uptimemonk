@@ -247,7 +247,14 @@ export async function buildMonitor(
     const dnsServer = input.dnsServer ?? existing?.dnsServer;
     if (dnsServer) {
       const serverHost = hostFromTarget(dnsServer);
-      await assertPublicHost(serverHost);
+      try {
+        await assertPublicHost(serverHost);
+      } catch (err) {
+        if (err instanceof BlockedTargetError) {
+          throw new ValidationError(`Custom DNS server "${dnsServer}" is invalid: ${err.message}`);
+        }
+        throw err;
+      }
       monitor.dnsServer = serverHost;
     }
   }
@@ -278,11 +285,13 @@ export async function buildMonitor(
   if (type === "icmp") {
     const pktCount = input.icmpPacketCount ?? existing?.icmpPacketCount;
     if (pktCount !== undefined) {
-      monitor.icmpPacketCount = clamp(Number(pktCount) || 3, 1, 5);
+      const parsed = Number(pktCount);
+      monitor.icmpPacketCount = clamp(Number.isFinite(parsed) ? parsed : 3, 1, 5);
     }
     const maxLoss = input.icmpMaxLossPercent ?? existing?.icmpMaxLossPercent;
     if (maxLoss !== undefined) {
-      monitor.icmpMaxLossPercent = clamp(Number(maxLoss) || 50, 1, 100);
+      const parsed = Number(maxLoss);
+      monitor.icmpMaxLossPercent = clamp(Number.isFinite(parsed) ? parsed : 50, 1, 100);
     }
   }
   if (type === "heartbeat") {

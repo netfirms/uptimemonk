@@ -45,10 +45,12 @@ export async function checkIcmp(
   const packetCount = Math.max(1, Math.min(5, monitor.icmpPacketCount ?? 1));
   const maxLossPercent = monitor.icmpMaxLossPercent ?? 100;
 
+  const waitArg = process.platform === "darwin" ? String(timeoutSeconds * 1000) : String(timeoutSeconds);
+
   return new Promise<CheckResult>((resolve) => {
     execFile(
       "ping",
-      ["-c", String(packetCount), "-n", "-W", String(timeoutSeconds), "--", host],
+      ["-c", String(packetCount), "-n", "-W", waitArg, "--", host],
       { timeout: (timeoutSeconds + 4) * 1000, killSignal: "SIGKILL" },
       (err, stdout) => {
         const elapsed = Date.now() - started;

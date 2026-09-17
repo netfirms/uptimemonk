@@ -406,3 +406,155 @@ describe("interval floors", () => {
     assert.ok((m.intervalSeconds ?? 0) >= 5, `got ${m.intervalSeconds}`);
   });
 });
+
+describe("Advanced Monitor Configuration Validation", () => {
+  const orgId = "org-test-123";
+
+  test("rejects invalid regex pattern in keyword monitor", async () => {
+    await assert.rejects(
+      async () =>
+        buildMonitor(
+          {
+            type: "keyword",
+            target: "https://example.com",
+            keyword: "[invalid(regex+",
+            keywordRegex: true,
+          },
+          orgId,
+          "free"
+        ),
+      (err: Error) => {
+        assert.ok(err instanceof ValidationError);
+        assert.match(err.message, /Invalid regular expression/i);
+        return true;
+      }
+    );
+  });
+
+  test("stores valid regex and jsonPath options on keyword monitor", async () => {
+    const m = await buildMonitor(
+      {
+        type: "keyword",
+        target: "https://example.com",
+        keyword: "ok[0-9]+",
+        keywordRegex: true,
+        jsonPath: "  data.status  ",
+        jsonPathExpected: "active",
+      },
+      orgId,
+      "free"
+    );
+    assert.equal(m.keywordRegex, true);
+    assert.equal(m.jsonPath, "data.status");
+    assert.equal(m.jsonPathExpected, "active");
+  });
+
+  test("validates and clamps maxResponseTimeMs on http monitor", async () => {
+    const mTooLow = await buildMonitor(
+      { type: "http", target: "https://example.com", maxResponseTimeMs: 10 },
+      orgId,
+      "free"
+    );
+    assert.equal(mTooLow.maxResponseTimeMs, 50, "clamped to min 50ms");
+
+    const mTooHigh = await buildMonitor(
+      { type: "http", target: "https://example.com", maxResponseTimeMs: 120000 },
+      orgId,
+      "free"
+    );
+    assert.equal(mTooHigh.maxResponseTimeMs, 60000, "clamped to max 60000ms");
+  });
+
+  test("rejects unsupported DNS record types", async () => {
+    await assert.rejects(
+      async () =>
+        buildMonitor(
+          { type: "dns", target: "example.com", dnsRecordType: "INVALID_REC" },
+          orgId,
+          "free"
+        ),
+      (err: Error) => {
+        assert.ok(err instanceof ValidationError);
+        assert.match(err.message, /Unsupported DNS record type/i);
+        return true;
+      }
+    );
+  });
+
+  test("rejects private host as custom DNS server", async () => {
+    await assert.rejects(
+      async () =>
+        buildMonitor(
+          { type: "dns", target: "example.com", dnsServer: "192.168.1.1" },
+          orgId,
+          "free"
+        ),
+      (err: Error) => {
+        assert.ok(err instanceof ValidationError);
+        assert.match(err.message, /internal hostname|private or link-local/i);
+        return true;
+      }
+    );
+  });
+
+  test("accepts public custom DNS server and validates record types", async () => {
+    const m = await buildMonitor(
+      { type: "dns", target: "example.com", dnsRecordType: "SOA", dnsServer: "1.1.1.1" },
+      orgId,
+      "free"
+    );
+    assert.equal(m.dnsRecordType, "SOA");
+    assert.equal(m.dnsServer, "1.1.1.1");
+  });
+
+  test("clamps ICMP packet count and max loss percentage", async () => {
+    const mClamped = await buildMonitor(
+      { type: "icmp", target: "1.1.1.1", icmpPacketCount: 10, icmpMaxLossPercent: 150 },
+      orgId,
+      "free"
+    );
+    assert.equal(mClamped.icmpPacketCount, 5, "clamped to max 5 packets");
+    assert.equal(mClamped.icmpMaxLossPercent, 100, "clamped to max 100%");
+
+    const mMin = await buildMonitor(
+      { type: "icmp", target: "1.1.1.1", icmpPacketCount: 0, icmpMaxLossPercent: 0 },
+      orgId,
+      "free"
+    );
+    assert.equal(mMin.icmpPacketCount, 1, "clamped to min 1 packet");
+    assert.equal(mMin.icmpMaxLossPercent, 1, "clamped to min 1%");
+  });
+
+  test("validates SSL min version and normalizes expected fingerprint", async () => {
+    const m = await buildMonitor(
+      {
+        type: "ssl",
+        target: "example.com",
+        sslExpectedFingerprint: "  aa:bb:cc:dd  ",
+        sslMinVersion: "TLSv1.3",
+      },
+      orgId,
+      "free"
+    );
+    assert.equal(m.sslExpectedFingerprint, "AA:BB:CC:DD");
+    assert.equal(m.sslMinVersion, "TLSv1.3");
+  });
+
+  test("truncates TCP custom payload and expected response to 1024 chars", async () => {
+    const longStr = "x".repeat(2000);
+    const m = await buildMonitor(
+      {
+        type: "tcp",
+        target: "1.1.1.1",
+        port: 80,
+        tcpPayload: longStr,
+        tcpExpectedResponse: longStr,
+      },
+      orgId,
+      "free"
+    );
+    assert.equal(m.tcpPayload?.length, 1024);
+    assert.equal(m.tcpExpectedResponse?.length, 1024);
+  });
+});
+
