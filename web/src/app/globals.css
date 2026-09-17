@@ -2347,8 +2347,12 @@ button.btn-outline-red {
     justify-content: space-between;
   }
 
+  /* `space-between` pushed the wordmark to the opposite edge of the bar,
+     leaving the mascot stranded on the left with a gap between a logo and
+     the name it belongs to. */
   .topbar .brand-badge {
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 10px;
     width: 100%;
     font-size: 1.15rem;
   }
@@ -2997,4 +3001,44 @@ button.btn-outline-red {
   color: #fb7185;
   border-color: rgba(244, 63, 94, 0.45);
   background: rgba(244, 63, 94, 0.1);
+}
+
+/* --- Tab strips on a phone --- */
+
+/*
+ * Both strips ran off the screen: the demo's fourth tab sat 130px past the
+ * edge and the alert channels' last one 61px, with nothing to say so.
+ *
+ * A fade would make that discoverable, but with only four tabs there is no
+ * reason to hide any of them — wrapping to two rows costs one line of height
+ * and keeps every option visible and tappable. An affordance you do not need
+ * beats one you have to teach.
+ */
+@media (max-width: 640px) {
+  .preview-nav-tabs,
+  .channel-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    overflow: visible;
+  }
+
+  .preview-nav-tabs {
+    justify-content: flex-start;
+    padding: 6px;
+  }
+
+  /* Two per row at 375px, rather than three-and-a-sliver. */
+  .preview-nav-tabs .preview-tab-btn {
+    flex: 1 1 calc(50% - 6px);
+    justify-content: center;
+    font-size: 0.76rem;
+    padding: 7px 8px;
+  }
+
+  .channel-tabs .channel-tab-btn {
+    font-size: 0.76rem;
+    padding: 7px 10px;
+  }
 }
