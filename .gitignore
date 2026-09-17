@@ -4,6 +4,7 @@ functions/lib/
 .next/
 out/
 web/out/
+admin/out/
 *.tsbuildinfo
 .DS_Store
 *.log

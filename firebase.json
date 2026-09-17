@@ -19,56 +19,95 @@
     },
     "singleProjectMode": true
   },
-  "hosting": {
-    "public": "web/out",
-    "cleanUrls": true,
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "/status/**",
-        "destination": "/status/_shell.html"
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ],
-    "headers": [
-      {
-        "source": "/**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/opengraph-image",
-        "headers": [
-          {
-            "key": "Content-Type",
-            "value": "image/png"
-          },
-          {
-            "key": "Cache-Control",
-            "value": "public, max-age=86400"
-          }
-        ]
-      },
-      {
-        "source": "/_next/static/**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "public, max-age=31536000, immutable"
-          }
-        ]
-      }
-    ]
-  }
+  "hosting": [
+    {
+      "site": "uptimemonk",
+      "public": "web/out",
+      "cleanUrls": true,
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "/status/**",
+          "destination": "/status/_shell.html"
+        },
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ],
+      "headers": [
+        {
+          "source": "/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, must-revalidate"
+            }
+          ]
+        },
+        {
+          "source": "/opengraph-image",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "image/png"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=86400"
+            }
+          ]
+        },
+        {
+          "source": "/_next/static/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "uptimemonke-admin",
+      "public": "admin/out",
+      "cleanUrls": true,
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ],
+      "headers": [
+        {
+          "source": "/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, must-revalidate"
+            }
+          ]
+        },
+        {
+          "source": "/_next/static/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
