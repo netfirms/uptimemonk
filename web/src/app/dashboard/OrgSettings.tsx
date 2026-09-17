@@ -121,6 +121,52 @@ export default function OrgSettings({
             <p className="dim">Loading…</p>
           ) : (
             <>
+              {onOpenProfile && (
+                <div className="profile-banner-card">
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      fontSize: "0.85rem",
+                      flexShrink: 0
+                    }}>
+                      👤
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#fff" }}>
+                        Personal Profile & Username
+                      </div>
+                      <div className="dim" style={{ fontSize: "0.75rem" }}>
+                        Change your display name and login profile
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    onClick={() => {
+                      onClose();
+                      onOpenProfile();
+                    }}
+                    style={{
+                      background: "rgba(59, 214, 113, 0.15)",
+                      borderColor: "#3BD671",
+                      color: "#3BD671",
+                      whiteSpace: "nowrap",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Edit Username ✎
+                  </button>
+                </div>
+              )}
+
               <form onSubmit={saveName} className="settings-block">
                 <div className="field">
                   <label htmlFor="org-name">Workspace name</label>

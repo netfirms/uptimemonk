@@ -265,200 +265,207 @@ export default function AuthModal({
           </div>
         )}
 
-        {/* Notification / Error Banners */}
-        {notice && (
-          <div className="auth-alert ok" role="status">
-            <span>{notice}</span>
-          </div>
-        )}
-        {error && (
-          <div className="auth-alert err" role="alert">
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* 1-Click Google Authentication */}
-        {mode !== "reset" && (
-          <div className="auth-modal-social">
-            <button
-              type="button"
-              className="btn-google-social"
-              onClick={handleGoogleSignIn}
-              disabled={googleBusy || busy}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              <span>{googleBusy ? "Connecting to Google…" : "Continue with Google"}</span>
-            </button>
-
-            <div className="auth-divider">
-              <span>or continue with email</span>
+        <div className="auth-modal-body">
+          {/* Notification / Error Banners */}
+          {notice && (
+            <div className="auth-alert ok" role="status">
+              <span>{notice}</span>
             </div>
-          </div>
-        )}
-
-        {/* Email & Password Form */}
-        <form className="auth-modal-form" onSubmit={handleSubmit}>
-          {mode === "signup" && (
-            <div className="auth-field">
-              <label htmlFor="auth-name">Your Name</label>
-              <input
-                id="auth-name"
-                type="text"
-                autoComplete="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Alex Developer"
-              />
+          )}
+          {error && (
+            <div className="auth-alert err" role="alert">
+              <span>{error}</span>
             </div>
           )}
 
-          <div className="auth-field">
-            <label htmlFor="auth-email">Work or Personal Email</label>
-            <input
-              id="auth-email"
-              ref={emailInputRef}
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
-            />
-          </div>
-
+          {/* 1-Click Google Authentication */}
           {mode !== "reset" && (
-            <div className="auth-field">
-              <div className="auth-label-row">
-                <label htmlFor="auth-password">Password</label>
-                {mode === "signin" && (
-                  <button
-                    type="button"
-                    className="auth-link-subtle"
-                    onClick={() => {
-                      setMode("reset");
-                      setError(null);
-                    }}
-                  >
-                    Forgot password?
-                  </button>
-                )}
+            <div className="auth-modal-social">
+              <button
+                type="button"
+                className="btn-google-social"
+                onClick={handleGoogleSignIn}
+                disabled={googleBusy || busy}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                  />
+                </svg>
+                <span>{googleBusy ? "Connecting to Google…" : "Continue with Google"}</span>
+              </button>
+
+              <div className="auth-divider">
+                <span>or continue with email</span>
               </div>
+            </div>
+          )}
+
+          {/* Email & Password Form */}
+          <form className="auth-modal-form" onSubmit={handleSubmit}>
+            {mode === "signup" && (
+              <div className="auth-field">
+                <label htmlFor="auth-name">Your Name</label>
+                <div className="auth-input-wrap">
+                  <input
+                    id="auth-name"
+                    type="text"
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Alex Developer"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="auth-field">
+              <label htmlFor="auth-email">Work or Personal Email</label>
               <div className="auth-input-wrap">
                 <input
-                  id="auth-password"
-                  type={showPassword ? "text" : "password"}
+                  id="auth-email"
+                  ref={emailInputRef}
+                  type="email"
                   required
-                  minLength={6}
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === "signup" ? "At least 6 characters" : "Enter password"}
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@company.com"
                 />
-                <button
-                  type="button"
-                  className="auth-pwd-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                  title={showPassword ? "Hide password" : "Show password"}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? "🙈" : "👁️"}
-                </button>
               </div>
-              {mode === "signup" && password.length > 0 && (
-                <div className="auth-pwd-strength">
-                  <span
-                    className={`strength-bar ${
-                      password.length >= 10 ? "strong" : password.length >= 6 ? "medium" : "weak"
-                    }`}
-                  />
-                  <span className="strength-text">
-                    {password.length >= 10
-                      ? "Great password"
-                      : password.length >= 6
-                      ? "Decent password"
-                      : "Too short"}
-                  </span>
-                </div>
-              )}
             </div>
-          )}
 
-          <button
-            type="submit"
-            className="btn-auth-submit"
-            disabled={busy || googleBusy}
-          >
-            {busy ? (
-              <span>Processing…</span>
-            ) : mode === "signup" ? (
-              <span>Create Free Account →</span>
-            ) : mode === "reset" ? (
-              <span>Send Reset Instructions</span>
-            ) : (
-              <span>Sign In to Dashboard →</span>
+            {mode !== "reset" && (
+              <div className="auth-field">
+                <div className="auth-label-row">
+                  <label htmlFor="auth-password">Password</label>
+                  {mode === "signin" && (
+                    <button
+                      type="button"
+                      className="auth-link-subtle"
+                      onClick={() => {
+                        setMode("reset");
+                        setError(null);
+                      }}
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <div className="auth-input-wrap">
+                  <input
+                    id="auth-password"
+                    className="has-toggle"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={6}
+                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={mode === "signup" ? "At least 6 characters" : "Enter password"}
+                  />
+                  <button
+                    type="button"
+                    className="auth-pwd-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                    title={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                {mode === "signup" && password.length > 0 && (
+                  <div className="auth-pwd-strength">
+                    <span
+                      className={`auth-strength-bar ${
+                        password.length >= 10 ? "strong" : password.length >= 6 ? "medium" : "weak"
+                      }`}
+                    />
+                    <span className="strength-text">
+                      {password.length >= 10
+                        ? "Great password"
+                        : password.length >= 6
+                        ? "Decent password"
+                        : "Too short"}
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
-          </button>
-        </form>
 
-        {/* Footer Navigation */}
-        <div className="auth-modal-footer">
-          {mode === "reset" ? (
             <button
-              type="button"
-              className="auth-link-subtle"
-              onClick={() => {
-                setMode("signin");
-                setError(null);
-              }}
+              type="submit"
+              className="btn-auth-submit"
+              disabled={busy || googleBusy}
             >
-              ← Back to sign in
+              {busy ? (
+                <span>Processing…</span>
+              ) : mode === "signup" ? (
+                <span>Create Free Account →</span>
+              ) : mode === "reset" ? (
+                <span>Send Reset Instructions</span>
+              ) : (
+                <span>Sign In to Dashboard →</span>
+              )}
             </button>
-          ) : mode === "signin" ? (
-            <p>
-              Don't have an account yet?{" "}
+          </form>
+
+          {/* Footer Navigation */}
+          <div className="auth-modal-footer">
+            {mode === "reset" ? (
               <button
                 type="button"
-                className="auth-link-highlight"
-                onClick={() => {
-                  setMode("signup");
-                  setError(null);
-                }}
-              >
-                Sign up for free
-              </button>
-            </p>
-          ) : (
-            <p>
-              Already have an account?{" "}
-              <button
-                type="button"
-                className="auth-link-highlight"
+                className="auth-link-subtle"
                 onClick={() => {
                   setMode("signin");
                   setError(null);
                 }}
               >
-                Sign in here
+                ← Back to sign in
               </button>
-            </p>
-          )}
+            ) : mode === "signin" ? (
+              <p>
+                Don't have an account yet?{" "}
+                <button
+                  type="button"
+                  className="auth-link-highlight"
+                  onClick={() => {
+                    setMode("signup");
+                    setError(null);
+                  }}
+                >
+                  Sign up for free
+                </button>
+              </p>
+            ) : (
+              <p>
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  className="auth-link-highlight"
+                  onClick={() => {
+                    setMode("signin");
+                    setError(null);
+                  }}
+                >
+                  Sign in here
+                </button>
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
