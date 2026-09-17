@@ -76,8 +76,15 @@ export function resolvePage(
   return orgExists ? { orgId: slug } : null;
 }
 
-/** Shape check before either lookup, so a junk slug costs no Firestore read. */
-export const isPlausibleSlug = (s: string) => /^[A-Za-z0-9_-]{6,64}$/.test(s);
+/**
+ * Shape check before either lookup, so a junk slug costs no Firestore read.
+ *
+ * Wide enough to cover both things that reach here: a customer-chosen slug
+ * (3-40, lowercase and hyphens — see `lib/slug.ts`) and a raw workspace id,
+ * which is the fallback address. The minimum was 6 and silently made every
+ * three-character slug unresolvable.
+ */
+export const isPlausibleSlug = (s: string) => /^[A-Za-z0-9_-]{3,64}$/.test(s);
 
 /**
  * Resolve a slug to the org it publishes.

@@ -7,6 +7,7 @@ import { auth, db } from "@/lib/firebase";
 import { api, ApiError, checksPerDay, type Billing } from "@/lib/api";
 import AlertContacts from "./AlertContacts";
 import Support from "./Support";
+import OrgSettings from "./OrgSettings";
 import NewMonitorForm, {
   MonitorTypeIcon,
   protocolTag,
@@ -98,6 +99,8 @@ export default function Dashboard() {
   const publicCount = monitors.filter((m) => m.publicOnStatusPage).length;
   const [contactsOpen, setContactsOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
 
   const copyHeartbeatUrl = (id: string, token: string) => {
@@ -110,6 +113,18 @@ export default function Dashboard() {
   };
 
   const [billing, setBilling] = useState<Billing | null>(null);
+
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    api
+      .org()
+      .then((o) => !cancelled && setWorkspaceName(o.name))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
 
   useEffect(() => {
     if (!orgId) return;
@@ -329,15 +344,19 @@ export default function Dashboard() {
               <img src="/mascot-128.png" alt="UptimeMonke" width={56} height={56} />
             </span>
           <span>UptimeMonke</span>
-          <span className="workspace-pill">
+          <button
+            className="workspace-pill"
+            onClick={() => setSettingsOpen(true)}
+            title="Rename the workspace, or set the status page address"
+          >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20 7h-9" />
               <path d="M14 17H5" />
               <circle cx="17" cy="17" r="3" />
               <circle cx="7" cy="7" r="3" />
             </svg>
-            Default Workspace
-          </span>
+            {workspaceName ?? "Workspace"}
+          </button>
         </div>
 
         <div className="row">
@@ -819,6 +838,12 @@ export default function Dashboard() {
 
       {/* Same dialog, edit mode. Keyed by id so reopening for a different
           monitor remounts with that monitor's values. */}
+      <OrgSettings
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onRenamed={setWorkspaceName}
+      />
+
       <AlertContacts isOpen={contactsOpen} onClose={() => setContactsOpen(false)} />
 
       <Support

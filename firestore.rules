@@ -29,6 +29,15 @@ service cloud.firestore {
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner')
       );
     }
+    function isAdminOrOwner() {
+      return signedIn() && (
+        request.auth.token.role == 'owner' ||
+        request.auth.token.role == 'admin' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'))
+      );
+    }
     match /users/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid;
@@ -111,6 +120,16 @@ service cloud.firestore {
       allow update, delete: if inOrg(resource.data.orgId);
     }
 
+    /**
+     * The slug -> org claim. The document id is the slug, and creating it is
+     * how uniqueness is enforced, so a client that could write here could
+     * squat every good address or steal one already in use.
+     */
+    match /statusSlugs/{slug} {
+      allow read: if false;
+      allow create, update, delete: if false;
+    }
+
     match /apiKeys/{id} {
       // The hash must never leave the backend.
       allow read: if false;
@@ -120,6 +139,12 @@ service cloud.firestore {
     match /notifications/{id} {
       allow read: if inOrg(resource.data.orgId);
       allow write: if false;
+    }
+
+    match /system/{docId} {
+      // Dynamic application configuration is accessible and manageable only
+      // by authenticated administrators and organization owners.
+      allow read, write: if isAdminOrOwner();
     }
 
     match /{document=**} {

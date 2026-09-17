@@ -120,7 +120,18 @@ if (!EMULATOR) {
       assert.equal((await get("draft-status")).statusCode, 404);
     });
 
-    test("an unknown slug is a plain 404, with no hint that others exist", async () => {
+    test("a short customer-chosen slug resolves", async () => {
+    // Slugs may be three characters; the resolver's shape check used to
+    // require six and made those silently unreachable.
+    await fs.collection("statusPages").doc("sp3").set({
+      orgId: ORG, slug: "ops", published: true, title: "Ops",
+    });
+    const res = await get("ops");
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.json().title, "Ops");
+  });
+
+  test("an unknown slug is a plain 404, with no hint that others exist", async () => {
       const res = await get("nosuchpagehere");
       assert.equal(res.statusCode, 404);
       assert.deepEqual(res.json(), { error: "No status page here" });

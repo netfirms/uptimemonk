@@ -125,6 +125,8 @@ describe("slug resolution", () => {
     for (const bad of ["", "ab", "../../etc/passwd", "has space", "x".repeat(65)]) {
       assert.equal(isPlausibleSlug(bad), false, bad);
     }
+    // A customer may claim a three-character slug, and it has to resolve.
+    assert.equal(isPlausibleSlug("abc"), true);
     assert.equal(isPlausibleSlug(ORG.padEnd(8, "x")), true);
   });
 });

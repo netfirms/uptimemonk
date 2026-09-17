@@ -3189,3 +3189,69 @@ button.btn-outline-red {
   font-size: 0.76rem;
   line-height: 1.55;
 }
+
+/* --- Workspace settings --- */
+
+/* The pill names the workspace, so it is the obvious place to click to
+   rename it. It was a static label reading "Default Workspace". */
+button.workspace-pill {
+  cursor: pointer;
+  font: inherit;
+}
+
+button.workspace-pill:hover {
+  border-color: rgba(59, 214, 113, 0.4);
+  color: #3BD671;
+}
+
+.settings-block {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-block:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* The prefix is part of the address, not a hint — showing it inline stops
+   people typing the whole URL into the box. */
+.slug-input {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.slug-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 4px 0 11px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.slug-input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 9px 11px 9px 0;
+  color: #e2e8f0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+}
+
+.slug-input input:focus {
+  outline: none;
+}
+
+.slug-input:focus-within {
+  border-color: rgba(59, 214, 113, 0.5);
+}

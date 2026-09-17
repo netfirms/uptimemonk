@@ -51,6 +51,15 @@ export const col = {
   incidents: () => db().collection("incidents"),
   alertContacts: () => db().collection("alertContacts"),
   statusPages: () => db().collection("statusPages"),
+  /**
+   * Slug -> orgId, with the slug as the document id.
+   *
+   * Firestore has no unique index, so uniqueness has to be something the
+   * database can actually enforce. A document id is exactly that: two
+   * workspaces cannot both create `statusSlugs/acme`, and a transaction makes
+   * the check-and-claim atomic instead of a race.
+   */
+  statusSlugs: () => db().collection("statusSlugs"),
   /** Applied Stripe event ids, so a retry cannot grant twice. */
   stripeEvents: () => db().collection("stripeEvents"),
   /**
@@ -62,4 +71,6 @@ export const col = {
    * received every month and credited to nobody.
    */
   stripeSubs: () => db().collection("stripeSubs"),
+  /** System-wide application configuration managed from admin console. */
+  system: () => db().collection("system"),
 };

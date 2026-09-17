@@ -218,7 +218,42 @@ export interface Billing {
 export const checksPerDay = (intervalSeconds: number) =>
   Math.ceil(86_400 / Math.max(5, intervalSeconds));
 
+export interface OrgSettings {
+  orgId: string;
+  name: string;
+  statusPage: {
+    slug: string | null;
+    title: string | null;
+    description: string | null;
+    published: boolean;
+    url: string;
+    /** A starting point derived from the workspace name, never auto-claimed. */
+    suggestion: string;
+  };
+}
+
 export const api = {
+  org: () => request<OrgSettings>("/v1/org"),
+
+  renameOrg: (name: string) =>
+    request<{ name: string }>("/v1/org", {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
+
+  setStatusPage: (input: {
+    slug: string;
+    title?: string;
+    description?: string;
+    published?: boolean;
+  }) =>
+    request<{ slug: string; url: string; replaced: string | null }>("/v1/org/status-page", {
+      method: "PUT",
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
+
   billing: () => request<Billing>("/v1/billing"),
 
   donate: (usd: number) =>
