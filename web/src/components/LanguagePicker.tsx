@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import type { SupportedLocale } from "@/lib/i18n/locales";
 
@@ -46,9 +47,20 @@ export default function LanguagePicker({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
-  function handleSelect(newLocale: SupportedLocale) {
+  function handleSelect(e: React.MouseEvent, newLocale: SupportedLocale) {
     setLocale(newLocale);
     setIsOpen(false);
+
+    // If inside modal or dashboard, don't navigate away
+    if (typeof window !== "undefined") {
+      const pathname = window.location.pathname;
+      const isLanding =
+        pathname === "/" ||
+        locales.some((l) => pathname === `/${l.code}` || pathname === `/${l.code}/`);
+      if (!isLanding) {
+        e.preventDefault();
+      }
+    }
   }
 
   return (
@@ -93,14 +105,17 @@ export default function LanguagePicker({
           <div className="lang-picker-list">
             {locales.map((item) => {
               const isSelected = item.code === locale;
+              const targetHref = item.code === "en" ? "/" : `/${item.code}`;
+
               return (
-                <button
+                <Link
                   key={item.code}
-                  type="button"
+                  href={targetHref}
+                  hrefLang={item.code}
                   role="option"
                   aria-selected={isSelected}
                   className={`lang-picker-item ${isSelected ? "active" : ""}`}
-                  onClick={() => handleSelect(item.code)}
+                  onClick={(e) => handleSelect(e, item.code)}
                 >
                   <span className="lang-item-flag" aria-hidden="true">
                     {item.flag}
@@ -123,7 +138,7 @@ export default function LanguagePicker({
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   )}
-                </button>
+                </Link>
               );
             })}
           </div>

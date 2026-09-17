@@ -4402,6 +4402,8 @@ button.workspace-pill:hover {
   color: #cbd5e1;
   font-size: 0.8125rem;
   text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
   cursor: pointer;
   transition: all 0.15s ease;
 }

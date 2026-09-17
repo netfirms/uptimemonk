@@ -30,6 +30,15 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: "https://www.uptimemonke.com",
+    languages: {
+      en: "https://www.uptimemonke.com/",
+      ja: "https://www.uptimemonke.com/ja",
+      ko: "https://www.uptimemonke.com/ko",
+      ms: "https://www.uptimemonke.com/ms",
+      id: "https://www.uptimemonke.com/id",
+      my: "https://www.uptimemonke.com/my",
+      "x-default": "https://www.uptimemonke.com/",
+    },
   },
   openGraph: {
     title: "UptimeMonke — High-Frequency Infrastructure Monitoring",

@@ -1,4 +1,4 @@
-import { test, describe, before } from "node:test";
+ and makeimport { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
 
 /**

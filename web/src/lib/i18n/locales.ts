@@ -48,16 +48,43 @@ export function matchLocale(rawLang: string): SupportedLocale | undefined {
 
 /**
  * Detects user's locale preference:
- * 1. Saved preference in localStorage
- * 2. navigator.languages or navigator.language
- * 3. Fallback to DEFAULT_LOCALE ("en")
+ * 1. URL pathname (e.g. /ja, /ko, /ms, /id, /my, /en)
+ * 2. URL search params (e.g. ?lang=ja or ?locale=ja)
+ * 3. Saved preference in localStorage
+ * 4. navigator.languages or navigator.language
+ * 5. Fallback to DEFAULT_LOCALE ("en")
  */
 export function detectUserLocale(): SupportedLocale {
   if (typeof window === "undefined") {
     return DEFAULT_LOCALE;
   }
 
-  // 1. Saved preference
+  // 1. URL pathname
+  try {
+    const segments = window.location.pathname.split("/").filter(Boolean);
+    if (segments.length > 0) {
+      const firstSegment = segments[0].toLowerCase();
+      if (isSupportedLocale(firstSegment)) {
+        return firstSegment;
+      }
+    }
+  } catch {
+    // Ignore location errors
+  }
+
+  // 2. URL search parameters (?lang= or ?locale=)
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const langParam = params.get("lang") || params.get("locale");
+    if (langParam) {
+      const matched = matchLocale(langParam);
+      if (matched) return matched;
+    }
+  } catch {
+    // Ignore URL search errors
+  }
+
+  // 3. Saved preference
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && isSupportedLocale(saved)) {
@@ -67,7 +94,7 @@ export function detectUserLocale(): SupportedLocale {
     // localStorage might be unavailable in private browsing
   }
 
-  // 2. Navigator languages
+  // 4. Navigator languages
   if (navigator.languages && navigator.languages.length > 0) {
     for (const lang of navigator.languages) {
       const matched = matchLocale(lang);
@@ -80,7 +107,7 @@ export function detectUserLocale(): SupportedLocale {
     if (matched) return matched;
   }
 
-  // 3. Fallback
+  // 5. Fallback
   return DEFAULT_LOCALE;
 }
 

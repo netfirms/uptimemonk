@@ -22,17 +22,25 @@ export interface I18nContextValue {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<SupportedLocale>(DEFAULT_LOCALE);
+export function I18nProvider({
+  children,
+  initialLocale,
+}: {
+  children: React.ReactNode;
+  initialLocale?: SupportedLocale;
+}) {
+  const [locale, setLocaleState] = useState<SupportedLocale>(
+    initialLocale || DEFAULT_LOCALE
+  );
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Client hydration & detection
   useEffect(() => {
-    const detected = detectUserLocale();
-    setLocaleState(detected);
-    applyLocale(detected);
+    const target = initialLocale || detectUserLocale();
+    setLocaleState(target);
+    applyLocale(target);
     setIsHydrated(true);
-  }, []);
+  }, [initialLocale]);
 
   const setLocale = (newLocale: SupportedLocale) => {
     setLocaleState(newLocale);
