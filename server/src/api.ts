@@ -8,7 +8,7 @@ import { contactRoutes } from "./api/contacts.js";
 import { statusRoutes } from "./api/status.js";
 import { billingRoutes } from "./api/billing.js";
 import { orgRoutes } from "./api/org.js";
-import { startSystemConfigListener } from "./sync/configListener.js";
+import { seedSystemConfig, startSystemConfigListener } from "./sync/configListener.js";
 import { log } from "./lib/log.js";
 import { API_VERSION, APP_URL, PORT } from "./config.js";
 
@@ -22,6 +22,10 @@ import { API_VERSION, APP_URL, PORT } from "./config.js";
  */
 async function main(): Promise<void> {
   openDb();
+  // Fill the admin console's config document on first boot, so nobody has to
+  // retype what the worker is already running. Never overwrites, never
+  // includes a secret.
+  await seedSystemConfig();
   const stopConfigListener = startSystemConfigListener();
 
   const app = Fastify({

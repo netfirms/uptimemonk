@@ -142,9 +142,25 @@ service cloud.firestore {
     }
 
     match /system/{docId} {
-      // Dynamic application configuration is accessible and manageable only
-      // by authenticated administrators and organization owners.
-      allow read, write: if isAdminOrOwner();
+      /**
+       * Backend-only. This was `isAdminOrOwner()`, and every customer is an
+       * owner — `bootstrap` sets `role: "owner"` on the claim of whoever
+       * signs up, because they own their own workspace. That made the global
+       * system configuration readable *and writable* by any signed-up user.
+       *
+       * The document holds the Mailgun key, the Stripe secret and webhook
+       * secret, and the cross-region verify secret, and `updateDynamicConfig`
+       * pushes whatever is here into the running workers within a second. A
+       * customer could have read every production credential, redirected
+       * alerts by rewriting `mailgunApiKey`, or pointed `verifyPeerUrl` at a
+       * host of their choosing.
+       *
+       * Nothing leaked: the document had never been created. Owning a
+       * workspace is not the same as operating the platform, and no rule
+       * should confuse the two — the admin console reads this through the
+       * worker API, which checks separately.
+       */
+      allow read, write: if false;
     }
 
     match /{document=**} {

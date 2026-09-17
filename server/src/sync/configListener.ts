@@ -10,6 +10,7 @@ import {
 import { initialDueAt } from "../scheduler/heap.js";
 import { getDb } from "../db/index.js";
 import { log } from "../lib/log.js";
+import { getSeedableConfig } from "../config.js";
 import { RECONCILE_MS, updateDynamicConfig } from "../config.js";
 import type { AlertContact, Monitor } from "../types.js";
 
@@ -149,6 +150,41 @@ export function startConfigListener(onChange: (changed: string[], removed: strin
   );
 
   subscriptions.push(monitors, contacts, systemConfig);
+}
+
+/**
+ * Create `system/config` from the environment the first time, and only then.
+ *
+ * The admin console edits this document, and an empty one means filling every
+ * field by hand to re-state what the worker is already running. Seeding it
+ * from the live values makes the console show the truth on first open.
+ *
+ * Two rules. It **never overwrites** an existing document — an operator's
+ * setting outranks an environment default, and a worker restart must not
+ * quietly revert a change made through the console. And it never writes a
+ * secret: `getSeedableConfig` strips them, because a credential in Firestore
+ * is a second copy in a weaker place than the 0600 file it came from.
+ */
+export async function seedSystemConfig(): Promise<void> {
+  const ref = col.system().doc("config");
+  try {
+    const existing = await ref.get();
+    if (existing.exists) {
+      log.debug("system config already present — leaving it alone");
+      return;
+    }
+
+    await ref.create({
+      ...getSeedableConfig(),
+      seededAt: new Date().toISOString(),
+      seededFrom: "worker environment",
+    });
+    log.info("seeded system config from the environment");
+  } catch (err) {
+    // A create that loses a race with another process is the correct outcome,
+    // and nothing here is worth failing a boot over.
+    log.warn({ err }, "could not seed system config — continuing");
+  }
 }
 
 /**

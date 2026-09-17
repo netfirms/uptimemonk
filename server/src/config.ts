@@ -304,6 +304,40 @@ export function updateDynamicConfig(data?: Record<string, unknown> | null): void
   VERIFY_PEER_URL = activeOverrides.verifyPeerUrl ?? envDefaults.verifyPeerUrl;
 }
 
+/**
+ * Fields that must never be written to Firestore.
+ *
+ * The dynamic config document is convenient for tunables and dangerous for
+ * credentials: it is a second copy of a secret, in a place that is backed up,
+ * replicated and readable by anything with project access — while the
+ * original already sits in `/etc/uptimemonk/env` at 0600 root, which is
+ * strictly better. A secret belongs in exactly one of those, and it is not
+ * this one.
+ *
+ * Setting one through the admin console still works; it is only the *seed*
+ * that refuses to copy them out of the environment.
+ */
+export const SECRET_CONFIG_KEYS = [
+  "resendApiKey",
+  "mailgunApiKey",
+  "telegramBotToken",
+  "stripeSecretKey",
+  "stripeWebhookSecret",
+  "recaptchaSecret",
+  "verifySecret",
+] as const;
+
+/** The effective config minus anything secret — what is safe to seed. */
+export function getSeedableConfig(): Record<string, unknown> {
+  const all = getEffectiveConfig() as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(all)) {
+    if ((SECRET_CONFIG_KEYS as readonly string[]).includes(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
 /** Returns the effective current merged config */
 export function getEffectiveConfig(): AppConfig {
   return {
