@@ -11,6 +11,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { events } from "@/lib/analytics";
+import EmailAuth from "./EmailAuth";
 
 /**
  * Public marketing landing page for UptimeMonke.
@@ -33,6 +34,8 @@ export default function Landing({
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  /** Google stays the one-click path; email is a disclosure beneath it. */
+  const [showEmailAuth, setShowEmailAuth] = useState(false);
 
   // Interactive Live Edge Probes Tab
   const [demoTab, setDemoTab] = useState<"http" | "ssl" | "ports" | "heartbeat">("http");
@@ -236,6 +239,25 @@ export default function Landing({
               )}
             </button>
           )}
+          {/* Not everyone has a Google account, and plenty of people will
+              not use one to sign in to a third-party service. Refusing them
+              an account over it costs a customer. */}
+          {!currentUser && (
+            <div className="hero-auth-alt">
+              {showEmailAuth ? (
+                <EmailAuth onSignedIn={(u) => (onSignedIn ? onSignedIn(u) : (window.location.href = "/dashboard"))} />
+              ) : (
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => setShowEmailAuth(true)}
+                >
+                  or use an email address
+                </button>
+              )}
+            </div>
+          )}
+
           <p className="hero-subtext">
             <span>Free forever</span> · <span>No credit card</span> · <span>No feature paywalled</span>
           </p>

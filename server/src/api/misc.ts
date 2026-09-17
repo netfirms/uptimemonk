@@ -9,7 +9,7 @@ import { handleVerifyRequest, signatureMatches } from "../probe/verify.js";
 import { requireAuth } from "./auth.js";
 import { log } from "../lib/log.js";
 import { readinessSummary } from "../lib/readiness.js";
-import { API_VERSION, REGION, VERIFY_SECRET } from "../config.js";
+import { API_VERSION, REGION, VERIFY_SECRET, getConfigMetadata } from "../config.js";
 import type { Plan } from "../types.js";
 
 const STATUS_FILE = process.env.UPTIMEMONK_STATUS_FILE ?? "/var/lib/uptimemonk/worker.json";
@@ -222,14 +222,27 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
       createdAt: now,
     });
     if (decoded.email) {
-      // The signup address is verified by definition — they just proved it.
+      /**
+       * Trust the token, not the sign-up.
+       *
+       * A Google sign-in proves the address: Google checked it, and
+       * `email_verified` says so. An email/password sign-up proves nothing —
+       * anyone can type a stranger's address and choose a password — and
+       * marking it verified would have this service mailing downtime alerts
+       * to someone who never asked for them. That is precisely the open-relay
+       * abuse `contacts.ts` exists to prevent, so the same rule applies here.
+       *
+       * An unverified contact is still created: it appears in the Alerts
+       * panel with a "Resend confirmation" button, and nothing is delivered
+       * to it until the address is confirmed.
+       */
       batch.set(col.alertContacts().doc(), {
         orgId: orgRef.id,
         channel: "email",
         name: decoded.email,
         destination: decoded.email,
         enabled: true,
-        verified: true,
+        verified: decoded.email_verified === true,
         createdAt: now,
       });
     }
@@ -263,5 +276,46 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
         maxMonitors: limits.maxMonitors,
       },
     };
+  });
+
+  /**
+   * Admin configuration metadata.
+   *
+   * Returns every AppConfig field with its effective value, source (env or
+   * Firestore), and the env-fallback value — so the admin console can show
+   * what the worker is actually running with, not client-side guesses.
+   *
+   * Secret fields are masked: the admin sees whether a secret is set and
+   * from which source, but never the raw value over HTTP. Editing is done
+   * via Firestore writes from the admin console, not through this endpoint.
+   */
+  const SECRET_KEYS = new Set([
+    "mailgunApiKey",
+    "resendApiKey",
+    "telegramBotToken",
+    "stripeSecretKey",
+    "stripeWebhookSecret",
+    "verifySecret",
+  ]);
+
+  function maskSecret(val: unknown): string {
+    const s = String(val ?? "");
+    if (!s) return "";
+    if (s.length <= 8) return "•".repeat(s.length);
+    return s.slice(0, 4) + "•".repeat(Math.min(s.length - 8, 20)) + s.slice(-4);
+  }
+
+  app.get("/v1/admin/config", async (_req, reply) => {
+    const meta = getConfigMetadata();
+    const result = meta.map((entry) => {
+      const isSecret = SECRET_KEYS.has(entry.key);
+      return {
+        key: entry.key,
+        value: isSecret ? maskSecret(entry.value) : entry.value,
+        source: entry.source,
+        fallbackValue: isSecret ? maskSecret(entry.fallbackValue) : entry.fallbackValue,
+      };
+    });
+    return reply.send(result);
   });
 }

@@ -3042,3 +3042,105 @@ button.btn-outline-red {
     padding: 7px 10px;
   }
 }
+
+/* --- Email / password sign-in --- */
+
+.hero-auth-alt {
+  margin-top: 14px;
+  width: 100%;
+  max-width: 380px;
+}
+
+/* A quiet link, not a second button: Google is the shorter path and should
+   stay the one that looks like the answer. */
+.link-button {
+  background: none;
+  border: 0;
+  padding: 4px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: #e2e8f0;
+}
+
+.email-auth {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(19, 27, 37, 0.72);
+}
+
+.email-auth-head {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.email-auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.email-auth-field > span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.email-auth-field input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  font-family: inherit;
+  font-size: 0.88rem;
+}
+
+.email-auth-field input:focus {
+  outline: none;
+  border-color: rgba(59, 214, 113, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.email-auth-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.email-auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.email-auth-switch button {
+  background: none;
+  border: 0;
+  padding: 2px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.email-auth-switch button:hover {
+  color: #3BD671;
+}
