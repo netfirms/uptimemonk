@@ -189,6 +189,23 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(401).send({ error: "Your session has expired. Sign in again." });
     }
 
+    /**
+     * No workspace until the address is confirmed.
+     *
+     * Bootstrap has its own token check rather than `requireAuth` — it is the
+     * one route that runs *before* a workspace exists — so the rule has to be
+     * repeated here or it would be the single way in around it.
+     *
+     * Ordering matters: this comes before the early return, so someone who
+     * somehow bootstrapped while unverified still cannot proceed.
+     */
+    if (decoded.email && decoded.email_verified !== true) {
+      return reply.code(403).send({
+        error: "Confirm your email address to continue.",
+        code: "email-not-verified",
+      });
+    }
+
     if (decoded.orgId) {
       return { orgId: decoded.orgId, created: false };
     }

@@ -40,7 +40,8 @@ describe("API Auth Middleware", () => {
 
   test("rejects token without orgId with 409 needs-bootstrap", async () => {
     setCustomAuth({
-      verifyIdToken: async () => ({ uid: "u1", email: "user@test.com" } as any),
+      verifyIdToken: async () =>
+        ({ uid: "u1", email: "user@test.com", email_verified: true } as any),
     } as unknown as Auth);
 
     const res = await app.inject({
@@ -52,9 +53,71 @@ describe("API Auth Middleware", () => {
     assert.equal(res.json().code, "needs-bootstrap");
   });
 
+  test("refuses a token whose email is not verified", async () => {
+    // A password sign-up until the link is clicked. The dashboard also gates
+    // this, but a gate in the browser is a suggestion — the API only ever
+    // sees the token.
+    setCustomAuth({
+      verifyIdToken: async () =>
+        ({
+          uid: "u1",
+          orgId: "org-1",
+          role: "owner",
+          email: "unconfirmed@test.com",
+          email_verified: false,
+        } as any),
+    } as unknown as Auth);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/test",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.json().code, "email-not-verified");
+  });
+
+  test("a missing email_verified flag is not permission", async () => {
+    // Absent must never read as yes on a security check.
+    setCustomAuth({
+      verifyIdToken: async () =>
+        ({ uid: "u1", orgId: "org-1", role: "owner", email: "a@test.com" } as any),
+    } as unknown as Auth);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/test",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    assert.equal(res.statusCode, 403);
+  });
+
+  test("a token with no email at all is let through", async () => {
+    // No enabled provider makes one today; the exemption is so that turning
+    // on phone or anonymous auth later locks nobody out by surprise.
+    setCustomAuth({
+      verifyIdToken: async () =>
+        ({ uid: "u1", orgId: "org-1", role: "owner" } as any),
+    } as unknown as Auth);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/test",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    assert.equal(res.statusCode, 200);
+  });
+
   test("authenticates valid token with orgId and role", async () => {
     setCustomAuth({
-      verifyIdToken: async () => ({ uid: "u1", orgId: "org-1", role: "owner", email: "owner@test.com" } as any),
+      verifyIdToken: async () =>
+        ({
+          uid: "u1",
+          orgId: "org-1",
+          role: "owner",
+          email: "owner@test.com",
+          email_verified: true,
+        } as any),
     } as unknown as Auth);
 
     const res = await app.inject({

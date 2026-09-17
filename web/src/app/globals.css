@@ -3144,3 +3144,48 @@ button.btn-outline-red {
 .email-auth-switch button:hover {
   color: #3BD671;
 }
+
+/* --- Confirm-your-email gate --- */
+
+.verify-gate {
+  max-width: 460px;
+  margin: 8vh auto 0;
+  padding: 26px 24px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-card);
+}
+
+.verify-gate h1 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.verify-gate .muted {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin-bottom: 16px;
+}
+
+.verify-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.verify-actions .primary,
+.verify-actions .btn-sm {
+  width: 100%;
+  justify-content: center;
+  padding: 10px 14px;
+}
+
+/* Says why the door is shut. A gate with no reason reads as a bug. */
+.verify-note {
+  margin-top: 16px;
+  font-size: 0.76rem;
+  line-height: 1.55;
+}

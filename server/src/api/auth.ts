@@ -36,6 +36,27 @@ export function requireAuth(options: AuthOptions = {}) {
 
     try {
       const decoded = await auth().verifyIdToken(token, options.checkRevoked === true);
+
+      /**
+       * An unconfirmed address cannot use the API.
+       *
+       * Enforced here rather than only in the dashboard, because a gate that
+       * lives in the browser is a suggestion — the token is all the API ever
+       * sees, and anyone can call it directly.
+       *
+       * Google sets `email_verified` itself, so those sign-ins pass
+       * untouched; a password sign-up does not until the link is clicked. The
+       * check is skipped when the token carries no email at all, which no
+       * enabled provider produces today — it is there so turning on phone or
+       * anonymous auth later locks nobody out by surprise.
+       */
+      if (decoded.email && decoded.email_verified !== true) {
+        return reply.code(403).send({
+          error: "Confirm your email address to continue.",
+          code: "email-not-verified",
+        });
+      }
+
       const orgId = decoded.orgId as string | undefined;
       if (!orgId) {
         // A user exists but has no workspace yet. On the free tier there is no

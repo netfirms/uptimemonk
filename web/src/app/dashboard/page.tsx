@@ -14,6 +14,7 @@ import NewMonitorForm, {
 } from "./NewMonitorForm";
 import MonitorDetail from "./MonitorDetail";
 import Landing from "@/components/Landing";
+import VerifyEmailGate from "@/components/VerifyEmailGate";
 import { events, identify } from "@/lib/analytics";
 
 type Status = "up" | "down" | "pending" | "paused";
@@ -304,6 +305,17 @@ export default function Dashboard() {
     );
   }
 
+
+  /**
+   * Signed in, but the address is not confirmed.
+   *
+   * The API refuses these tokens outright, so without this the dashboard
+   * would render and then fail every request with nothing explaining why.
+   * Google sign-ins never land here — Google verifies the address itself.
+   */
+  if (currentUser.email && !currentUser.emailVerified) {
+    return <VerifyEmailGate user={currentUser} />;
+  }
 
   // --- 2. AUTHENTICATED DASHBOARD (UPTIMEROBOT THEME) ---
   return (
