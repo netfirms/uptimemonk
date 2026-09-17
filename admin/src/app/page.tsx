@@ -9,7 +9,8 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 // --- Domain Models ---
 
@@ -20,19 +21,24 @@ export type AdminTab =
   | "monitors"
   | "user-stats"
   | "monitor-stats"
-  | "donations";
+  | "donations"
+  | "settings";
 
 export interface UserAccount {
   uid: string;
-  email: string;
-  name: string;
-  orgId: string;
+  email: string | null;
+  name: string | null;
+  orgId: string | null;
+  orgName?: string | null;
   role: "owner" | "member";
-  plan: "free" | "donor";
+  plan: string | null;
   monitorsCount: number;
   creditsRemaining: number;
-  createdAt: string;
-  lastActive: string;
+  createdAt: string | null;
+  lastActive: string | null;
+  emailVerified?: boolean;
+  providers?: string[];
+  standing?: string | null;
 }
 
 export interface MonitorItem {
@@ -61,16 +67,21 @@ export interface MonitorItem {
 export interface WorkerNode {
   id: string;
   region: string;
-  host: string;
+  host?: string;
   status: "active" | "standby" | "unhealthy";
   version: string;
-  lagMs: number;
-  queueDepth: number;
-  scheduled: number;
-  memoryMb: number;
-  maxMemoryMb: number;
-  swapMb: number;
-  units: {
+  /** Null when the worker has not written a status file yet. */
+  lagMs: number | null;
+  queueDepth: number | null;
+  scheduled: number | null;
+  index?: number;
+  count?: number;
+  updatedAt?: number | null;
+  /** Absent rather than invented — the API does not report these. */
+  memoryMb?: number;
+  maxMemoryMb?: number;
+  swapMb?: number;
+  units?: {
     worker: "active (running)" | "failed" | "stopped";
     api: "active (running)" | "failed" | "stopped";
     caddy: "active (running)" | "failed" | "stopped";
@@ -120,6 +131,68 @@ export interface HealthData {
   };
 }
 
+export interface SystemConfigState {
+  alertFromEmail: string;
+  mailgunApiKey: string;
+  mailgunDomain: string;
+  mailgunBaseUrl: string;
+  resendApiKey: string;
+  telegramBotToken: string;
+
+  donationLinkUrl: string;
+  donationLinkCents: string;
+  donationLinkRecurring: boolean;
+  stripeSecretKey: string;
+  stripeWebhookSecret: string;
+
+  probeConcurrency: string;
+  dbFlushMs: string;
+  mirrorFlushMs: string;
+  mirrorMinIntervalMs: string;
+  reconcileMs: string;
+  retentionDays: string;
+  incidentRetentionDays: string;
+  userAgent: string;
+  heartbeatUrl: string;
+
+  verifySecret: string;
+  verifyPeerUrl: string;
+
+  appUrl: string;
+  apiUrl: string;
+}
+
+const CONFIG_DEFAULTS: SystemConfigState = {
+  alertFromEmail: "alerts@mg.uptimemonke.com",
+  mailgunApiKey: "",
+  mailgunDomain: "mg.uptimemonke.com",
+  mailgunBaseUrl: "https://api.mailgun.net",
+  resendApiKey: "",
+  telegramBotToken: "",
+
+  donationLinkUrl: "https://buy.stripe.com/9B69AU4lc2uh83Fc9Z9sk02",
+  donationLinkCents: "299",
+  donationLinkRecurring: false,
+  stripeSecretKey: "",
+  stripeWebhookSecret: "",
+
+  probeConcurrency: "200",
+  dbFlushMs: "5000",
+  mirrorFlushMs: "300000",
+  mirrorMinIntervalMs: "10000",
+  reconcileMs: "900000",
+  retentionDays: "35",
+  incidentRetentionDays: "365",
+  userAgent: "UptimeMonke/1.0 (+https://uptimemonke.com/bot)",
+  heartbeatUrl: "",
+
+  verifySecret: "",
+  verifyPeerUrl: "",
+
+  appUrl: "https://uptimemonke.com",
+  apiUrl: "https://api.uptimemonke.com",
+};
+
 export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -127,6 +200,25 @@ export default function AdminPage() {
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+
+  // Dynamic App Configuration
+  const [configForm, setConfigForm] = useState<SystemConfigState>(CONFIG_DEFAULTS);
+  const [rawConfigFromDb, setRawConfigFromDb] = useState<Record<string, unknown> | null>(null);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configSuccess, setConfigSuccess] = useState<string | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [visibleSecrets, setVisibleSecrets] = useState<Record<string, boolean>>({});
+  // Env defaults fetched from the running worker — the real values from /etc/uptimemonk/env
+  const [envDefaults, setEnvDefaults] = useState<SystemConfigState>(CONFIG_DEFAULTS);
+  const [envDefaultsLoaded, setEnvDefaultsLoaded] = useState(false);
+
+  const toggleSecret = (field: string) => {
+    setVisibleSecrets((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  const isFieldCustom = (key: keyof SystemConfigState): boolean => {
+    return rawConfigFromDb != null && key in rawConfigFromDb;
+  };
 
   // Telemetry from live worker
   const [telemetry, setTelemetry] = useState<HealthData | null>(null);
@@ -197,108 +289,69 @@ export default function AdminPage() {
   const [donationSearch, setDonationSearch] = useState("");
 
   // Seed Data: Users
-  const [users] = useState<UserAccount[]>([
-    {
-      uid: "usr_admin_master",
-      email: "taweechai@example.com",
-      name: "Taweechai (Admin)",
-      orgId: "org_default_main",
-      role: "owner",
-      plan: "donor",
-      monitorsCount: 12,
-      creditsRemaining: 842000,
-      createdAt: "2026-09-10",
-      lastActive: "Just now",
-    },
-    {
-      uid: "usr_dev_alice",
-      email: "alice@acme-cloud.io",
-      name: "Alice Wang",
-      orgId: "org_acme_prod",
-      role: "owner",
-      plan: "donor",
-      monitorsCount: 24,
-      creditsRemaining: 1540000,
-      createdAt: "2026-09-12",
-      lastActive: "14m ago",
-    },
-    {
-      uid: "usr_dev_bob",
-      email: "bob.dev@fintech-labs.net",
-      name: "Bob Dylan",
-      orgId: "org_fintech_labs",
-      role: "member",
-      plan: "free",
-      monitorsCount: 4,
-      creditsRemaining: 0,
-      createdAt: "2026-09-14",
-      lastActive: "2h ago",
-    },
-    {
-      uid: "usr_eng_charlie",
-      email: "charlie@infra-ops.co",
-      name: "Charlie Zhang",
-      orgId: "org_infra_ops",
-      role: "owner",
-      plan: "donor",
-      monitorsCount: 18,
-      creditsRemaining: 680000,
-      createdAt: "2026-09-15",
-      lastActive: "5m ago",
-    },
-    {
-      uid: "usr_founder_dave",
-      email: "dave@indie-startup.xyz",
-      name: "Dave Miller",
-      orgId: "org_indie_startup",
-      role: "owner",
-      plan: "free",
-      monitorsCount: 2,
-      creditsRemaining: 0,
-      createdAt: "2026-09-16",
-      lastActive: "1d ago",
-    },
-  ]);
+  // Real accounts, from the admin API. This was a list of invented people —
+  // alice@acme-cloud.io and friends — which reads as the truth to whoever
+  // is looking, and operational decisions get made from it.
+  const [users, setUsers] = useState<UserAccount[]>([]);
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminLoading, setAdminLoading] = useState(true);
+
+  /**
+   * Real fleet data, behind the admin allowlist.
+   *
+   * A 403 here is the expected answer for anyone who is not an operator —
+   * the console will sign them in, because it has no gate of its own, and
+   * then show nothing rather than someone else's customers.
+   */
+  useEffect(() => {
+    if (!currentUser) return;
+    let cancelled = false;
+
+    (async () => {
+      setAdminLoading(true);
+      setAdminError(null);
+      try {
+        const token = await currentUser.getIdToken();
+        const get = async (path: string) => {
+          const res = await fetch(`https://api.uptimemonke.com${path}`, {
+            headers: { authorization: `Bearer ${token}` },
+          });
+          if (res.status === 403) throw new Error("not-admin");
+          if (!res.ok) throw new Error(`${path} returned ${res.status}`);
+          return res.json();
+        };
+
+        const [u, w] = await Promise.all([get("/v1/admin/users"), get("/v1/admin/workers")]);
+        if (cancelled) return;
+        setUsers(
+          (u.users as UserAccount[]).map((x) => ({
+            ...x,
+            role: "owner" as const,
+            lastActive: x.lastActive ?? null,
+          }))
+        );
+        setWorkers(w.workers as WorkerNode[]);
+      } catch (err) {
+        if (cancelled) return;
+        setAdminError(
+          (err as Error).message === "not-admin"
+            ? "This account is not on the operator allowlist."
+            : "Could not load fleet data from the worker."
+        );
+      } finally {
+        if (!cancelled) setAdminLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser]);
 
   // Seed Data: Worker Fleet
-  const [workers] = useState<WorkerNode[]>([
-    {
-      id: "sg-1",
-      region: "ap-southeast-1a",
-      host: "47.129.253.94",
-      status: "active",
-      version: "0.5.0",
-      lagMs: 4,
-      queueDepth: 0,
-      scheduled: 60,
-      memoryMb: 178,
-      maxMemoryMb: 414,
-      swapMb: 32,
-      units: {
-        worker: "active (running)",
-        api: "active (running)",
-        caddy: "active (running)",
-      },
-    },
-    {
-      id: "sg-2",
-      region: "ap-southeast-1b",
-      host: "standby-provisioning",
-      status: "standby",
-      version: "0.5.0",
-      lagMs: 0,
-      queueDepth: 0,
-      scheduled: 0,
-      memoryMb: 0,
-      maxMemoryMb: 414,
-      swapMb: 0,
-      units: {
-        worker: "stopped",
-        api: "stopped",
-        caddy: "stopped",
-      },
-    },
-  ]);
+  // Real fleet, from the worker. The invented sg-2 and sg-3 made the system
+  // look redundant when one box failing takes everything with it.
+  const [workers, setWorkers] = useState<WorkerNode[]>([]);
 
   // Seed Data: Monitors
   const [monitors] = useState<MonitorItem[]>([
@@ -529,6 +582,176 @@ export default function AdminPage() {
     }
   }, [currentUser, fetchTelemetry, pingEndpoints]);
 
+  // Realtime System Configuration Sync
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = onSnapshot(
+      doc(db, "system", "config"),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setRawConfigFromDb(data);
+          setConfigForm({
+            alertFromEmail: data.alertFromEmail != null ? String(data.alertFromEmail) : envDefaults.alertFromEmail,
+            mailgunApiKey: data.mailgunApiKey != null ? String(data.mailgunApiKey) : envDefaults.mailgunApiKey,
+            mailgunDomain: data.mailgunDomain != null ? String(data.mailgunDomain) : envDefaults.mailgunDomain,
+            mailgunBaseUrl: data.mailgunBaseUrl != null ? String(data.mailgunBaseUrl) : envDefaults.mailgunBaseUrl,
+            resendApiKey: data.resendApiKey != null ? String(data.resendApiKey) : envDefaults.resendApiKey,
+            telegramBotToken: data.telegramBotToken != null ? String(data.telegramBotToken) : envDefaults.telegramBotToken,
+
+            donationLinkUrl: data.donationLinkUrl != null ? String(data.donationLinkUrl) : envDefaults.donationLinkUrl,
+            donationLinkCents: data.donationLinkCents != null ? String(data.donationLinkCents) : envDefaults.donationLinkCents,
+            donationLinkRecurring: data.donationLinkRecurring === true,
+            stripeSecretKey: data.stripeSecretKey != null ? String(data.stripeSecretKey) : envDefaults.stripeSecretKey,
+            stripeWebhookSecret: data.stripeWebhookSecret != null ? String(data.stripeWebhookSecret) : envDefaults.stripeWebhookSecret,
+
+            probeConcurrency: data.probeConcurrency != null ? String(data.probeConcurrency) : envDefaults.probeConcurrency,
+            dbFlushMs: data.dbFlushMs != null ? String(data.dbFlushMs) : envDefaults.dbFlushMs,
+            mirrorFlushMs: data.mirrorFlushMs != null ? String(data.mirrorFlushMs) : envDefaults.mirrorFlushMs,
+            mirrorMinIntervalMs: data.mirrorMinIntervalMs != null ? String(data.mirrorMinIntervalMs) : envDefaults.mirrorMinIntervalMs,
+            reconcileMs: data.reconcileMs != null ? String(data.reconcileMs) : envDefaults.reconcileMs,
+            retentionDays: data.retentionDays != null ? String(data.retentionDays) : envDefaults.retentionDays,
+            incidentRetentionDays: data.incidentRetentionDays != null ? String(data.incidentRetentionDays) : envDefaults.incidentRetentionDays,
+            userAgent: data.userAgent != null ? String(data.userAgent) : envDefaults.userAgent,
+            heartbeatUrl: data.heartbeatUrl != null ? String(data.heartbeatUrl) : envDefaults.heartbeatUrl,
+
+            verifySecret: data.verifySecret != null ? String(data.verifySecret) : envDefaults.verifySecret,
+            verifyPeerUrl: data.verifyPeerUrl != null ? String(data.verifyPeerUrl) : envDefaults.verifyPeerUrl,
+
+            appUrl: data.appUrl != null ? String(data.appUrl) : envDefaults.appUrl,
+            apiUrl: data.apiUrl != null ? String(data.apiUrl) : envDefaults.apiUrl,
+          });
+        } else {
+          setRawConfigFromDb(null);
+          setConfigForm(envDefaults);
+        }
+      },
+      (err) => {
+        console.warn("Could not subscribe to system config:", err);
+      }
+    );
+    return () => unsub();
+  }, [currentUser]);
+
+  // Fetch real env defaults from the running worker
+  useEffect(() => {
+    if (!currentUser) return;
+    (async () => {
+      try {
+        const res = await fetch("https://api.uptimemonke.com/v1/admin/config", {
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) return;
+        const meta = (await res.json()) as Array<{
+          key: string;
+          value: unknown;
+          source: string;
+          fallbackValue: unknown;
+        }>;
+        const defaults: Record<string, unknown> = {};
+        for (const entry of meta) {
+          defaults[entry.key] = entry.fallbackValue;
+        }
+        const merged: SystemConfigState = {
+          alertFromEmail: String(defaults.alertFromEmail ?? CONFIG_DEFAULTS.alertFromEmail),
+          mailgunApiKey: String(defaults.mailgunApiKey ?? CONFIG_DEFAULTS.mailgunApiKey),
+          mailgunDomain: String(defaults.mailgunDomain ?? CONFIG_DEFAULTS.mailgunDomain),
+          mailgunBaseUrl: String(defaults.mailgunBaseUrl ?? CONFIG_DEFAULTS.mailgunBaseUrl),
+          resendApiKey: String(defaults.resendApiKey ?? CONFIG_DEFAULTS.resendApiKey),
+          telegramBotToken: String(defaults.telegramBotToken ?? CONFIG_DEFAULTS.telegramBotToken),
+
+          donationLinkUrl: String(defaults.donationLinkUrl ?? CONFIG_DEFAULTS.donationLinkUrl),
+          donationLinkCents: String(defaults.donationLinkCents ?? CONFIG_DEFAULTS.donationLinkCents),
+          donationLinkRecurring: defaults.donationLinkRecurring === true,
+          stripeSecretKey: String(defaults.stripeSecretKey ?? CONFIG_DEFAULTS.stripeSecretKey),
+          stripeWebhookSecret: String(defaults.stripeWebhookSecret ?? CONFIG_DEFAULTS.stripeWebhookSecret),
+
+          probeConcurrency: String(defaults.probeConcurrency ?? CONFIG_DEFAULTS.probeConcurrency),
+          dbFlushMs: String(defaults.dbFlushMs ?? CONFIG_DEFAULTS.dbFlushMs),
+          mirrorFlushMs: String(defaults.mirrorFlushMs ?? CONFIG_DEFAULTS.mirrorFlushMs),
+          mirrorMinIntervalMs: String(defaults.mirrorMinIntervalMs ?? CONFIG_DEFAULTS.mirrorMinIntervalMs),
+          reconcileMs: String(defaults.reconcileMs ?? CONFIG_DEFAULTS.reconcileMs),
+          retentionDays: String(defaults.retentionDays ?? CONFIG_DEFAULTS.retentionDays),
+          incidentRetentionDays: String(defaults.incidentRetentionDays ?? CONFIG_DEFAULTS.incidentRetentionDays),
+          userAgent: String(defaults.userAgent ?? CONFIG_DEFAULTS.userAgent),
+          heartbeatUrl: String(defaults.heartbeatUrl ?? CONFIG_DEFAULTS.heartbeatUrl),
+
+          verifySecret: String(defaults.verifySecret ?? CONFIG_DEFAULTS.verifySecret),
+          verifyPeerUrl: String(defaults.verifyPeerUrl ?? CONFIG_DEFAULTS.verifyPeerUrl),
+
+          appUrl: String(defaults.appUrl ?? CONFIG_DEFAULTS.appUrl),
+          apiUrl: String(defaults.apiUrl ?? CONFIG_DEFAULTS.apiUrl),
+        };
+        setEnvDefaults(merged);
+        setEnvDefaultsLoaded(true);
+        // If no Firestore config exists yet, populate the form with real env defaults
+        if (!rawConfigFromDb) {
+          setConfigForm(merged);
+        }
+      } catch {
+        // Fallback to hardcoded CONFIG_DEFAULTS gracefully
+      }
+    })();
+  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSaveConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConfigSaving(true);
+    setConfigError(null);
+    setConfigSuccess(null);
+    try {
+      const payload: Record<string, unknown> = {
+        alertFromEmail: configForm.alertFromEmail.trim(),
+        mailgunApiKey: configForm.mailgunApiKey.trim(),
+        mailgunDomain: configForm.mailgunDomain.trim(),
+        mailgunBaseUrl: configForm.mailgunBaseUrl.trim(),
+        resendApiKey: configForm.resendApiKey.trim(),
+        telegramBotToken: configForm.telegramBotToken.trim(),
+
+        donationLinkUrl: configForm.donationLinkUrl.trim(),
+        donationLinkCents: Number(configForm.donationLinkCents) || 299,
+        donationLinkRecurring: configForm.donationLinkRecurring,
+        stripeSecretKey: configForm.stripeSecretKey.trim(),
+        stripeWebhookSecret: configForm.stripeWebhookSecret.trim(),
+
+        probeConcurrency: Number(configForm.probeConcurrency) || 200,
+        dbFlushMs: Number(configForm.dbFlushMs) || 5000,
+        mirrorFlushMs: Number(configForm.mirrorFlushMs) || 300000,
+        mirrorMinIntervalMs: Number(configForm.mirrorMinIntervalMs) || 10000,
+        reconcileMs: Number(configForm.reconcileMs) || 900000,
+        retentionDays: Number(configForm.retentionDays) || 35,
+        incidentRetentionDays: Number(configForm.incidentRetentionDays) || 365,
+        userAgent: configForm.userAgent.trim(),
+        heartbeatUrl: configForm.heartbeatUrl.trim(),
+
+        verifySecret: configForm.verifySecret.trim(),
+        verifyPeerUrl: configForm.verifyPeerUrl.trim(),
+
+        appUrl: configForm.appUrl.trim(),
+        apiUrl: configForm.apiUrl.trim(),
+
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser?.email || "admin",
+      };
+
+      await setDoc(doc(db, "system", "config"), payload, { merge: true });
+      setConfigSuccess("Configuration saved! Realtime updates pushed to all workers.");
+      setTimeout(() => setConfigSuccess(null), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to save configuration";
+      setConfigError(msg);
+    } finally {
+      setConfigSaving(false);
+    }
+  };
+
+  const handleResetField = (key: keyof SystemConfigState) => {
+    setConfigForm((prev) => ({
+      ...prev,
+      [key]: envDefaults[key],
+    }));
+  };
+
   /** Names the exact domain, because this console is served from two of them
    *  and Firebase's own message identifies neither. */
   const unauthorisedDomainMessage = () =>
@@ -633,8 +856,8 @@ export default function AdminPage() {
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
       const matchesSearch =
-        u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-        u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+        (u.email ?? "").toLowerCase().includes(userSearch.toLowerCase()) ||
+        (u.name ?? "").toLowerCase().includes(userSearch.toLowerCase()) ||
         u.uid.toLowerCase().includes(userSearch.toLowerCase());
       const matchesRole = userRoleFilter === "all" || u.role === userRoleFilter;
       const matchesPlan = userPlanFilter === "all" || u.plan === userPlanFilter;
@@ -645,9 +868,14 @@ export default function AdminPage() {
   // Filtered Monitors
   const filteredMonitors = useMemo(() => {
     return monitors.filter((m) => {
+      const q = monitorSearch.toLowerCase().trim();
+      const isCron = m.type === "heartbeat";
       const matchesSearch =
-        m.name.toLowerCase().includes(monitorSearch.toLowerCase()) ||
-        m.target.toLowerCase().includes(monitorSearch.toLowerCase());
+        !q ||
+        m.name.toLowerCase().includes(q) ||
+        m.target.toLowerCase().includes(q) ||
+        m.type.toLowerCase().includes(q) ||
+        (isCron && ("cron".includes(q) || "heartbeat".includes(q)));
       const matchesType = monitorTypeFilter === "all" || m.type === monitorTypeFilter;
       const matchesStatus = monitorStatusFilter === "all" || m.status === monitorStatusFilter;
       return matchesSearch && matchesType && matchesStatus;
@@ -882,6 +1110,14 @@ export default function AdminPage() {
         >
           <span>☕ Donations</span>
           <span className="tab-badge">${donationStats.totalRevenue.toFixed(2)}</span>
+        </button>
+
+        <button
+          className={`admin-tab-btn ${activeTab === "settings" ? "active" : ""}`}
+          onClick={() => setActiveTab("settings")}
+        >
+          <span>🔧 Configuration</span>
+          {rawConfigFromDb && <span className="tab-badge ok">Active</span>}
         </button>
       </nav>
 
@@ -1275,8 +1511,20 @@ export default function AdminPage() {
                       </span>
                     </td>
                     <td>
-                      <span className="font-mono" style={{ color: w.lagMs < 50 ? "var(--green)" : "var(--amber)" }}>
-                        {w.lagMs} ms
+                      {/* Null means the worker has not written a status file
+                          — silence, not zero. */}
+                      <span
+                        className="font-mono"
+                        style={{
+                          color:
+                            w.lagMs == null
+                              ? "var(--text-dim)"
+                              : w.lagMs < 50
+                                ? "var(--green)"
+                                : "var(--amber)",
+                        }}
+                      >
+                        {w.lagMs == null ? "—" : `${w.lagMs} ms`}
                       </span>
                     </td>
                     <td>
@@ -1291,9 +1539,21 @@ export default function AdminPage() {
                     </td>
                     <td>
                       <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                        <span style={{ fontSize: "0.72rem", color: "var(--green)" }}>• worker: {w.units.worker}</span>
-                        <span style={{ fontSize: "0.72rem", color: "var(--green)" }}>• api: {w.units.api}</span>
-                        <span style={{ fontSize: "0.72rem", color: "var(--green)" }}>• caddy: {w.units.caddy}</span>
+                        {/* The API does not report systemd unit state, so
+                            this shows what it does know rather than three
+                            reassuring lines that were never checked. */}
+                        {w.units ? (
+                          <>
+                            <span style={{ fontSize: "0.72rem", color: "var(--green)" }}>• worker: {w.units.worker}</span>
+                            <span style={{ fontSize: "0.72rem", color: "var(--green)" }}>• api: {w.units.api}</span>
+                            <span style={{ fontSize: "0.72rem", color: "var(--green)" }}>• caddy: {w.units.caddy}</span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: "0.72rem", color: "var(--text-dim)" }}>
+                            shard {w.index ?? 0}/{w.count ?? 1} · updated{" "}
+                            {w.updatedAt ? new Date(w.updatedAt).toLocaleTimeString() : "never"}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td>
@@ -1376,6 +1636,7 @@ export default function AdminPage() {
                 <option value="up">Operational (Up)</option>
                 <option value="down">Degraded (Down)</option>
                 <option value="paused">Paused</option>
+                <option value="pending">Pending</option>
               </select>
             </div>
           </div>
@@ -1764,6 +2025,639 @@ export default function AdminPage() {
         </section>
       )}
 
+      {/* 10. TAB 8: DYNAMIC APP CONFIGURATION */}
+      {activeTab === "settings" && (
+        <form onSubmit={handleSaveConfig} className="config-container">
+          <div className="panel" style={{ padding: "20px 24px", marginBottom: 0 }}>
+            <div className="panel-header" style={{ marginBottom: 0 }}>
+              <div className="panel-title-wrap">
+                <span style={{ fontSize: "1.3rem" }}>🔧</span>
+                <div>
+                  <h2 className="panel-title">Application &amp; Fleet Dynamic Configuration</h2>
+                  <p className="panel-desc">
+                    Configure alert delivery gateways, Stripe billing, and probe engine parameters live without SSH or restarting workers.
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={configSaving}
+                  style={{ minWidth: "160px", justifyContent: "center" }}
+                >
+                  {configSaving ? "Saving to Fleet…" : "Save Configuration"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {configSuccess && (
+            <div
+              style={{
+                background: "rgba(59, 214, 113, 0.12)",
+                border: "1px solid rgba(59, 214, 113, 0.35)",
+                borderRadius: "10px",
+                padding: "12px 18px",
+                color: "#4ade80",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>✓ {configSuccess}</span>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: "4px 8px", fontSize: "0.72rem" }}
+                onClick={() => setConfigSuccess(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {configError && (
+            <div
+              style={{
+                background: "rgba(239, 68, 68, 0.12)",
+                border: "1px solid rgba(239, 68, 68, 0.35)",
+                borderRadius: "10px",
+                padding: "12px 18px",
+                color: "#ef4444",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>⚠️ {configError}</span>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: "4px 8px", fontSize: "0.72rem" }}
+                onClick={() => setConfigError(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* SECTION 1: ALERT & NOTIFICATION GATEWAYS */}
+          <div className="config-card">
+            <div className="config-card-header">
+              <div>
+                <div className="config-card-title">
+                  <span>📧 Alert Delivery Gateways</span>
+                </div>
+                <div className="config-card-desc">
+                  Mailgun (primary) and Resend (fallback) email delivery, Telegram alerts, and sender verification.
+                </div>
+              </div>
+              <span className="badge-pill ok">Runtime Hot-Reload</span>
+            </div>
+
+            <div className="config-grid">
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Sender From Email (ALERT_FROM_EMAIL)</label>
+                  <span className={`config-badge ${isFieldCustom("alertFromEmail") ? "custom" : "default"}`}>
+                    {isFieldCustom("alertFromEmail") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="email"
+                  className="config-input"
+                  value={configForm.alertFromEmail}
+                  onChange={(e) => setConfigForm({ ...configForm, alertFromEmail: e.target.value })}
+                  placeholder={envDefaults.alertFromEmail}
+                />
+                <span className="config-hint">Must sit on the Mailgun sending domain for DMARC/SPF compliance.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Mailgun Sending Domain (MAILGUN_DOMAIN)</label>
+                  <span className={`config-badge ${isFieldCustom("mailgunDomain") ? "custom" : "default"}`}>
+                    {isFieldCustom("mailgunDomain") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  className="config-input"
+                  value={configForm.mailgunDomain}
+                  onChange={(e) => setConfigForm({ ...configForm, mailgunDomain: e.target.value })}
+                  placeholder={envDefaults.mailgunDomain}
+                />
+                <span className="config-hint">Configured sub-domain in Mailgun (e.g. mg.uptimemonke.com).</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Mailgun API Key (MAILGUN_API_KEY)</label>
+                  <span className={`config-badge ${isFieldCustom("mailgunApiKey") ? "custom" : "default"}`}>
+                    {isFieldCustom("mailgunApiKey") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <div className="config-input-wrap">
+                  <input
+                    type={visibleSecrets.mailgunApiKey ? "text" : "password"}
+                    className="config-input config-input-secret"
+                    value={configForm.mailgunApiKey}
+                    onChange={(e) => setConfigForm({ ...configForm, mailgunApiKey: e.target.value })}
+                    placeholder="key-xxxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                  <button
+                    type="button"
+                    className="config-secret-toggle"
+                    onClick={() => toggleSecret("mailgunApiKey")}
+                    title={visibleSecrets.mailgunApiKey ? "Hide key" : "Show key"}
+                  >
+                    {visibleSecrets.mailgunApiKey ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <span className="config-hint">Primary email delivery key. Form-encoded basic auth username is 'api'.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Mailgun API Endpoint (MAILGUN_BASE_URL)</label>
+                  <span className={`config-badge ${isFieldCustom("mailgunBaseUrl") ? "custom" : "default"}`}>
+                    {isFieldCustom("mailgunBaseUrl") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  className="config-input"
+                  value={configForm.mailgunBaseUrl}
+                  onChange={(e) => setConfigForm({ ...configForm, mailgunBaseUrl: e.target.value })}
+                  placeholder={envDefaults.mailgunBaseUrl}
+                />
+                <span className="config-hint">Use https://api.eu.mailgun.net for European Union region accounts.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Resend API Key Fallback (RESEND_API_KEY)</label>
+                  <span className={`config-badge ${isFieldCustom("resendApiKey") ? "custom" : "default"}`}>
+                    {isFieldCustom("resendApiKey") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <div className="config-input-wrap">
+                  <input
+                    type={visibleSecrets.resendApiKey ? "text" : "password"}
+                    className="config-input config-input-secret"
+                    value={configForm.resendApiKey}
+                    onChange={(e) => setConfigForm({ ...configForm, resendApiKey: e.target.value })}
+                    placeholder="re_xxxxxxxxxxxxxxxx"
+                  />
+                  <button
+                    type="button"
+                    className="config-secret-toggle"
+                    onClick={() => toggleSecret("resendApiKey")}
+                  >
+                    {visibleSecrets.resendApiKey ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <span className="config-hint">Used automatically when Mailgun key is empty or returns provider failure.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Telegram Bot Token (TELEGRAM_BOT_TOKEN)</label>
+                  <span className={`config-badge ${isFieldCustom("telegramBotToken") ? "custom" : "default"}`}>
+                    {isFieldCustom("telegramBotToken") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <div className="config-input-wrap">
+                  <input
+                    type={visibleSecrets.telegramBotToken ? "text" : "password"}
+                    className="config-input config-input-secret"
+                    value={configForm.telegramBotToken}
+                    onChange={(e) => setConfigForm({ ...configForm, telegramBotToken: e.target.value })}
+                    placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
+                  />
+                  <button
+                    type="button"
+                    className="config-secret-toggle"
+                    onClick={() => toggleSecret("telegramBotToken")}
+                  >
+                    {visibleSecrets.telegramBotToken ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <span className="config-hint">BotFather token for sending alerts to Telegram chat and group channels.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 2: BILLING & STRIPE DONATIONS */}
+          <div className="config-card">
+            <div className="config-card-header">
+              <div>
+                <div className="config-card-title">
+                  <span>💳 Billing &amp; Stripe Donations</span>
+                </div>
+                <div className="config-card-desc">
+                  Payment Links, one-off vs recurring subscription pricing, and raw-body webhook signature verification.
+                </div>
+              </div>
+              <span className="badge-pill warn" style={{ color: "var(--amber)", borderColor: "rgba(245,158,11,0.3)" }}>
+                Credit Ledger
+              </span>
+            </div>
+
+            <div className="config-grid">
+              <div className="config-field full-width">
+                <div className="config-label-row">
+                  <label className="config-label">Stripe Payment Link URL (DONATION_LINK_URL)</label>
+                  <span className={`config-badge ${isFieldCustom("donationLinkUrl") ? "custom" : "default"}`}>
+                    {isFieldCustom("donationLinkUrl") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  className="config-input"
+                  value={configForm.donationLinkUrl}
+                  onChange={(e) => setConfigForm({ ...configForm, donationLinkUrl: e.target.value })}
+                  placeholder={envDefaults.donationLinkUrl}
+                />
+                <span className="config-hint">Stripe Payment Link URL without workspace query params. API appends client_reference_id dynamically.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Donation Amount in Cents (DONATION_LINK_CENTS)</label>
+                  <span className={`config-badge ${isFieldCustom("donationLinkCents") ? "custom" : "default"}`}>
+                    {isFieldCustom("donationLinkCents") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  className="config-input"
+                  value={configForm.donationLinkCents}
+                  onChange={(e) => setConfigForm({ ...configForm, donationLinkCents: e.target.value })}
+                  placeholder={envDefaults.donationLinkCents}
+                />
+                <span className="config-hint">Amount charged (e.g. 299 = $2.99). Grants 10,000 capacity checks per $1.00.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Recurring Subscription Flag (DONATION_LINK_RECURRING)</label>
+                  <span className={`config-badge ${isFieldCustom("donationLinkRecurring") ? "custom" : "default"}`}>
+                    {isFieldCustom("donationLinkRecurring") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "8px" }}>
+                  <input
+                    type="checkbox"
+                    id="donationLinkRecurring"
+                    checked={configForm.donationLinkRecurring}
+                    onChange={(e) => setConfigForm({ ...configForm, donationLinkRecurring: e.target.checked })}
+                    style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "var(--green)" }}
+                  />
+                  <label htmlFor="donationLinkRecurring" style={{ fontSize: "0.85rem", cursor: "pointer", color: "var(--text)" }}>
+                    Stripe Payment Link is configured as monthly recurring subscription
+                  </label>
+                </div>
+                <span className="config-hint">Controls button copy and renewal badge in the supporter dashboard.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Stripe Webhook Secret (STRIPE_WEBHOOK_SECRET)</label>
+                  <span className={`config-badge ${isFieldCustom("stripeWebhookSecret") ? "custom" : "default"}`}>
+                    {isFieldCustom("stripeWebhookSecret") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <div className="config-input-wrap">
+                  <input
+                    type={visibleSecrets.stripeWebhookSecret ? "text" : "password"}
+                    className="config-input config-input-secret"
+                    value={configForm.stripeWebhookSecret}
+                    onChange={(e) => setConfigForm({ ...configForm, stripeWebhookSecret: e.target.value })}
+                    placeholder="whsec_xxxxxxxxxxxxxxxxxxxx"
+                  />
+                  <button
+                    type="button"
+                    className="config-secret-toggle"
+                    onClick={() => toggleSecret("stripeWebhookSecret")}
+                  >
+                    {visibleSecrets.stripeWebhookSecret ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <span className="config-hint">Signing secret used to cryptographically verify Stripe raw-body webhook payloads.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Stripe Secret Key (STRIPE_SECRET_KEY, Optional)</label>
+                  <span className={`config-badge ${isFieldCustom("stripeSecretKey") ? "custom" : "default"}`}>
+                    {isFieldCustom("stripeSecretKey") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <div className="config-input-wrap">
+                  <input
+                    type={visibleSecrets.stripeSecretKey ? "text" : "password"}
+                    className="config-input config-input-secret"
+                    value={configForm.stripeSecretKey}
+                    onChange={(e) => setConfigForm({ ...configForm, stripeSecretKey: e.target.value })}
+                    placeholder="sk_live_xxxxxxxxxxxxxxxxxxxx"
+                  />
+                  <button
+                    type="button"
+                    className="config-secret-toggle"
+                    onClick={() => toggleSecret("stripeSecretKey")}
+                  >
+                    {visibleSecrets.stripeSecretKey ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <span className="config-hint">Optional API key. Payment links require only webhook secret to credit accounts.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 3: PROBE ENGINE & WORKER TUNING */}
+          <div className="config-card">
+            <div className="config-card-header">
+              <div>
+                <div className="config-card-title">
+                  <span>⚡ Probe Engine &amp; Worker Tuning</span>
+                </div>
+                <div className="config-card-desc">
+                  Concurrency ceilings, SQLite batch flush intervals, data retention, and external dead-man's switch.
+                </div>
+              </div>
+              <span className="badge-pill ok">Fleet Probes</span>
+            </div>
+
+            <div className="config-grid">
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Max In-Flight Probe Concurrency (PROBE_CONCURRENCY)</label>
+                  <span className={`config-badge ${isFieldCustom("probeConcurrency") ? "custom" : "default"}`}>
+                    {isFieldCustom("probeConcurrency") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  className="config-input"
+                  value={configForm.probeConcurrency}
+                  onChange={(e) => setConfigForm({ ...configForm, probeConcurrency: e.target.value })}
+                  placeholder={envDefaults.probeConcurrency}
+                />
+                <span className="config-hint">50 for 512MB RAM workers, 200+ for 1GB+ RAM instances. Protects sockets &amp; memory.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">External Dead-Man's Switch URL (UPTIMEMONK_HEARTBEAT_URL)</label>
+                  <span className={`config-badge ${isFieldCustom("heartbeatUrl") ? "custom" : "default"}`}>
+                    {isFieldCustom("heartbeatUrl") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  className="config-input"
+                  value={configForm.heartbeatUrl}
+                  onChange={(e) => setConfigForm({ ...configForm, heartbeatUrl: e.target.value })}
+                  placeholder={envDefaults.heartbeatUrl || "https://betteruptime.com/api/v1/heartbeat/..."}
+                />
+                <span className="config-hint">Pinged every tick. External service alerts if the worker box dies silently.</span>
+              </div>
+
+              <div className="config-field full-width">
+                <div className="config-label-row">
+                  <label className="config-label">HTTP Probe User-Agent (USER_AGENT)</label>
+                  <span className={`config-badge ${isFieldCustom("userAgent") ? "custom" : "default"}`}>
+                    {isFieldCustom("userAgent") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  className="config-input"
+                  value={configForm.userAgent}
+                  onChange={(e) => setConfigForm({ ...configForm, userAgent: e.target.value })}
+                  placeholder={envDefaults.userAgent}
+                />
+                <span className="config-hint">Sent in all outbound HTTP/HTTPS and keyword verification requests.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Hourly Samples Retention Days (RETENTION_DAYS)</label>
+                  <span className={`config-badge ${isFieldCustom("retentionDays") ? "custom" : "default"}`}>
+                    {isFieldCustom("retentionDays") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  className="config-input"
+                  value={configForm.retentionDays}
+                  onChange={(e) => setConfigForm({ ...configForm, retentionDays: e.target.value })}
+                  placeholder={envDefaults.retentionDays}
+                />
+                <span className="config-hint">Raw hourly sample buckets pruned nightly (default 35 days).</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Incident History Retention Days (INCIDENT_RETENTION_DAYS)</label>
+                  <span className={`config-badge ${isFieldCustom("incidentRetentionDays") ? "custom" : "default"}`}>
+                    {isFieldCustom("incidentRetentionDays") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  className="config-input"
+                  value={configForm.incidentRetentionDays}
+                  onChange={(e) => setConfigForm({ ...configForm, incidentRetentionDays: e.target.value })}
+                  placeholder={envDefaults.incidentRetentionDays}
+                />
+                <span className="config-hint">Resolved incident retention window (default 365 days). Open incidents are never pruned.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">SQLite Disk Flush Milliseconds (DB_FLUSH_MS)</label>
+                  <span className={`config-badge ${isFieldCustom("dbFlushMs") ? "custom" : "default"}`}>
+                    {isFieldCustom("dbFlushMs") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  className="config-input"
+                  value={configForm.dbFlushMs}
+                  onChange={(e) => setConfigForm({ ...configForm, dbFlushMs: e.target.value })}
+                  placeholder={envDefaults.dbFlushMs}
+                />
+                <span className="config-hint">Buffers in-memory checks and writes in one single synchronous transaction (default 5,000 ms).</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Firestore Status Mirror Flush (MIRROR_FLUSH_MS)</label>
+                  <span className={`config-badge ${isFieldCustom("mirrorFlushMs") ? "custom" : "default"}`}>
+                    {isFieldCustom("mirrorFlushMs") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  className="config-input"
+                  value={configForm.mirrorFlushMs}
+                  onChange={(e) => setConfigForm({ ...configForm, mirrorFlushMs: e.target.value })}
+                  placeholder={envDefaults.mirrorFlushMs}
+                />
+                <span className="config-hint">Periodic sync of aggregated org status mirror to Cloud Firestore (default 5 min).</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 4: PEER VERIFICATION & CLUSTERING */}
+          <div className="config-card">
+            <div className="config-card-header">
+              <div>
+                <div className="config-card-title">
+                  <span>🛡️ Cross-Region Peer Verification</span>
+                </div>
+                <div className="config-card-desc">
+                  Shared cryptographic secret and remote peer URL for multi-region failure confirmations.
+                </div>
+              </div>
+              <span className="badge-pill warn" style={{ color: "var(--blue)", borderColor: "rgba(56,189,248,0.3)" }}>
+                False Alarm Guard
+              </span>
+            </div>
+
+            <div className="config-grid">
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Peer Verification Secret (VERIFY_SECRET)</label>
+                  <span className={`config-badge ${isFieldCustom("verifySecret") ? "custom" : "default"}`}>
+                    {isFieldCustom("verifySecret") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <div className="config-input-wrap">
+                  <input
+                    type={visibleSecrets.verifySecret ? "text" : "password"}
+                    className="config-input config-input-secret"
+                    value={configForm.verifySecret}
+                    onChange={(e) => setConfigForm({ ...configForm, verifySecret: e.target.value })}
+                    placeholder="sec_peer_verification_hmac_key"
+                  />
+                  <button
+                    type="button"
+                    className="config-secret-toggle"
+                    onClick={() => toggleSecret("verifySecret")}
+                  >
+                    {visibleSecrets.verifySecret ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <span className="config-hint">Shared HMAC secret used by workers to sign /internal/verify probe requests.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Peer Worker Base URL (VERIFY_PEER_URL)</label>
+                  <span className={`config-badge ${isFieldCustom("verifyPeerUrl") ? "custom" : "default"}`}>
+                    {isFieldCustom("verifyPeerUrl") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  className="config-input"
+                  value={configForm.verifyPeerUrl}
+                  onChange={(e) => setConfigForm({ ...configForm, verifyPeerUrl: e.target.value })}
+                  placeholder={envDefaults.verifyPeerUrl || "https://api-us.uptimemonke.com"}
+                />
+                <span className="config-hint">URL of the secondary worker deployed in another AWS region.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 5: APP ROUTING & DOMAINS */}
+          <div className="config-card">
+            <div className="config-card-header">
+              <div>
+                <div className="config-card-title">
+                  <span>🌐 Application &amp; API Domain Routing</span>
+                </div>
+                <div className="config-card-desc">
+                  Customer web dashboard URL and worker API endpoint used for links in email alerts and CORS origins.
+                </div>
+              </div>
+              <span className="badge-pill ok">Domains</span>
+            </div>
+
+            <div className="config-grid">
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Dashboard Web URL (APP_URL)</label>
+                  <span className={`config-badge ${isFieldCustom("appUrl") ? "custom" : "default"}`}>
+                    {isFieldCustom("appUrl") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  className="config-input"
+                  value={configForm.appUrl}
+                  onChange={(e) => setConfigForm({ ...configForm, appUrl: e.target.value })}
+                  placeholder={envDefaults.appUrl}
+                />
+                <span className="config-hint">Referenced in alert emails to navigate customers directly to incident reports.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Worker API Endpoint (API_URL)</label>
+                  <span className={`config-badge ${isFieldCustom("apiUrl") ? "custom" : "default"}`}>
+                    {isFieldCustom("apiUrl") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  className="config-input"
+                  value={configForm.apiUrl}
+                  onChange={(e) => setConfigForm({ ...configForm, apiUrl: e.target.value })}
+                  placeholder={envDefaults.apiUrl}
+                />
+                <span className="config-hint">Public entrypoint for probe heartbeats, monitoring CRUD, and status pages.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Floating Actions Bar */}
+          <div className="config-actions-bar">
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span className="status-dot ok pulse" />
+              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                {rawConfigFromDb ? "Realtime sync active via Firestore system/config" : "Using environment variable defaults"}
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  if (confirm("Reset form back to original environment variable defaults?")) {
+                    setConfigForm(envDefaults);
+                  }
+                }}
+              >
+                Reset to Env Defaults
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={configSaving}
+                style={{ minWidth: "160px", justifyContent: "center" }}
+              >
+                {configSaving ? "Applying Changes…" : "Save Configuration"}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
       {/* INSPECTOR MODALS */}
 
       {/* User Inspector */}
@@ -1788,7 +2682,7 @@ export default function AdminPage() {
             </div>
             <div className="inspector-field">
               <label>Account Role &amp; Plan</label>
-              <div className="val">{inspectedUser.role.toUpperCase()} · {inspectedUser.plan.toUpperCase()} TIER</div>
+              <div className="val">{inspectedUser.role.toUpperCase()} · {(inspectedUser.plan ?? "none").toUpperCase()} TIER</div>
             </div>
             <div className="inspector-field">
               <label>Capacity Balance</label>

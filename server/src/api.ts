@@ -8,6 +8,7 @@ import { contactRoutes } from "./api/contacts.js";
 import { statusRoutes } from "./api/status.js";
 import { billingRoutes } from "./api/billing.js";
 import { orgRoutes } from "./api/org.js";
+import { adminRoutes } from "./api/admin.js";
 import { seedSystemConfig, startSystemConfigListener } from "./sync/configListener.js";
 import { log } from "./lib/log.js";
 import { API_VERSION, APP_URL, PORT } from "./config.js";
@@ -70,6 +71,7 @@ async function main(): Promise<void> {
   await app.register(statusRoutes);
   await app.register(billingRoutes);
   await app.register(orgRoutes);
+  await app.register(adminRoutes);
 
   await app.listen({ port: PORT, host: "127.0.0.1" }); // Caddy is the only client
   log.info({ port: PORT, version: API_VERSION }, "api listening");

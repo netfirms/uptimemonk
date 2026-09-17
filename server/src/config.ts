@@ -175,6 +175,15 @@ export let DONATION_LINK_URL = envDefaults.donationLinkUrl;
 export let DONATION_LINK_CENTS = envDefaults.donationLinkCents;
 export let DONATION_LINK_RECURRING = envDefaults.donationLinkRecurring;
 export let STRIPE_SECRET_KEY = envDefaults.stripeSecretKey;
+/**
+ * Who may use the operations console. Comma-separated addresses; empty means
+ * nobody, which is the safe default for a view of every customer.
+ */
+export const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 export let RECAPTCHA_SECRET = envDefaults.recaptchaSecret;
 export let RECAPTCHA_MIN_SCORE = envDefaults.recaptchaMinScore;
 export let STRIPE_WEBHOOK_SECRET = envDefaults.stripeWebhookSecret;

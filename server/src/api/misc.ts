@@ -9,6 +9,8 @@ import { handleVerifyRequest, signatureMatches } from "../probe/verify.js";
 import { requireAuth } from "./auth.js";
 import { log } from "../lib/log.js";
 import { verifyRecaptcha } from "../lib/recaptcha.js";
+import { SECRET_CONFIG_KEYS } from "../config.js";
+import { requireAdmin } from "./auth.js";
 import { readinessSummary } from "../lib/readiness.js";
 import { API_VERSION, REGION, VERIFY_SECRET, getConfigMetadata } from "../config.js";
 import type { Plan } from "../types.js";
@@ -335,14 +337,14 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
    * from which source, but never the raw value over HTTP. Editing is done
    * via Firestore writes from the admin console, not through this endpoint.
    */
-  const SECRET_KEYS = new Set([
-    "mailgunApiKey",
-    "resendApiKey",
-    "telegramBotToken",
-    "stripeSecretKey",
-    "stripeWebhookSecret",
-    "verifySecret",
-  ]);
+  /**
+   * Derived, never hand-listed.
+   *
+   * This was a literal set and `recaptchaSecret` was not in it, so that key
+   * was served in full from an endpoint with no authentication. A list you
+   * have to remember to update is a leak waiting for the next credential.
+   */
+  const SECRET_KEYS = new Set<string>(SECRET_CONFIG_KEYS);
 
   function maskSecret(val: unknown): string {
     const s = String(val ?? "");
@@ -351,7 +353,15 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
     return s.slice(0, 4) + "•".repeat(Math.min(s.length - 8, 20)) + s.slice(-4);
   }
 
-  app.get("/v1/admin/config", async (_req, reply) => {
+  /**
+   * Was unauthenticated, on the public internet, returning masked secrets —
+   * and one unmasked. Even a mask leaks: first four and last four narrows a
+   * key and confirms which are set.
+   */
+  app.get(
+    "/v1/admin/config",
+    { preHandler: [requireAuth(), requireAdmin] },
+    async (_req, reply) => {
     const meta = getConfigMetadata();
     const result = meta.map((entry) => {
       const isSecret = SECRET_KEYS.has(entry.key);

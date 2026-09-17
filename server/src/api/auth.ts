@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { auth } from "../sync/firebase.js";
 import { log } from "../lib/log.js";
+import { ADMIN_EMAILS } from "../config.js";
 
 /**
  * Request authentication.
@@ -83,5 +84,30 @@ export function requireAuth(options: AuthOptions = {}) {
 export async function requireOwner(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   if (req.user?.role !== "owner") {
     return reply.code(403).send({ error: "Only the workspace owner can do that" });
+  }
+}
+
+/**
+ * Platform operator, which is not the same as a workspace owner.
+ *
+ * `requireOwner` means "owner of this org", and every customer is one —
+ * `bootstrap` sets that claim on whoever signs up. Using it to guard
+ * fleet-wide data would expose every account to every account.
+ *
+ * Membership is an explicit allowlist in `ADMIN_EMAILS`, matched against the
+ * verified token. It **fails closed**: with nothing configured, nobody is an
+ * admin, which is the right default for a door that shows every customer's
+ * details.
+ */
+export async function requireAdmin(
+  req: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const allowed = ADMIN_EMAILS;
+  const email = req.user?.email?.toLowerCase();
+
+  if (!allowed.length || !email || !allowed.includes(email)) {
+    log.warn({ uid: req.user?.uid, email }, "admin access refused");
+    return reply.code(403).send({ error: "Not an administrator" });
   }
 }
