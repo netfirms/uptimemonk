@@ -73,6 +73,8 @@ fi
 if [[ "$TARGETS" == *"hosting"* ]]; then
   echo "==> Building web frontend (static export)..."
   npm --prefix web run build
+  echo "==> Building admin portal (static export)..."
+  npm --prefix admin run build
 fi
 
 # 2. Determine target project
