@@ -5,7 +5,18 @@ import { listMonitors, getOrgCredit, creditLedger } from "../db/repo.js";
 import { budgetFor, standingOf } from "../lib/credits.js";
 import { readinessSummary } from "../lib/readiness.js";
 import { readFileSync } from "node:fs";
+import { log } from "../lib/log.js";
+
+/** Same shape the config endpoint uses: enough to recognise, not to reuse. */
+function maskForDisplay(val: unknown): string {
+  const str = String(val ?? "");
+  if (!str) return "";
+  if (str.length <= 8) return "•".repeat(str.length);
+  return str.slice(0, 4) + "•".repeat(Math.min(str.length - 8, 20)) + str.slice(-4);
+}
 import {
+  SECRET_CONFIG_KEYS,
+  getEffectiveConfig,
   API_VERSION,
   REGION,
   WORKER_ID,
@@ -114,6 +125,80 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       readiness: readinessSummary(),
     };
   });
+
+  /**
+   * The live config document, for the console to edit.
+   *
+   * Read through the worker rather than from the browser: `system/config` is
+   * backend-only in the rules, because it holds credentials and every
+   * customer used to be able to read *and write* it.
+   *
+   * Secrets come back masked. An operator setting one does not need to read
+   * the old value back, and a console that displays them is one screenshot
+   * away from leaking them.
+   */
+  app.get("/v1/admin/system-config", guard, async () => {
+    const snap = await col.system().doc("config").get();
+    const data = (snap.data() ?? {}) as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data)) {
+      out[k] = (SECRET_CONFIG_KEYS as readonly string[]).includes(k)
+        ? maskForDisplay(v)
+        : v;
+    }
+    return { config: out, exists: snap.exists };
+  });
+
+  /**
+   * Save it.
+   *
+   * Only keys the config actually has are written — an open merge would let
+   * the console (or anything that could reach it) put arbitrary fields into a
+   * document the workers read.
+   *
+   * A masked value means "unchanged". The console renders secrets masked, so
+   * saving the form would otherwise write the bullets back over the real key
+   * and silently break email or payments.
+   */
+  app.put<{ Body: Record<string, unknown> }>(
+    "/v1/admin/system-config",
+    guard,
+    async (req, reply) => {
+      const incoming = req.body ?? {};
+      const known = new Set(Object.keys(getEffectiveConfig()));
+      const patch: Record<string, unknown> = {};
+      const ignored: string[] = [];
+
+      for (const [k, v] of Object.entries(incoming)) {
+        if (!known.has(k)) {
+          ignored.push(k);
+          continue;
+        }
+        if (
+          (SECRET_CONFIG_KEYS as readonly string[]).includes(k) &&
+          typeof v === "string" &&
+          (v.includes("•") || v === "")
+        ) {
+          continue; // masked or blank: leave whatever is stored alone
+        }
+        patch[k] = v;
+      }
+
+      if (!Object.keys(patch).length) {
+        return reply.code(400).send({ error: "Nothing to change", ignored });
+      }
+
+      patch.updatedAt = new Date().toISOString();
+      patch.updatedBy = req.user!.email ?? req.user!.uid;
+
+      await col.system().doc("config").set(patch, { merge: true });
+      log.info(
+        { by: req.user!.email, keys: Object.keys(patch).length, ignored: ignored.length },
+        "system config updated"
+      );
+      return { saved: Object.keys(patch).length, ignored };
+    }
+  );
 
   /** Fleet-wide monitor totals, straight from SQLite. */
   app.get("/v1/admin/monitors", guard, async () => {

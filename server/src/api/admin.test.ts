@@ -35,3 +35,52 @@ describe("admin access", () => {
     assert.equal(isAdmin(["ops@example.com"], undefined), false);
   });
 });
+
+/**
+ * Saving the config document.
+ *
+ * The console renders secrets masked, so a naive save writes the bullets back
+ * over the real key and silently breaks email or payments. And an open merge
+ * would let anything that reaches this route put arbitrary fields into a
+ * document the workers read.
+ */
+const KNOWN = new Set(["appUrl", "probeConcurrency", "mailgunApiKey", "stripeSecretKey"]);
+const SECRETS = ["mailgunApiKey", "stripeSecretKey"];
+
+function buildPatch(incoming: Record<string, unknown>) {
+  const patch: Record<string, unknown> = {};
+  const ignored: string[] = [];
+  for (const [k, v] of Object.entries(incoming)) {
+    if (!KNOWN.has(k)) { ignored.push(k); continue; }
+    if (SECRETS.includes(k) && typeof v === "string" && (v.includes("•") || v === "")) continue;
+    patch[k] = v;
+  }
+  return { patch, ignored };
+}
+
+describe("saving system config", () => {
+  test("an ordinary field is written", () => {
+    assert.deepEqual(buildPatch({ appUrl: "https://x" }).patch, { appUrl: "https://x" });
+  });
+
+  test("a masked secret is left alone, not written back as bullets", () => {
+    const { patch } = buildPatch({ mailgunApiKey: "e80b••••••••7550" });
+    assert.deepEqual(patch, {}, "would have overwritten the real key with its mask");
+  });
+
+  test("a blank secret is left alone too", () => {
+    // An operator clearing a field by accident must not silently disable email.
+    assert.deepEqual(buildPatch({ stripeSecretKey: "" }).patch, {});
+  });
+
+  test("a genuinely new secret IS written", () => {
+    const { patch } = buildPatch({ mailgunApiKey: "key-abcdef123456" });
+    assert.deepEqual(patch, { mailgunApiKey: "key-abcdef123456" });
+  });
+
+  test("unknown keys are refused, not merged in", () => {
+    const { patch, ignored } = buildPatch({ appUrl: "https://x", isAdmin: true, __proto__: {} });
+    assert.deepEqual(patch, { appUrl: "https://x" });
+    assert.ok(ignored.includes("isAdmin"));
+  });
+});

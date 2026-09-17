@@ -9,8 +9,7 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 
 // --- Domain Models ---
 
@@ -582,14 +581,32 @@ export default function AdminPage() {
     }
   }, [currentUser, fetchTelemetry, pingEndpoints]);
 
-  // Realtime System Configuration Sync
+  /**
+   * System configuration, through the worker.
+   *
+   * It used to read `system/config` straight from Firestore, which stopped
+   * working when that document became backend-only — it holds credentials,
+   * and every customer could previously read and write it. Polling the API
+   * loses the realtime push, which matters far less than the document being
+   * readable by anyone who signed up.
+   */
+  const [configReloadKey, setConfigReloadKey] = useState(0);
   useEffect(() => {
     if (!currentUser) return;
-    const unsub = onSnapshot(
-      doc(db, "system", "config"),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const token = await currentUser.getIdToken();
+        const res = await fetch("https://api.uptimemonke.com/v1/admin/system-config", {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const body = (await res.json()) as { config: Record<string, unknown>; exists: boolean };
+        if (cancelled) return;
+
+        if (body.exists) {
+          const data = body.config;
           setRawConfigFromDb(data);
           setConfigForm({
             alertFromEmail: data.alertFromEmail != null ? String(data.alertFromEmail) : envDefaults.alertFromEmail,
@@ -625,13 +642,15 @@ export default function AdminPage() {
           setRawConfigFromDb(null);
           setConfigForm(envDefaults);
         }
-      },
-      (err) => {
-        console.warn("Could not subscribe to system config:", err);
+      } catch (err) {
+        console.warn("Could not load system config:", err);
       }
-    );
-    return () => unsub();
-  }, [currentUser]);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, configReloadKey]);
 
   // Fetch real env defaults from the running worker
   useEffect(() => {
@@ -734,8 +753,27 @@ export default function AdminPage() {
         updatedBy: currentUser?.email || "admin",
       };
 
-      await setDoc(doc(db, "system", "config"), payload, { merge: true });
-      setConfigSuccess("Configuration saved! Realtime updates pushed to all workers.");
+      // Through the worker, which checks the operator allowlist and refuses
+      // to write a masked secret back over the real one.
+      const token = await currentUser!.getIdToken();
+      const res = await fetch("https://api.uptimemonke.com/v1/admin/system-config", {
+        method: "PUT",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          res.status === 403
+            ? "This account is not on the operator allowlist."
+            : (body as { error?: string }).error ?? `Save failed (${res.status})`
+        );
+      }
+      const saved = (await res.json()) as { saved: number; ignored: string[] };
+      setConfigReloadKey((k) => k + 1);
+      setConfigSuccess(
+        `Saved ${saved.saved} setting${saved.saved === 1 ? "" : "s"}. Workers pick it up within a second.`
+      );
       setTimeout(() => setConfigSuccess(null), 5000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save configuration";
