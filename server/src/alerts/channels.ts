@@ -4,7 +4,7 @@ import type { AlertContact, Incident, Monitor } from "../types.js";
 import { humanDuration } from "../lib/time.js";
 
 export interface AlertPayload {
-  event: "down" | "up";
+  event: "down" | "up" | "cert";
   monitor: Monitor;
   monitorId: string;
   incident: Incident;
@@ -12,12 +12,26 @@ export interface AlertPayload {
 }
 
 export function subjectFor(p: AlertPayload): string {
+  // A certificate warning is not an outage and must not read like one. The
+  // site is serving fine; something needs renewing before it stops.
+  if (p.event === "cert") return `🟡 CERT — ${p.monitor.name} expires soon`;
   return p.event === "down"
     ? `🔴 DOWN — ${p.monitor.name}`
     : `🟢 UP — ${p.monitor.name} is back`;
 }
 
 export function bodyFor(p: AlertPayload): string {
+  if (p.event === "cert") {
+    return [
+      `${p.monitor.name} is still up — this is a certificate warning.`,
+      ``,
+      `Host:     ${p.monitor.target}`,
+      `Detail:   ${p.incident.cause}`,
+      ``,
+      `Renew before it expires, or the site will start failing for visitors.`,
+    ].join("\n");
+  }
+
   const when = p.event === "down" ? p.incident.startedAt : p.incident.resolvedAt;
   const whenIso = new Date(when ?? Date.now()).toISOString();
   const lines = [
@@ -180,7 +194,7 @@ export async function sendDiscord(webhookUrl: string, p: AlertPayload): Promise<
       {
         title: subjectFor(p),
         description: bodyFor(p),
-        color: p.event === "down" ? 0xef4444 : 0x22c55e,
+        color: p.event === "down" ? 0xef4444 : p.event === "cert" ? 0xf59e0b : 0x22c55e,
         url: `${APP_URL}/monitors/${p.monitorId}`,
       },
     ],

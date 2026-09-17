@@ -62,6 +62,13 @@ export interface Monitor {
   dnsExpectedValue?: string;
   dnsServer?: string;
 
+  /**
+   * Days before expiry at which to warn, highest first — e.g. [30, 14, 7, 1].
+   * Each fires once for a given certificate; a renewal resets them.
+   */
+  sslExpiryAlertDays?: number[];
+  /** @deprecated Single threshold. Read as a one-element `sslExpiryAlertDays`
+   *  so monitors created before this keep working. */
   sslExpiryWarningDays?: number;
   sslExpectedFingerprint?: string;
   sslMinVersion?: "TLSv1.2" | "TLSv1.3";
@@ -113,6 +120,13 @@ export interface Monitor {
   uptime7d?: number;
   uptime30d?: number;
   certExpiresAt?: number | null;
+  /** Start of the validity window, so the UI can show the whole span. */
+  certIssuedAt?: number | null;
+  certIssuer?: string | null;
+  /** Thresholds already announced for the cert currently installed. */
+  certAlertedDays?: number[];
+  /** The expiry those alerts were computed against — a change means renewal. */
+  certAlertBasis?: number | null;
 
   createdAt: number;
   updatedAt: number;
@@ -197,7 +211,7 @@ export interface OutboxRow {
   id: number;
   incidentId: string;
   contactId: string;
-  event: "down" | "up";
+  event: "down" | "up" | "cert";
   attempts: number;
   nextAttemptAt: number;
   status: "pending" | "sent" | "failed";

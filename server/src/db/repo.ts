@@ -50,6 +50,10 @@ export function rowToMonitor(r: any): Monitor {
     consecutiveFailures: r.consecutive_failures,
     inMaintenance: bool(r.in_maintenance),
     certExpiresAt: r.cert_expires_at ?? null,
+    certIssuedAt: r.cert_issued_at ?? null,
+    certIssuer: r.cert_issuer ?? null,
+    certAlertedDays: json(r.cert_alerted_days, [] as number[]),
+    certAlertBasis: r.cert_alert_basis ?? null,
     uptime24h: r.uptime_24h ?? undefined,
     uptime7d: r.uptime_7d ?? undefined,
     uptime30d: r.uptime_30d ?? undefined,
@@ -80,6 +84,7 @@ const CONFIG_KEYS = [
   "dnsExpectedValue",
   "dnsServer",
   "sslExpiryWarningDays",
+  "sslExpiryAlertDays",
   "sslExpectedFingerprint",
   "sslMinVersion",
   "tcpPayload",
@@ -270,6 +275,8 @@ export function flushResults(writes: PendingWrite[]): void {
        consecutive_failures = @failures,
        in_maintenance = @inMaintenance,
        cert_expires_at = COALESCE(@certExpiresAt, cert_expires_at),
+       cert_issued_at  = COALESCE(@certIssuedAt, cert_issued_at),
+       cert_issuer     = COALESCE(@certIssuer, cert_issuer),
        last_status_changed_at = CASE WHEN @statusChanged = 1
          THEN @checkedAt ELSE last_status_changed_at END,
        updated_at = @checkedAt
@@ -290,10 +297,15 @@ export function flushResults(writes: PendingWrite[]): void {
 
   db.transaction((batch: PendingWrite[]) => {
     for (const w of batch) {
-      const certExpiresAt =
-        typeof w.result.meta?.expiresAt === "number"
-          ? (w.result.meta.expiresAt as number)
-          : null;
+      // COALESCE in the statement keeps the last known values when a check
+      // returns no cert at all — a timeout should not blank the expiry date
+      // the dashboard is showing.
+      const meta = w.result.meta as
+        | { expiresAt?: number; issuedAt?: number; issuer?: string }
+        | undefined;
+      const certExpiresAt = typeof meta?.expiresAt === "number" ? meta.expiresAt : null;
+      const certIssuedAt = typeof meta?.issuedAt === "number" ? meta.issuedAt : null;
+      const certIssuer = typeof meta?.issuer === "string" ? meta.issuer : null;
 
       updateMonitor.run({
         id: w.monitor.id,
@@ -304,6 +316,8 @@ export function flushResults(writes: PendingWrite[]): void {
         failures: w.failures,
         inMaintenance: num(w.suppressed),
         certExpiresAt,
+        certIssuedAt,
+        certIssuer,
         statusChanged: num(w.statusChanged),
       });
 
@@ -411,7 +425,7 @@ export function resolveOpenIncident(
 function queueAlerts(
   incidentId: string,
   monitor: Monitor,
-  event: "down" | "up",
+  event: "down" | "up" | "cert",
   now: number
 ): void {
   if (monitor.muteAlerts) return;
@@ -426,6 +440,49 @@ function queueAlerts(
   for (const contactId of contactIds) {
     insert.run(incidentId, contactId, event, now, now);
   }
+}
+
+/**
+ * Record which expiry thresholds have been announced for the installed cert.
+ *
+ * Config-shaped but worker-owned, like `status` — it describes what this
+ * worker has already said, so a config sync must never reset it.
+ */
+export function setCertAlertState(
+  id: string,
+  alertedDays: number[],
+  basis: number | null
+): void {
+  getDb()
+    .prepare("UPDATE monitors SET cert_alerted_days = ?, cert_alert_basis = ? WHERE id = ?")
+    .run(JSON.stringify(alertedDays), basis, id);
+}
+
+/**
+ * A certificate warning, recorded and paged like an incident but marked as a
+ * different kind.
+ *
+ * It reuses incidents so it inherits the outbox, the drainer, retry and all
+ * five channels — and so it shows up in the monitor's history, which is where
+ * someone asks "when were we warned". It opens and resolves immediately: a
+ * renewal reminder has no duration, unlike an outage.
+ */
+export function openCertNotice(monitor: Monitor, cause: string, at: number): string {
+  const db = getDb();
+  const id = randomUUID();
+
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO incidents (id, org_id, monitor_id, monitor_name, started_at,
+                              resolved_at, duration_seconds, cause, confirmed_by,
+                              status, suppressed, kind, synced)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, '[]', 'resolved', 0, 'cert', 0)`
+    ).run(id, monitor.orgId, monitor.id, monitor.name, at, at, cause);
+
+    queueAlerts(id, monitor, "cert", at);
+  })();
+
+  return id;
 }
 
 export function getIncident(id: string): Incident | null {

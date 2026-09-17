@@ -181,6 +181,7 @@ export interface EditableMonitor {
   icmpPacketCount?: number;
   icmpMaxLossPercent?: number;
   publicOnStatusPage?: boolean;
+  sslExpiryAlertDays?: number[];
   muteAlerts?: boolean;
   alertContactIds?: string[];
   heartbeatToken?: string;
@@ -206,7 +207,14 @@ export default function NewMonitorForm({
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedSuccessUrl, setCopiedSuccessUrl] = useState(false);
   const handleClose = () => {
+    const wasCreatedHeartbeat = !!createdHeartbeat;
     setCreatedHeartbeat(null);
+    if (wasCreatedHeartbeat) {
+      setName("");
+      setTarget("");
+      setKeyword("");
+      onCreated?.();
+    }
     if (onClose) onClose();
     else setInternalOpen(false);
   };
@@ -219,6 +227,8 @@ export default function NewMonitorForm({
   const [intervalSeconds, setIntervalSeconds] = useState("300");
   const [isPublic, setIsPublic] = useState(false);
   const [muteAlerts, setMuteAlerts] = useState(false);
+  /** Highest first, matching the server. Empty means "use the default". */
+  const [certAlertDays, setCertAlertDays] = useState<number[]>([30, 14, 7, 1]);
   const [contacts, setContacts] = useState<AlertContact[] | null>(null);
   /** Empty means "everyone verified", which is what the server does too. */
   const [contactIds, setContactIds] = useState<string[]>([]);
@@ -261,6 +271,7 @@ export default function NewMonitorForm({
       setIntervalSeconds(String(monitor.intervalSeconds ?? 300));
       setIsPublic(monitor.publicOnStatusPage === true);
       setMuteAlerts(monitor.muteAlerts === true);
+      setCertAlertDays(monitor.sslExpiryAlertDays ?? [30, 14, 7, 1]);
       setContactIds(monitor.alertContactIds ?? []);
 
       setMethod(monitor.method ?? (monitor.type === "keyword" ? "GET" : "HEAD"));
@@ -289,6 +300,7 @@ export default function NewMonitorForm({
       setIsPublic(false);
       setMuteAlerts(false);
       setContactIds([]);
+      setCertAlertDays([30, 14, 7, 1]);
 
       setMethod("GET");
       setMaxResponseTimeMs("");
@@ -376,6 +388,7 @@ export default function NewMonitorForm({
       publicOnStatusPage: isPublic,
       muteAlerts,
       alertContactIds: contactIds,
+      ...(type === "ssl" ? { sslExpiryAlertDays: certAlertDays } : {}),
       ...(needsKeyword ? { keyword } : {}),
       ...(needsPort ? { port: Number(port) } : {}),
       ...(maxResponseTimeMs ? { maxResponseTimeMs: Number(maxResponseTimeMs) } : {}),
@@ -429,7 +442,6 @@ export default function NewMonitorForm({
         void events.monitorCreated(type, Number(intervalSeconds));
         if (type === "heartbeat" && res?.heartbeatToken) {
           setCreatedHeartbeat({ id: res.id, token: res.heartbeatToken, name: name || "Cron Heartbeat" });
-          onCreated?.();
         } else {
           setName("");
           setTarget("");
@@ -786,6 +798,39 @@ export default function NewMonitorForm({
                 </span>
               </label>
             </div>
+
+            {type === "ssl" && (
+              <div className="field">
+                <label>Warn me before the certificate expires</label>
+                <div className="interval-chips">
+                  {[60, 30, 14, 7, 3, 1].map((d) => {
+                    const on = certAlertDays.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        className={`interval-chip ${on ? "selected" : ""}`}
+                        onClick={() =>
+                          setCertAlertDays((cur) =>
+                            (on ? cur.filter((x) => x !== d) : [...cur, d]).sort(
+                              (a, b) => b - a
+                            )
+                          )
+                        }
+                      >
+                        {d === 1 ? "1 day" : `${d} days`}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="dim" style={{ marginTop: 4 }}>
+                  {certAlertDays.length
+                    ? `Each fires once, and a renewal resets them. An expiring certificate
+                       does not mark the monitor down — the site still works until it expires.`
+                    : "Pick at least one, or the default (30, 14, 7, 1) is used."}
+                </p>
+              </div>
+            )}
 
             <div className="field">
               <label>Alerts</label>

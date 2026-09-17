@@ -1,9 +1,12 @@
 import { decideTransition } from "./stateMachine.js";
+import { certCause, decideCertAlerts } from "./certWatch.js";
 import { inMaintenance } from "../lib/time.js";
 import {
   flushResults,
+  openCertNotice,
   openIncident,
   resolveOpenIncident,
+  setCertAlertState,
   type PendingWrite,
 } from "../db/repo.js";
 import { markOrgDirty } from "../sync/mirror.js";
@@ -26,6 +29,42 @@ import type { CheckResult, Monitor } from "../types.js";
 
 let buffer: PendingWrite[] = [];
 let timer: NodeJS.Timeout | null = null;
+
+/**
+ * Raise any newly-crossed expiry threshold, once.
+ *
+ * Suppressed during maintenance for the same reason an outage is: the customer
+ * already knows, and this is not the moment.
+ */
+function noteCertificate(
+  monitor: Monitor,
+  expiresAt: number,
+  result: CheckResult
+): void {
+  const decision = decideCertAlerts(monitor, expiresAt, result.checkedAt);
+
+  // Persist even when nothing fires: a renewal clears the record, and that
+  // has to stick or the new certificate inherits the old one's silence.
+  if (
+    decision.renewed ||
+    decision.alertedDays.length !== (monitor.certAlertedDays ?? []).length ||
+    monitor.certAlertBasis !== expiresAt
+  ) {
+    monitor.certAlertedDays = decision.alertedDays;
+    monitor.certAlertBasis = decision.basis;
+    setCertAlertState(monitor.id, decision.alertedDays, decision.basis);
+  }
+
+  if (!decision.fire.length || monitor.inMaintenance) return;
+
+  const daysLeft = Math.floor((expiresAt - result.checkedAt) / 86_400_000);
+  const issuer = (result.meta as { issuer?: string } | undefined)?.issuer;
+  const cause = certCause(daysLeft, issuer);
+
+  const incidentId = openCertNotice(monitor, cause, result.checkedAt);
+  log.warn({ monitorId: monitor.id, incidentId, daysLeft }, "certificate expiry warning");
+  markOrgDirty(monitor.orgId, true);
+}
 
 export function recordResult(monitor: Monitor, result: CheckResult): void {
   const suppressed = inMaintenance(monitor.maintenanceWindows, result.checkedAt);
@@ -75,6 +114,16 @@ export function recordResult(monitor: Monitor, result: CheckResult): void {
     markOrgDirty(monitor.orgId, true);
   } else {
     markOrgDirty(monitor.orgId, false);
+  }
+
+  /**
+   * Certificate warnings ride alongside the up/down decision rather than
+   * through it. The monitor is up — the site serves fine — so nothing above
+   * has anything to say about a certificate with nine days left.
+   */
+  const expiresAt = (result.meta as { expiresAt?: number } | undefined)?.expiresAt;
+  if (typeof expiresAt === "number" && Number.isFinite(expiresAt)) {
+    noteCertificate(monitor, expiresAt, result);
   }
 
   if (buffer.length >= 500) flush();

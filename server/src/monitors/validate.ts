@@ -7,6 +7,7 @@ import {
   sanitizeHeaders,
 } from "../lib/targetGuard.js";
 import { limitsFor, type PlanLimits } from "../lib/plans.js";
+import { normaliseAlertDays } from "./certWatch.js";
 import {
   MAX_MONITORS_DONOR,
   MAX_MONITORS_FREE,
@@ -70,6 +71,7 @@ export interface MonitorInput {
   dnsRecordType?: string;
   dnsExpectedValue?: string;
   dnsServer?: string;
+  sslExpiryAlertDays?: number[];
   sslExpiryWarningDays?: number;
   sslExpectedFingerprint?: string;
   sslMinVersion?: string;
@@ -259,6 +261,13 @@ export async function buildMonitor(
     }
   }
   if (type === "ssl") {
+    // Several thresholds now. The old single field is still read so a monitor
+    // created before this keeps exactly the one warning it was configured with,
+    // rather than silently gaining three more pages.
+    monitor.sslExpiryAlertDays = normaliseAlertDays(
+      input.sslExpiryAlertDays ?? existing?.sslExpiryAlertDays,
+      input.sslExpiryWarningDays ?? existing?.sslExpiryWarningDays
+    );
     monitor.sslExpiryWarningDays = clamp(
       Number(input.sslExpiryWarningDays ?? existing?.sslExpiryWarningDays) || 14,
       1,

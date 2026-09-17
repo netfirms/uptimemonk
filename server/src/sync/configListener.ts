@@ -10,7 +10,7 @@ import {
 import { initialDueAt } from "../scheduler/heap.js";
 import { getDb } from "../db/index.js";
 import { log } from "../lib/log.js";
-import { RECONCILE_MS } from "../config.js";
+import { RECONCILE_MS, updateDynamicConfig } from "../config.js";
 import type { AlertContact, Monitor } from "../types.js";
 
 /**
@@ -56,6 +56,7 @@ function toMonitor(id: string, d: Record<string, unknown>): Monitor {
     dnsRecordType: d.dnsRecordType as Monitor["dnsRecordType"],
     dnsExpectedValue: d.dnsExpectedValue as string | undefined,
     sslExpiryWarningDays: d.sslExpiryWarningDays as number | undefined,
+    sslExpiryAlertDays: d.sslExpiryAlertDays as number[] | undefined,
     heartbeatToken: d.heartbeatToken as string | undefined,
     heartbeatGraceSeconds: d.heartbeatGraceSeconds as number | undefined,
     intervalSeconds,
@@ -135,7 +136,36 @@ export function startConfigListener(onChange: (changed: string[], removed: strin
     (err) => log.error({ err }, "contact listener error")
   );
 
-  subscriptions.push(monitors, contacts);
+  const systemConfig = col.system().doc("config").onSnapshot(
+    (snap) => {
+      if (snap.exists) {
+        log.info("received live dynamic app configuration from Firestore");
+        updateDynamicConfig(snap.data() as Record<string, unknown>);
+      } else {
+        updateDynamicConfig(null);
+      }
+    },
+    (err) => log.error({ err }, "system config listener error")
+  );
+
+  subscriptions.push(monitors, contacts, systemConfig);
+}
+
+/**
+ * Dedicated system config listener for processes that do not run full monitor sync (e.g. API).
+ */
+export function startSystemConfigListener(): () => void {
+  return col.system().doc("config").onSnapshot(
+    (snap) => {
+      if (snap.exists) {
+        log.info("api received live dynamic app configuration from Firestore");
+        updateDynamicConfig(snap.data() as Record<string, unknown>);
+      } else {
+        updateDynamicConfig(null);
+      }
+    },
+    (err) => log.error({ err }, "api system config listener error")
+  );
 }
 
 /**
@@ -162,11 +192,16 @@ async function reconcile(
 ): Promise<void> {
   {
     try {
-      const [monitorSnap, contactSnap, orgSnap] = await Promise.all([
+      const [monitorSnap, contactSnap, orgSnap, systemConfigSnap] = await Promise.all([
         col.monitors().get(),
         col.alertContacts().get(),
         col.orgs().get(),
+        col.system().doc("config").get(),
       ]);
+
+      if (systemConfigSnap.exists) {
+        updateDynamicConfig(systemConfigSnap.data() as Record<string, unknown>);
+      }
 
       const seen = new Set<string>();
       const changed: string[] = [];

@@ -4,15 +4,24 @@ import type { CheckResult, Monitor, ProbeRegion } from "../types.js";
 
 /**
  * TLS certificate check: is the chain valid, and how many days until expiry.
- * Fails when the cert is invalid, or when expiry is closer than the monitor's
- * warning threshold (default 14 days) — that is the alert customers want.
+ *
+ * **Approaching expiry is not a failure.** A certificate with nine days left
+ * serves every visitor perfectly; the renewal is urgent, the outage is
+ * fictional. This used to return `ok: false` inside the warning window, which
+ * drove the monitor DOWN, opened an outage incident and paged people about a
+ * site that was working. Expiry warnings are now their own event with their
+ * own thresholds — see `monitors/certWatch.ts`.
+ *
+ * What genuinely fails: an expired certificate, an untrusted chain, a
+ * fingerprint that does not match the pin, a protocol below the required
+ * minimum, and any handshake that does not complete. Those all mean a real
+ * visitor is seeing a real error.
  */
 export async function checkSsl(
   monitor: Monitor,
   region: ProbeRegion
 ): Promise<CheckResult> {
   const started = Date.now();
-  const warnDays = monitor.sslExpiryWarningDays ?? 14;
   const host = hostFromTarget(monitor.target);
   const port = monitor.port ?? 443;
   const timeoutMs = Math.max(1, monitor.timeoutSeconds) * 1000;
@@ -56,10 +65,16 @@ export async function checkSsl(
         const protocol = socket.getProtocol() || "unknown";
         const fingerprint256 = cert.fingerprint256;
 
+        // `valid_from` as well as `valid_to`: the UI shows a validity window,
+        // and "issued 3 days ago" is how you spot a renewal that worked.
+        const issuedAt = cert.valid_from ? new Date(cert.valid_from).getTime() : undefined;
+
         const meta = {
           expiresAt,
+          issuedAt: Number.isFinite(issuedAt) ? issuedAt : undefined,
           daysLeft,
           issuer: cert.issuer?.O,
+          subject: cert.subject?.CN,
           fingerprint256,
           protocol,
         };
@@ -105,20 +120,18 @@ export async function checkSsl(
           }
         }
 
-        if (daysLeft < warnDays) {
+        // Expired is a real failure: browsers refuse the connection.
+        if (daysLeft < 0) {
           return finish({
             ok: false,
-            error:
-              daysLeft < 0
-                ? `Certificate expired ${Math.abs(daysLeft)} days ago`
-                : `Certificate expires in ${daysLeft} days`,
+            error: `Certificate expired ${Math.abs(daysLeft)} days ago`,
             meta,
           });
         }
-        return finish({
-          ok: true,
-          meta,
-        });
+
+        // Still valid. Any threshold warning is raised from `meta` by
+        // certWatch, without touching the monitor's up/down state.
+        return finish({ ok: true, meta });
       }
     );
 

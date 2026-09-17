@@ -148,6 +148,9 @@ export interface MonitorHistory {
     uptime7d: number | null;
     uptime30d: number | null;
     certExpiresAt: number | null;
+    certIssuedAt: number | null;
+    certIssuer: string | null;
+    sslExpiryAlertDays: number[] | null;
     heartbeatToken?: string | null;
     heartbeatGraceSeconds?: number | null;
   };

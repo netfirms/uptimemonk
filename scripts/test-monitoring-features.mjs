@@ -357,18 +357,38 @@ describe("UPTIMEMONK — ALL MONITORING FEATURES TEST SUITE", () => {
       assert.equal(res.error, undefined);
     });
 
-    test("SSL Warning Threshold: warns when certificate expires within warning window", async () => {
-      // Set warning threshold very high (e.g. 3650 days = 10 years) so any standard cert triggers a warning
+    test("SSL Expiry Warning: an approaching expiry does NOT mark the monitor down", async () => {
+      // This used to assert the opposite. A certificate with days left serves
+      // every visitor perfectly — the renewal is urgent, the outage is
+      // fictional. Driving the monitor DOWN paged people about a working site.
+      // Expiry warnings are their own event now; see monitors/certWatch.ts.
       const monitor = makeMonitor({
         type: "ssl",
         target: "cloudflare.com",
-        sslExpiryWarningDays: 3650,
+        sslExpiryAlertDays: [3650], // any real cert is inside this window
         timeoutSeconds: 10,
       });
 
       const res = await checkSsl(monitor, REGION);
-      assert.equal(res.ok, false, "Expected probe to fail due to upcoming expiry within threshold");
-      assert.match(res.error || "", /Certificate expires in \d+ days/);
+      assert.equal(res.ok, true, "a valid certificate is up, however soon it expires");
+      assert.equal(res.error, undefined);
+      // The data the warning is raised from still comes back.
+      assert.ok(typeof res.meta?.expiresAt === "number");
+      assert.ok(typeof res.meta?.daysLeft === "number");
+    });
+
+    test("SSL Expiry: an expired certificate IS a failure", async () => {
+      // The line between warning and outage: browsers refuse an expired cert,
+      // so a visitor genuinely cannot reach the site.
+      const monitor = makeMonitor({
+        type: "ssl",
+        target: "expired.badssl.com",
+        timeoutSeconds: 10,
+      });
+
+      const res = await checkSsl(monitor, REGION);
+      assert.equal(res.ok, false);
+      assert.match(res.error || "", /expired|not trusted/i);
     });
 
     test("SSL TargetGuard SSRF: blocks private IP targets from SSL checks", async () => {

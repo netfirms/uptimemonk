@@ -67,6 +67,10 @@ export function buildStatusDoc(monitors: ReturnType<typeof listMonitors>) {
       lastError: m.lastError ?? null,
       uptime24h: m.uptime24h ?? null,
       uptime30d: m.uptime30d ?? null,
+      // Only for certificate monitors, and only the expiry — the list shows
+      // "expires in 12 days" and the detail panel fetches the full window
+      // from the API. Every field here is paid for in the write bill.
+      ...(m.type === "ssl" && m.certExpiresAt ? { certExpiresAt: m.certExpiresAt } : {}),
     };
   }
   return entry;

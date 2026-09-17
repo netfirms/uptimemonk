@@ -41,6 +41,25 @@ interface LiveState {
   lastResponseTimeMs?: number | null;
   lastError?: string | null;
   uptime30d?: number | null;
+  certExpiresAt?: number | null;
+}
+
+/**
+ * How long a certificate has left, and how alarmed to be about it.
+ *
+ * Thresholds match the default alert days so the badge turns amber at the
+ * same moment the first warning is sent — a list that still looks calm while
+ * an email says otherwise is worse than no badge.
+ */
+function certBadge(expiresAt: number): { text: string; state: "ok" | "warn" | "down" } {
+  const days = Math.floor((expiresAt - Date.now()) / 86_400_000);
+  if (days < 0) return { text: "cert expired", state: "down" };
+  if (days === 0) return { text: "cert expires today", state: "down" };
+  if (days === 1) return { text: "cert expires tomorrow", state: "down" };
+  return {
+    text: `cert ${days}d`,
+    state: days <= 7 ? "down" : days <= 30 ? "warn" : "ok",
+  };
 }
 
 /** Big numbers, short. "8.97M checks left" reads; "8,970,000" fills the bar. */
@@ -104,7 +123,7 @@ export default function Dashboard() {
     .reduce((sum, m) => sum + checksPerDay(m.intervalSeconds ?? 60), 0);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "up" | "down" | "paused">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "up" | "down" | "paused" | "pending">("all");
 
   useEffect(
     () =>
@@ -208,6 +227,7 @@ export default function Dashboard() {
     let upCount = 0;
     let downCount = 0;
     let pausedCount = 0;
+    let pendingCount = 0;
     let totalLatency = 0;
     let latencyCount = 0;
     let totalUptime = 0;
@@ -218,6 +238,7 @@ export default function Dashboard() {
       if (s === "up") upCount++;
       else if (s === "down") downCount++;
       else if (s === "paused") pausedCount++;
+      else if (s === "pending") pendingCount++;
 
       const l = live[m.id];
       if (l?.lastResponseTimeMs != null && l.lastResponseTimeMs > 0) {
@@ -233,7 +254,7 @@ export default function Dashboard() {
     const avgLatency = latencyCount > 0 ? Math.round(totalLatency / latencyCount) : null;
     const avgUptime = uptimeCount > 0 ? (totalUptime / uptimeCount).toFixed(2) : "100.00";
 
-    return { total, upCount, downCount, pausedCount, avgLatency, avgUptime };
+    return { total, upCount, downCount, pausedCount, pendingCount, avgLatency, avgUptime };
   }, [monitors, live]);
 
   // Filtered list
@@ -242,11 +263,14 @@ export default function Dashboard() {
       const s = statusOf(m);
       if (activeTab !== "all" && s !== activeTab) return false;
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+        const q = searchQuery.toLowerCase().trim();
+        const isHeartbeat = m.type === "heartbeat";
+        const matchesCron = isHeartbeat && ("cron".includes(q) || "heartbeat".includes(q));
         return (
           m.name.toLowerCase().includes(q) ||
           (m.target && m.target.toLowerCase().includes(q)) ||
-          m.type.toLowerCase().includes(q)
+          m.type.toLowerCase().includes(q) ||
+          matchesCron
         );
       }
       return true;
@@ -435,6 +459,15 @@ export default function Dashboard() {
             <span>Paused</span>
             <span className="badge-count">{stats.pausedCount}</span>
           </button>
+          {stats.pendingCount > 0 && (
+            <button
+              className={`tab-btn ${activeTab === "pending" ? "active" : ""}`}
+              onClick={() => setActiveTab("pending")}
+            >
+              <span>Pending</span>
+              <span className="badge-count" style={{ background: "rgba(234, 179, 8, 0.2)", color: "#eab308" }}>{stats.pendingCount}</span>
+            </button>
+          )}
         </div>
 
         <div className="row grow" style={{ justifyContent: "flex-end" }}>
@@ -532,6 +565,23 @@ export default function Dashboard() {
                       Public
                     </span>
                   )}
+                  {state?.certExpiresAt != null && (() => {
+                    const b = certBadge(state.certExpiresAt);
+                    return (
+                      <span
+                        className={`cert-tag ${b.state}`}
+                        title={`Certificate valid until ${new Date(
+                          state.certExpiresAt
+                        ).toLocaleDateString(undefined, {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}`}
+                      >
+                        {b.text}
+                      </span>
+                    );
+                  })()}
                   {m.muteAlerts && (
                     <span className="interval-tag muted" title="Incidents are recorded but nobody is paged">
                       Muted

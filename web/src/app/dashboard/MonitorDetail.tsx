@@ -405,6 +405,66 @@ const BUCKETS_PER_RANGE: Record<RangeKey, number> = {
   "90d": 90,
 };
 
+/**
+ * The certificate's validity window.
+ *
+ * A bar rather than two dates, because "expires 2 Dec" means nothing without
+ * knowing the cert is ninety days long — the same date is comfortable on a
+ * one-year cert and alarming on a Let's Encrypt one. The fill shows how much
+ * of the life is spent.
+ */
+function CertPanel({
+  issuedAt,
+  expiresAt,
+  issuer,
+}: {
+  issuedAt: number | null;
+  expiresAt: number;
+  issuer: string | null;
+}) {
+  const now = Date.now();
+  const daysLeft = Math.floor((expiresAt - now) / 86_400_000);
+  const state = daysLeft < 0 ? "down" : daysLeft <= 7 ? "down" : daysLeft <= 30 ? "warn" : "ok";
+
+  const span = issuedAt ? expiresAt - issuedAt : null;
+  const used = issuedAt ? Math.min(100, Math.max(0, ((now - issuedAt) / span!) * 100)) : null;
+
+  const date = (ms: number) =>
+    new Date(ms).toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+
+  return (
+    <div className="cert-panel">
+      <div className="row-between">
+        <strong className={`cert-left ${state}`}>
+          {daysLeft < 0
+            ? `Expired ${Math.abs(daysLeft)} days ago`
+            : daysLeft === 0
+              ? "Expires today"
+              : daysLeft === 1
+                ? "Expires tomorrow"
+                : `${daysLeft} days left`}
+        </strong>
+        {issuer && <span className="dim">{issuer}</span>}
+      </div>
+
+      {used != null && (
+        <div className="cert-bar">
+          <span className={state} style={{ width: `${used}%` }} />
+        </div>
+      )}
+
+      <div className="detail-axis">
+        <span>{issuedAt ? `Valid from ${date(issuedAt)}` : "Issue date unknown"}</span>
+        <span>Until {date(expiresAt)}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function MonitorDetail({
   monitorId,
   onClose,
@@ -714,6 +774,24 @@ export default function MonitorDetail({
                         `curl -X POST https://api.uptimemonke.com/heartbeat/${m.heartbeatToken} \\\n  -H "Content-Type: application/json" \\\n  -d '{"status":"fail","error":"Job crashed"}'`}
                     </pre>
                   </div>
+                </section>
+              )}
+
+              {m.certExpiresAt != null && (
+                <section className="detail-section">
+                  <div className="detail-section-head">
+                    <h3>Certificate</h3>
+                    {!!data.monitor.sslExpiryAlertDays?.length && (
+                      <span className="dim">
+                        warns at {data.monitor.sslExpiryAlertDays.join(", ")} days
+                      </span>
+                    )}
+                  </div>
+                  <CertPanel
+                    issuedAt={m.certIssuedAt}
+                    expiresAt={m.certExpiresAt}
+                    issuer={m.certIssuer}
+                  />
                 </section>
               )}
 

@@ -2756,3 +2756,78 @@ button.btn-outline-red {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Certificate expiry on a monitor card --- */
+
+/* Its own shape rather than another interval-tag: this one changes colour to
+   mean something, and a chip that is sometimes red should not look like a
+   chip that never is. */
+.cert-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cert-tag.ok {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #94a3b8;
+}
+
+/* Amber at 30 days, the same moment the first warning email goes out. */
+.cert-tag.warn {
+  background: rgba(245, 158, 11, 0.13);
+  border-color: rgba(245, 158, 11, 0.34);
+  color: #f59e0b;
+}
+
+.cert-tag.down {
+  background: rgba(239, 68, 68, 0.13);
+  border-color: rgba(239, 68, 68, 0.34);
+  color: #f87171;
+}
+
+/* --- Certificate validity in the detail panel --- */
+
+.cert-panel {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.cert-left {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.cert-left.ok { color: #e2e8f0; }
+.cert-left.warn { color: #f59e0b; }
+.cert-left.down { color: #f87171; }
+
+/* Fills as the certificate ages, so a date has context: 2 Dec is comfortable
+   on a year-long cert and alarming on a ninety-day one. */
+.cert-bar {
+  height: 8px;
+  margin: 12px 0 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.cert-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.cert-bar span.ok { background: #3BD671; }
+.cert-bar span.warn { background: #f59e0b; }
+.cert-bar span.down { background: #ef4444; }
