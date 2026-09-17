@@ -147,6 +147,8 @@ export async function monitorRoutes(app: FastifyInstance): Promise<void> {
           uptime7d: monitor.uptime7d ?? null,
           uptime30d: monitor.uptime30d ?? null,
           certExpiresAt: monitor.certExpiresAt ?? null,
+          heartbeatToken: monitor.heartbeatToken ?? null,
+          heartbeatGraceSeconds: monitor.heartbeatGraceSeconds ?? null,
         },
         // The range-aware view: buckets for the bars, points for the chart.
         ...series,

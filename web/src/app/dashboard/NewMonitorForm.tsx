@@ -183,6 +183,8 @@ export interface EditableMonitor {
   publicOnStatusPage?: boolean;
   muteAlerts?: boolean;
   alertContactIds?: string[];
+  heartbeatToken?: string;
+  heartbeatGraceSeconds?: number;
 }
 
 export default function NewMonitorForm({
@@ -200,7 +202,11 @@ export default function NewMonitorForm({
   const isEditing = !!monitor;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = isOpen !== undefined ? isOpen : internalOpen;
+  const [createdHeartbeat, setCreatedHeartbeat] = useState<{ id: string; token: string; name: string } | null>(null);
+  const [copiedToken, setCopiedToken] = useState(false);
+  const [copiedSuccessUrl, setCopiedSuccessUrl] = useState(false);
   const handleClose = () => {
+    setCreatedHeartbeat(null);
     if (onClose) onClose();
     else setInternalOpen(false);
   };
@@ -413,16 +419,25 @@ export default function NewMonitorForm({
       if (monitor) {
         await api.updateMonitor(monitor.id, payload as any);
         void events.monitorEdited(type);
+        setName("");
+        setTarget("");
+        setKeyword("");
+        handleClose();
+        onCreated?.();
       } else {
-        await api.createMonitor(payload as any);
+        const res = await api.createMonitor(payload as any);
         void events.monitorCreated(type, Number(intervalSeconds));
+        if (type === "heartbeat" && res?.heartbeatToken) {
+          setCreatedHeartbeat({ id: res.id, token: res.heartbeatToken, name: name || "Cron Heartbeat" });
+          onCreated?.();
+        } else {
+          setName("");
+          setTarget("");
+          setKeyword("");
+          handleClose();
+          onCreated?.();
+        }
       }
-
-      setName("");
-      setTarget("");
-      setKeyword("");
-      handleClose();
-      onCreated?.();
     } catch (err) {
       void events.actionFailed(
         monitor ? "edit_monitor" : "create_monitor",
@@ -484,8 +499,125 @@ export default function NewMonitorForm({
           </button>
         </div>
 
-        <form onSubmit={submit}>
-          <div className="modal-body">
+        {createdHeartbeat ? (
+          <div className="modal-body" style={{ padding: "28px 24px", textAlign: "center" }}>
+            <div
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                background: "rgba(16, 185, 129, 0.15)",
+                border: "1px solid rgba(16, 185, 129, 0.4)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px",
+                color: "#10b981",
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <h3 style={{ fontSize: "1.2rem", fontWeight: 600, color: "var(--text)", marginBottom: "8px" }}>
+              Cron Heartbeat Created!
+            </h3>
+            <p className="dim" style={{ fontSize: "0.88rem", maxWidth: "440px", margin: "0 auto 20px", lineHeight: "1.4" }}>
+              Your heartbeat monitor <strong style={{ color: "var(--text)" }}>{createdHeartbeat.name}</strong> is live and waiting for its first check-in.
+            </p>
+
+            <div
+              style={{
+                background: "rgba(0, 0, 0, 0.4)",
+                border: "1px solid var(--border)",
+                borderRadius: "8px",
+                padding: "12px 14px",
+                textAlign: "left",
+                marginBottom: "16px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <span className="dim" style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                  Ping Ingest URL
+                </span>
+                <span className="dim" style={{ fontSize: "0.75rem", fontFamily: "var(--font-mono, monospace)" }}>
+                  Token: {createdHeartbeat.token.slice(0, 8)}…
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <code
+                  style={{
+                    flex: 1,
+                    fontFamily: "var(--font-mono, monospace)",
+                    fontSize: "0.82rem",
+                    color: "var(--text)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  https://api.uptimemonke.com/heartbeat/{createdHeartbeat.token}
+                </code>
+                <button
+                  type="button"
+                  className="btn-sm"
+                  onClick={() => {
+                    if (typeof navigator !== "undefined" && navigator.clipboard) {
+                      navigator.clipboard.writeText(`https://api.uptimemonke.com/heartbeat/${createdHeartbeat.token}`);
+                    }
+                    setCopiedSuccessUrl(true);
+                    setTimeout(() => setCopiedSuccessUrl(false), 2500);
+                  }}
+                  style={{
+                    background: copiedSuccessUrl ? "rgba(16, 185, 129, 0.2)" : "var(--primary)",
+                    color: copiedSuccessUrl ? "#10b981" : "#fff",
+                    padding: "4px 12px",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  {copiedSuccessUrl ? "✓ Copied!" : "Copy URL"}
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: "rgba(0, 0, 0, 0.25)",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+                borderRadius: "8px",
+                padding: "12px 14px",
+                textAlign: "left",
+                marginBottom: "22px",
+              }}
+            >
+              <div className="dim" style={{ fontSize: "0.75rem", marginBottom: "6px" }}>
+                Example Integration (cURL):
+              </div>
+              <code
+                style={{
+                  display: "block",
+                  fontFamily: "var(--font-mono, monospace)",
+                  fontSize: "0.78rem",
+                  color: "#cbd5e1",
+                  wordBreak: "break-all",
+                }}
+              >
+                curl -fsS -m 10 https://api.uptimemonke.com/heartbeat/{createdHeartbeat.token}
+              </code>
+            </div>
+
+            <button
+              type="button"
+              className="primary"
+              onClick={handleClose}
+              style={{ width: "100%", justifyContent: "center", padding: "10px 16px" }}
+            >
+              Done / Return to Dashboard
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={submit}>
+            <div className="modal-body">
             {/* Monitor Type Grid */}
             <div className="field">
               <label>Monitor Protocol</label>
@@ -1039,6 +1171,46 @@ export default function NewMonitorForm({
                   {/* Heartbeat Advanced */}
                   {type === "heartbeat" && (
                     <div style={{ fontSize: "0.8rem", color: "var(--text-muted, #94a3b8)" }}>
+                      {monitor?.heartbeatToken ? (
+                        <div
+                          style={{
+                            background: "rgba(59, 130, 246, 0.08)",
+                            border: "1px solid rgba(59, 130, 246, 0.25)",
+                            borderRadius: "6px",
+                            padding: "10px 12px",
+                            marginBottom: "12px",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                            <strong style={{ color: "var(--text)", fontSize: "0.8rem" }}>Active Heartbeat Ingest URL</strong>
+                            <button
+                              type="button"
+                              className="btn-xs"
+                              onClick={() => {
+                                if (typeof navigator !== "undefined" && navigator.clipboard) {
+                                  navigator.clipboard.writeText(`https://api.uptimemonke.com/heartbeat/${monitor.heartbeatToken}`);
+                                }
+                                setCopiedToken(true);
+                                setTimeout(() => setCopiedToken(false), 2500);
+                              }}
+                              style={{
+                                background: copiedToken ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.1)",
+                                color: copiedToken ? "#10b981" : "var(--text)",
+                                border: "1px solid var(--border)",
+                                borderRadius: "4px",
+                                padding: "2px 8px",
+                                fontSize: "0.72rem",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {copiedToken ? "✓ Copied URL" : "Copy URL"}
+                            </button>
+                          </div>
+                          <code style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.75rem", color: "var(--text)", wordBreak: "break-all" }}>
+                            https://api.uptimemonke.com/heartbeat/{monitor.heartbeatToken}
+                          </code>
+                        </div>
+                      ) : null}
                       <p style={{ marginBottom: "6px" }}>
                         💡 <strong>Heartbeat Push API:</strong>
                       </p>
@@ -1053,9 +1225,9 @@ export default function NewMonitorForm({
                         }}
                       >
                         # Success check-in:<br />
-                        curl https://api.uptimemonke.com/heartbeat/&lt;token&gt;<br /><br />
+                        curl https://api.uptimemonke.com/heartbeat/{monitor?.heartbeatToken || "&lt;token&gt;"}<br /><br />
                         # Immediate failure report:<br />
-                        curl -X POST https://api.uptimemonke.com/heartbeat/&lt;token&gt; -d &#39;&#123;&quot;status&quot;:&quot;fail&quot;,&quot;error&quot;:&quot;Job crashed&quot;&#125;&#39;
+                        curl -X POST https://api.uptimemonke.com/heartbeat/{monitor?.heartbeatToken || "&lt;token&gt;"} -d &#39;&#123;&quot;status&quot;:&quot;fail&quot;,&quot;error&quot;:&quot;Job crashed&quot;&#125;&#39;
                       </div>
                     </div>
                   )}
@@ -1096,6 +1268,7 @@ export default function NewMonitorForm({
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

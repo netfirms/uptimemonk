@@ -54,6 +54,8 @@ export interface MonitorItem {
   tcpExpectedResponse?: string;
   dnsServer?: string;
   icmpPacketCount?: number;
+  heartbeatToken?: string;
+  heartbeatGraceSeconds?: number;
 }
 
 export interface WorkerNode {
@@ -135,6 +137,7 @@ export default function AdminPage() {
   const [inspectedUser, setInspectedUser] = useState<UserAccount | null>(null);
   const [inspectedMonitor, setInspectedMonitor] = useState<MonitorItem | null>(null);
   const [inspectedDonation, setInspectedDonation] = useState<DonationRecord | null>(null);
+  const [copiedAdminToken, setCopiedAdminToken] = useState(false);
 
   // Interactive diagnostic probe
   const [probeTarget, setProbeTarget] = useState("https://api.uptimemonke.com/healthz");
@@ -376,6 +379,8 @@ export default function AdminPage() {
       orgId: "org_default_main",
       publicOnStatusPage: false,
       lastCheckedAt: "5h ago",
+      heartbeatToken: "hb_live_tok_9xK8mN2vP4qL7sT1wY3z",
+      heartbeatGraceSeconds: 300,
     },
     {
       id: "mon_staging_test",
@@ -1825,6 +1830,42 @@ export default function AdminPage() {
               <label>Public Status Page Visibility</label>
               <div className="val">{inspectedMonitor.publicOnStatusPage ? "Visible on /status/:slug" : "Private (Hidden)"}</div>
             </div>
+            {(inspectedMonitor.type === "heartbeat" || inspectedMonitor.heartbeatToken) && (
+              <div className="inspector-field" style={{ background: "rgba(59, 130, 246, 0.08)", padding: "10px 12px", borderRadius: "6px", border: "1px solid rgba(59, 130, 246, 0.25)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <label style={{ margin: 0, color: "#60a5fa", fontWeight: 600 }}>Heartbeat Push API Ingestion</label>
+                  {inspectedMonitor.heartbeatToken && (
+                    <button
+                      type="button"
+                      className="btn-xs"
+                      onClick={() => {
+                        if (typeof navigator !== "undefined" && navigator.clipboard) {
+                          navigator.clipboard.writeText(`https://api.uptimemonke.com/heartbeat/${inspectedMonitor.heartbeatToken}`);
+                        }
+                        setCopiedAdminToken(true);
+                        setTimeout(() => setCopiedAdminToken(false), 2000);
+                      }}
+                      style={{
+                        background: copiedAdminToken ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.1)",
+                        color: copiedAdminToken ? "#10b981" : "var(--text)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "4px",
+                        padding: "2px 8px",
+                        fontSize: "0.72rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {copiedAdminToken ? "✓ Copied Ping URL" : "Copy Ping URL"}
+                    </button>
+                  )}
+                </div>
+                <div className="val font-mono" style={{ fontSize: "0.78rem", wordBreak: "break-all" }}>
+                  {inspectedMonitor.heartbeatToken
+                    ? `https://api.uptimemonke.com/heartbeat/${inspectedMonitor.heartbeatToken}`
+                    : "Token generated dynamically on check deployment"}
+                </div>
+              </div>
+            )}
             {inspectedMonitor.maxResponseTimeMs && (
               <div className="inspector-field">
                 <label>SLA Latency Threshold</label>

@@ -416,6 +416,16 @@ export default function MonitorDetail({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [range, setRange] = useState<RangeKey>("24h");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [activeSnippetTab, setActiveSnippetTab] = useState<"curl" | "crontab" | "python" | "fail">("curl");
+
+  const copySnippet = (text: string, key: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey((curr) => (curr === key ? null : curr)), 2500);
+  };
 
   // Reset to the default window when a different monitor is opened; keeping
   // the last one would silently answer a question about the previous monitor.
@@ -546,6 +556,166 @@ export default function MonitorDetail({
                   <span className="stat-num detail-stat-sm">{fmtWhen(m.lastCheckedAt)}</span>
                 </div>
               </div>
+
+              {m.type === "heartbeat" && m.heartbeatToken && (
+                <section
+                  className="detail-section"
+                  style={{
+                    background: "rgba(15, 23, 42, 0.6)",
+                    border: "1px solid rgba(59, 130, 246, 0.25)",
+                    borderRadius: "10px",
+                    padding: "16px 18px",
+                    marginTop: "16px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "1.1rem" }}>⚡</span>
+                        <h3 style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text)", margin: 0 }}>
+                          Heartbeat / Cron Ingestion Endpoint
+                        </h3>
+                      </div>
+                      <p className="dim" style={{ fontSize: "0.8rem", marginTop: "4px" }}>
+                        Ping this URL periodically from your background job, cron script, or worker. Expected at least every {Math.round(m.intervalSeconds / 60)}m {m.heartbeatGraceSeconds ? `(+${m.heartbeatGraceSeconds}s grace)` : ""}.
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span className="interval-tag" style={{ background: "rgba(59, 130, 246, 0.15)", color: "#60a5fa", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
+                        Token: {m.heartbeatToken.slice(0, 8)}…
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Primary URL Bar */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      background: "rgba(0, 0, 0, 0.4)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "6px",
+                      padding: "8px 12px",
+                      marginBottom: "14px",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: 600 }}>GET/POST</span>
+                    <code
+                      style={{
+                        flex: 1,
+                        fontFamily: "var(--font-mono, monospace)",
+                        fontSize: "0.8rem",
+                        color: "var(--text)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      https://api.uptimemonke.com/heartbeat/{m.heartbeatToken}
+                    </code>
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      onClick={() => copySnippet(`https://api.uptimemonke.com/heartbeat/${m.heartbeatToken}`, "url")}
+                      style={{
+                        background: copiedKey === "url" ? "rgba(16, 185, 129, 0.2)" : "var(--primary)",
+                        color: copiedKey === "url" ? "#10b981" : "#fff",
+                        borderColor: copiedKey === "url" ? "rgba(16, 185, 129, 0.5)" : "transparent",
+                        padding: "4px 10px",
+                        fontSize: "0.75rem",
+                      }}
+                    >
+                      {copiedKey === "url" ? "✓ Copied!" : "Copy URL"}
+                    </button>
+                  </div>
+
+                  {/* Code Snippet Tabs */}
+                  <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        {(
+                          [
+                            { id: "curl", label: "cURL / Shell" },
+                            { id: "crontab", label: "Crontab" },
+                            { id: "python", label: "Python" },
+                            { id: "fail", label: "Report Failure (POST)" },
+                          ] as const
+                        ).map((tab) => (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setActiveSnippetTab(tab.id)}
+                            style={{
+                              background: activeSnippetTab === tab.id ? "rgba(255, 255, 255, 0.12)" : "transparent",
+                              color: activeSnippetTab === tab.id ? "var(--text)" : "var(--text-dim)",
+                              border: "none",
+                              borderRadius: "4px",
+                              padding: "4px 8px",
+                              fontSize: "0.75rem",
+                              cursor: "pointer",
+                              fontWeight: activeSnippetTab === tab.id ? 600 : 400,
+                            }}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn-xs"
+                        onClick={() => {
+                          const code =
+                            activeSnippetTab === "curl"
+                              ? `curl -fsS -m 10 --retry 3 https://api.uptimemonke.com/heartbeat/${m.heartbeatToken}`
+                              : activeSnippetTab === "crontab"
+                              ? `0 * * * * /path/to/backup.sh && curl -fsS -m 10 https://api.uptimemonke.com/heartbeat/${m.heartbeatToken}`
+                              : activeSnippetTab === "python"
+                              ? `import urllib.request\n\n# Ping upon successful completion\nurllib.request.urlopen("https://api.uptimemonke.com/heartbeat/${m.heartbeatToken}", timeout=10)`
+                              : `curl -X POST https://api.uptimemonke.com/heartbeat/${m.heartbeatToken} \\\n  -H "Content-Type: application/json" \\\n  -d '{"status":"fail","error":"Job crashed"}'`;
+                          copySnippet(code, activeSnippetTab);
+                        }}
+                        style={{
+                          background: copiedKey === activeSnippetTab ? "rgba(16, 185, 129, 0.15)" : "rgba(255, 255, 255, 0.06)",
+                          border: `1px solid ${copiedKey === activeSnippetTab ? "rgba(16, 185, 129, 0.4)" : "var(--border)"}`,
+                          color: copiedKey === activeSnippetTab ? "#10b981" : "var(--text-dim)",
+                          borderRadius: "4px",
+                          padding: "3px 8px",
+                          fontSize: "0.72rem",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {copiedKey === activeSnippetTab ? "✓ Copied Snippet!" : "Copy Snippet"}
+                      </button>
+                    </div>
+
+                    <pre
+                      style={{
+                        background: "rgba(0, 0, 0, 0.5)",
+                        border: "1px solid rgba(255, 255, 255, 0.06)",
+                        borderRadius: "6px",
+                        padding: "10px 12px",
+                        fontFamily: "var(--font-mono, monospace)",
+                        fontSize: "0.78rem",
+                        lineHeight: 1.45,
+                        color: "#cbd5e1",
+                        margin: 0,
+                        overflowX: "auto",
+                      }}
+                    >
+                      {activeSnippetTab === "curl" &&
+                        `curl -fsS -m 10 --retry 3 https://api.uptimemonke.com/heartbeat/${m.heartbeatToken}`}
+                      {activeSnippetTab === "crontab" &&
+                        `# Append to crontab:\n0 * * * * /path/to/backup.sh && curl -fsS -m 10 https://api.uptimemonke.com/heartbeat/${m.heartbeatToken}`}
+                      {activeSnippetTab === "python" &&
+                        `import urllib.request\n\n# Ping upon successful completion\nurllib.request.urlopen("https://api.uptimemonke.com/heartbeat/${m.heartbeatToken}", timeout=10)`}
+                      {activeSnippetTab === "fail" &&
+                        `curl -X POST https://api.uptimemonke.com/heartbeat/${m.heartbeatToken} \\\n  -H "Content-Type: application/json" \\\n  -d '{"status":"fail","error":"Job crashed"}'`}
+                    </pre>
+                  </div>
+                </section>
+              )}
 
               <section className="detail-section">
                 <div className="detail-section-head">

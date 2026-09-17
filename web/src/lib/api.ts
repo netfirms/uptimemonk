@@ -148,6 +148,8 @@ export interface MonitorHistory {
     uptime7d: number | null;
     uptime30d: number | null;
     certExpiresAt: number | null;
+    heartbeatToken?: string | null;
+    heartbeatGraceSeconds?: number | null;
   };
   range: RangeKey;
   granularity: "hour" | "day";
@@ -272,7 +274,7 @@ export const api = {
     ),
 
   createMonitor: (input: MonitorInput) =>
-    request<{ id: string }>("/v1/monitors", {
+    request<{ id: string; heartbeatToken?: string }>("/v1/monitors", {
       method: "POST",
       body: JSON.stringify(input),
       signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),

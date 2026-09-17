@@ -31,6 +31,8 @@ interface MonitorConfig {
   publicOnStatusPage?: boolean;
   muteAlerts?: boolean;
   alertContactIds?: string[];
+  heartbeatToken?: string;
+  heartbeatGraceSeconds?: number;
 }
 
 interface LiveState {
@@ -60,6 +62,16 @@ export default function Dashboard() {
   const publicCount = monitors.filter((m) => m.publicOnStatusPage).length;
   const [contactsOpen, setContactsOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
+
+  const copyHeartbeatUrl = (id: string, token: string) => {
+    const url = `https://api.uptimemonke.com/heartbeat/${token}`;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+    }
+    setCopiedTokenId(id);
+    setTimeout(() => setCopiedTokenId((curr) => (curr === id ? null : curr)), 2500);
+  };
 
   const [billing, setBilling] = useState<Billing | null>(null);
 
@@ -527,7 +539,62 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="monitor-target">
-                  {m.target ? (
+                  {m.type === "heartbeat" && m.heartbeatToken ? (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "2px" }}>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono, monospace)",
+                          fontSize: "0.75rem",
+                          background: "rgba(255, 255, 255, 0.05)",
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          color: "var(--text-dim)",
+                          maxWidth: "260px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={`https://api.uptimemonke.com/heartbeat/${m.heartbeatToken}`}
+                      >
+                        {`.../heartbeat/${m.heartbeatToken.slice(0, 10)}…`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyHeartbeatUrl(m.id, m.heartbeatToken!);
+                        }}
+                        style={{
+                          background: copiedTokenId === m.id ? "rgba(16, 185, 129, 0.15)" : "rgba(255, 255, 255, 0.08)",
+                          border: `1px solid ${copiedTokenId === m.id ? "rgba(16, 185, 129, 0.4)" : "var(--border)"}`,
+                          color: copiedTokenId === m.id ? "#10b981" : "var(--text)",
+                          borderRadius: "4px",
+                          padding: "2px 8px",
+                          fontSize: "0.72rem",
+                          fontWeight: 500,
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          transition: "all 0.15s ease",
+                        }}
+                        title="Copy Heartbeat ping URL"
+                        aria-label="Copy Heartbeat ping URL"
+                      >
+                        {copiedTokenId === m.id ? (
+                          <>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            <span>Copy Ping URL</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : m.target ? (
                     <a
                       href={m.target.startsWith("http") ? m.target : `http://${m.target}`}
                       target="_blank"
@@ -537,7 +604,7 @@ export default function Dashboard() {
                       {m.target} ↗
                     </a>
                   ) : (
-                    <span>{m.type}</span>
+                    <span>{m.type === "heartbeat" ? "Heartbeat Push API" : m.type}</span>
                   )}
                 </div>
               </div>
