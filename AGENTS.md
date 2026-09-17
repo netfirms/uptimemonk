@@ -309,6 +309,18 @@ monitoring. Both are held by `ConditionPathExists=/etc/uptimemonk/sa.json` —
 if that is missing they are *skipped with a readable reason* rather than
 crash-looping.
 
+## How far this scales
+
+**~64 users**, and the binding constraint is Firestore's 20,000 writes/day —
+not the hardware, which is 9% used at that point. The `orgStatus` mirror costs
+308 writes per org per day and exists only so the dashboard can use a realtime
+listener; everything else it reads already comes from the worker API. Replacing
+that listener removes the ceiling rather than raising it.
+
+Measured ceilings, the method behind them, and the staged plan are in
+[SCALING.md](SCALING.md). Do not re-derive them from spec sheets — the figures
+there came from the running box.
+
 ## Known gaps
 
 - Telegram has no bot token, so Telegram contacts cannot deliver. Email

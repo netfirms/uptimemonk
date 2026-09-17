@@ -32,6 +32,11 @@ tier.
 > Working on this with an AI agent? Read **[AGENTS.md](AGENTS.md)** first — it
 > carries the invariants that look like bugs but are not, and the boundaries
 > around credentials and the live worker.
+>
+> Wondering how far this goes? **[SCALING.md](SCALING.md)** has measured
+> ceilings and the staged plan. The short version: ~64 users, and the limit
+> is Firestore's free-tier write quota, not the box — which sits at 9% used
+> when that ceiling is reached.
 
 ## What it does
 
