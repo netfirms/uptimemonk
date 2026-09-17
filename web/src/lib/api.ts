@@ -342,8 +342,11 @@ export const api = {
    * sets the custom claim that every security rule reads for tenancy, which a
    * client cannot do. Idempotent — a retry after a dropped response is normal.
    */
-  bootstrap: () =>
+  /** The token is only spent on workspace creation — see lib/recaptcha.ts for
+   *  why that is the one place it can be enforced. */
+  bootstrap: (recaptchaToken?: string) =>
     request<{ orgId: string; created: boolean }>("/v1/bootstrap", {
+      body: JSON.stringify({ recaptchaToken }),
       method: "POST",
       signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
     }),

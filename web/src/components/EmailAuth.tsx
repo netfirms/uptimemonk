@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -11,6 +11,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { events } from "@/lib/analytics";
+import { prewarmRecaptcha } from "@/lib/recaptcha";
 
 /**
  * Email and password sign-in, beside the Google button.
@@ -67,6 +68,12 @@ export default function EmailAuth({
   next?: string;
 }) {
   const [mode, setMode] = useState<Mode>("signin");
+
+  // Fetch the script while they fill the form, so creating the workspace does
+  // not stall waiting for a third party.
+  useEffect(() => {
+    prewarmRecaptcha();
+  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");

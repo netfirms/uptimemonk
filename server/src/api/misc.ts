@@ -8,6 +8,7 @@ import { flush, recordResult } from "../monitors/recordResult.js";
 import { handleVerifyRequest, signatureMatches } from "../probe/verify.js";
 import { requireAuth } from "./auth.js";
 import { log } from "../lib/log.js";
+import { verifyRecaptcha } from "../lib/recaptcha.js";
 import { readinessSummary } from "../lib/readiness.js";
 import { API_VERSION, REGION, VERIFY_SECRET, getConfigMetadata } from "../config.js";
 import type { Plan } from "../types.js";
@@ -177,7 +178,7 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
    * it must be idempotent, because a retry after a dropped response is the
    * normal case, not the exception.
    */
-  app.post("/v1/bootstrap", async (req, reply) => {
+  app.post<{ Body?: { recaptchaToken?: string } }>("/v1/bootstrap", async (req, reply) => {
     const header = req.headers.authorization ?? "";
     const token = header.startsWith("Bearer ") ? header.slice(7) : "";
     if (!token) return reply.code(401).send({ error: "Sign in to continue" });
@@ -208,6 +209,34 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
 
     if (decoded.orgId) {
       return { orgId: decoded.orgId, created: false };
+    }
+
+    /**
+     * The one place a bot can be stopped.
+     *
+     * Sign-up happens in the browser against Google directly, so this server
+     * never sees it and cannot gate it. Creating a *workspace* does come
+     * through here, and that is the request with the cost — a Firestore
+     * document, a scheduler slot, a free capacity allowance. An account that
+     * cannot create one has achieved nothing.
+     *
+     * Checked after the early return above, so an existing customer whose
+     * token already carries an orgId never needs a token for it.
+     */
+    const verdict = await verifyRecaptcha(
+      req.body?.recaptchaToken,
+      "signup",
+      req.ip
+    );
+    if (!verdict.ok) {
+      log.warn(
+        { uid: decoded.uid, score: verdict.score, reason: verdict.reason },
+        "bootstrap refused by recaptcha"
+      );
+      return reply.code(429).send({
+        error: "We could not verify this request. Reload the page and try again.",
+        code: "recaptcha-failed",
+      });
     }
 
     // A claim can lag a moment behind the document; check Firestore too so a

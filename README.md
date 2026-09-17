@@ -394,6 +394,33 @@ The key is **440 root:uptimemonk**. systemd's `LoadCredential` reads it as
 root and hands the path to the process, which runs as the `uptimemonk` user.
 The service account needs `roles/datastore.user` and nothing else.
 
+## Turning reCAPTCHA on
+
+v3, invisible — no puzzle. Create a **reCAPTCHA v3** key pair at
+[google.com/recaptcha/admin](https://www.google.com/recaptcha/admin), adding
+`uptimemonke.com` and `www.uptimemonke.com` as domains, then:
+
+```bash
+# worker
+ssh uptimemonk-worker-1 'sudo tee -a /etc/uptimemonk/env >/dev/null' <<'EOF'
+RECAPTCHA_SECRET=...
+EOF
+
+# web — site key is public by design
+echo 'NEXT_PUBLIC_RECAPTCHA_SITE_KEY=...' >> web/.env.local
+```
+
+**What it protects, precisely.** Sign-up and sign-in run in the browser
+straight against Google's identitytoolkit; this server never sees them and so
+cannot gate them — a check that lives only in the page is advice an attacker
+skips. What *is* enforceable is `/v1/bootstrap`, which creates a workspace,
+and that is the request with the cost: a Firestore document, a scheduler slot
+and a free capacity allowance. A bot that makes an account but no workspace
+has achieved nothing, and Google rate-limits account creation itself.
+
+Verification **fails open** if Google is unreachable. An outage at a spam
+filter is not a reason to stop people signing up.
+
 ## Turning donations on
 
 The code is deployed and inert: both routes register, `/v1/billing/checkout`

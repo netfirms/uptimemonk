@@ -8,6 +8,7 @@ import { api, ApiError, checksPerDay, type Billing } from "@/lib/api";
 import AlertContacts from "./AlertContacts";
 import Support from "./Support";
 import OrgSettings from "./OrgSettings";
+import { recaptchaToken } from "@/lib/recaptcha";
 import NewMonitorForm, {
   MonitorTypeIcon,
   protocolTag,
@@ -174,7 +175,10 @@ export default function Dashboard() {
 
         if (!id) {
           try {
-            const { orgId: created } = await api.bootstrap();
+            // Minted here rather than at sign-in: this is the call the
+            // worker actually gates, and a token is only valid briefly.
+            const captcha = await recaptchaToken("signup");
+            const { orgId: created } = await api.bootstrap(captcha);
             void events.signUpBootstrapped();
             await u.getIdToken(true);
             id = created;
