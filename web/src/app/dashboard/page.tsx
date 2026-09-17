@@ -42,6 +42,22 @@ interface LiveState {
   lastError?: string | null;
   uptime30d?: number | null;
   certExpiresAt?: number | null;
+  /** The mirror has always sent this; the card never showed it. */
+  lastCheckedAt?: number | null;
+}
+
+/**
+ * "3s ago" rather than a timestamp: on a monitoring list the only thing that
+ * matters is whether the last check was recent, and a clock face makes you do
+ * the subtraction yourself.
+ */
+function sinceLabel(at?: number | null): string {
+  if (!at) return "never checked";
+  const secs = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.round(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.round(secs / 3600)}h ago`;
+  return `${Math.round(secs / 86400)}d ago`;
 }
 
 /**
@@ -538,7 +554,25 @@ export default function Dashboard() {
               : "5 min";
 
           return (
-            <div key={m.id} className="monitor-card">
+            <div
+              key={m.id}
+              className={`monitor-card ${status === "down" ? "is-down" : ""} ${
+                isPaused ? "is-paused" : ""
+              }`}
+              role="button"
+              tabIndex={0}
+              aria-label={`${m.name} — view history`}
+              onClick={() => {
+                setDetailId(m.id);
+                void events.historyViewed(String(m.type));
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
+                setDetailId(m.id);
+                void events.historyViewed(String(m.type));
+              }}
+            >
               {/* Status Pill (UP / DOWN / PAUSED) */}
               <span className={`status-pill ${state?.inMaintenance ? "maintenance" : status}`}>
                 <span className="status-dot-container">
@@ -660,35 +694,34 @@ export default function Dashboard() {
               </div>
 
               {/* Response Time & 30d Uptime */}
-              <div className="monitor-metrics" style={{ textAlign: "right", minWidth: "120px" }}>
+              <div className="monitor-metrics">
                 <div className={`latency-val ${latencyClass}`}>
                   {latency != null ? `${latency} ms` : "—"}
                 </div>
                 <div className="dim">
                   {state?.uptime30d != null ? `${state.uptime30d.toFixed(2)}% / 30d` : "measuring…"}
                 </div>
+                {/* "Is this thing even running?" is the first question a
+                    monitoring list has to answer, and it was not on the card. */}
+                <div
+                  className="monitor-checked"
+                  title={
+                    state?.lastCheckedAt
+                      ? `Last checked ${new Date(state.lastCheckedAt).toLocaleString()}`
+                      : "No check recorded yet"
+                  }
+                >
+                  {sinceLabel(state?.lastCheckedAt)}
+                </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="monitor-actions" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div
+                className={`monitor-actions ${busyId === m.id ? "busy" : ""}`}
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
-                  className="btn-sm"
-                  onClick={() => {
-                    setDetailId(m.id);
-                    void events.historyViewed(String(m.type));
-                  }}
-                  title="View history"
-                  aria-label={`View history for ${m.name}`}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 3v18h18" />
-                    <polyline points="19 9 13 15 9 11 5 15" />
-                  </svg>
-                  History
-                </button>
-
-                <button
-                  className="btn-sm"
+                  className="btn-icon"
                   onClick={() => setEditing(m)}
                   disabled={busyId === m.id}
                   title="Edit monitor"
@@ -698,46 +731,33 @@ export default function Dashboard() {
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
-                  Edit
                 </button>
 
                 <button
-                  className="btn-sm"
+                  className="btn-icon"
                   onClick={() => togglePause(m)}
                   disabled={busyId === m.id}
-                  title={isPaused ? "Resume" : "Pause"}
+                  title={isPaused ? `Resume ${m.name}` : `Pause ${m.name}`}
+                  aria-label={isPaused ? `Resume ${m.name}` : `Pause ${m.name}`}
                 >
-                  {busyId === m.id ? (
-                    "Updating…"
-                  ) : isPaused ? (
-                    <>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                        <polygon points="5 3 19 12 5 21 5 3" />
-                      </svg>
-                      Resume
-                    </>
+                  {isPaused ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
                   ) : (
-                    <>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                        <rect x="6" y="4" width="4" height="16" />
-                        <rect x="14" y="4" width="4" height="16" />
-                      </svg>
-                      Pause
-                    </>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="6" y="4" width="4" height="16" />
+                      <rect x="14" y="4" width="4" height="16" />
+                    </svg>
                   )}
                 </button>
 
                 <button
-                  className="btn-sm"
+                  className="btn-icon danger"
                   onClick={() => handleDelete(m)}
                   disabled={busyId === m.id}
-                  title="Delete monitor"
-                  style={{
-                    padding: "6px 8px",
-                    color: "#f43f5e",
-                    borderColor: "rgba(244, 63, 94, 0.2)",
-                  }}
-                  aria-label="Delete monitor"
+                  title={`Delete ${m.name}`}
+                  aria-label={`Delete ${m.name}`}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="3 6 5 6 21 6" />

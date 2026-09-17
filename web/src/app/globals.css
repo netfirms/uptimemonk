@@ -2489,8 +2489,7 @@ button.btn-outline-red {
     max-width: 100%;
   }
 
-  .monitor-card .monitor-metrics,
-  .monitor-card > div[style*="text-align: right"] {
+  .monitor-card .monitor-metrics {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -2501,21 +2500,22 @@ button.btn-outline-red {
     padding-top: 8px;
   }
 
-  .monitor-card .monitor-actions,
-  .monitor-card > div[style*="display: flex; alignItems: center"],
-  .monitor-card > div[style*="display: flex; align-items: center"] {
+  .monitor-card .monitor-actions {
     width: 100%;
     gap: 8px;
     margin-top: 4px;
   }
 
-  .monitor-card .monitor-actions button,
-  .monitor-card > div[style*="display: flex; alignItems: center"] button,
-  .monitor-card > div[style*="display: flex; align-items: center"] button {
+  /* Touch targets, not 28px squares, once the row has stacked. */
+  .monitor-card .monitor-actions .btn-icon {
     flex: 1;
-    justify-content: center;
-    padding: 8px 12px;
-    font-size: 0.8rem;
+    height: 38px;
+  }
+
+  .monitor-card .monitor-metrics {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 10px;
   }
 
   /* Landing Page Elements */
@@ -2834,3 +2834,106 @@ button.btn-outline-red {
 .cert-bar span.ok { background: #3BD671; }
 .cert-bar span.warn { background: #f59e0b; }
 .cert-bar span.down { background: #ef4444; }
+
+/* --- Monitor card: the row people scan --- */
+
+/* The whole card opens history. There were four labelled buttons per row —
+   forty-four of them on a list of eleven monitors, all competing with the
+   data they sit beside — and the most-used one was a small target among
+   them. */
+.monitor-card[role="button"] {
+  cursor: pointer;
+}
+
+.monitor-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* A down monitor should be findable without reading. The card carries the
+   state, not just the pill on its left edge. */
+.monitor-card.is-down {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: linear-gradient(
+    90deg,
+    rgba(239, 68, 68, 0.09) 0%,
+    var(--surface-card) 220px
+  );
+}
+
+.monitor-card.is-down:hover {
+  border-color: rgba(239, 68, 68, 0.65);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.14);
+}
+
+/* Paused recedes rather than shouts — it is a deliberate state, not a fault. */
+.monitor-card.is-paused {
+  opacity: 0.62;
+}
+
+.monitor-card.is-paused:hover {
+  opacity: 1;
+}
+
+.monitor-metrics {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  min-width: 124px;
+  text-align: right;
+}
+
+.monitor-checked {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.monitor-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+/* Dim while a pause or delete is in flight. The buttons used to swap their
+   label to "Updating…", which resized the row mid-click. */
+.monitor-actions.busy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Square icon buttons: the labels were four words repeated on every row, and
+   the icons plus tooltips say the same thing in a quarter of the space. */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.btn-icon:hover:not(:disabled) {
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.btn-icon:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn-icon.danger:hover:not(:disabled) {
+  color: #fb7185;
+  border-color: rgba(244, 63, 94, 0.45);
+  background: rgba(244, 63, 94, 0.1);
+}
