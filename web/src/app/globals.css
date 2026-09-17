@@ -736,6 +736,8 @@ button.btn-outline-red {
   font-size: 0.85rem;
   font-weight: 600;
   text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: color 0.15s ease;
 }
 
@@ -3487,10 +3489,18 @@ button.workspace-pill:hover {
   pointer-events: none;
 }
 
-.auth-modal-close {
+.auth-modal-top-bar {
   position: absolute;
-  top: 18px;
+  top: 14px;
+  left: 18px;
   right: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+}
+
+.auth-modal-close {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #94a3b8;
@@ -3503,7 +3513,7 @@ button.workspace-pill:hover {
   justify-content: center;
   font-size: 0.85rem;
   transition: all 0.18s ease;
-  z-index: 10;
+  margin-left: auto;
 }
 
 .auth-modal-close:hover {
@@ -4285,5 +4295,159 @@ button.workspace-pill:hover {
   margin-top: 4px;
   text-align: center;
 }
+
+/* ==========================================================================
+   Language Picker Dropdown Component
+   ========================================================================== */
+
+.lang-picker-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.lang-picker-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+  height: 34px;
+}
+
+.lang-picker-btn:hover,
+.lang-picker-btn.open {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.lang-picker-btn:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+.lang-picker-flag {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.lang-picker-name {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.lang-picker-chevron {
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.lang-picker-chevron.rotate {
+  transform: rotate(180deg);
+}
+
+.lang-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 210px;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  z-index: 10000;
+  animation: langMenuDrop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes langMenuDrop {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.lang-picker-header {
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 4px;
+}
+
+.lang-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lang-picker-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #cbd5e1;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lang-picker-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.lang-picker-item.active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  font-weight: 600;
+}
+
+.lang-item-flag {
+  font-size: 1rem;
+}
+
+.lang-item-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.lang-item-native {
+  font-size: 0.8125rem;
+  color: inherit;
+}
+
+.lang-item-en {
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.lang-picker-item.active .lang-item-en {
+  color: #059669;
+}
+
+/* Burmese Unicode Line-Height & Font Adjustment */
+html[data-locale="my"],
+html[lang="my"] {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Padauk", "Pyidaungsu", "Noto Sans Myanmar", Inter, sans-serif;
+  line-height: 1.65;
+}
+
 
 

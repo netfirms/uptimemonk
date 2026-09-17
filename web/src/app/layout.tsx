@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Analytics from "@/components/Analytics";
+import { I18nProvider } from "@/lib/i18n/context";
 
 export const viewport: Viewport = {
   themeColor: "#090d16",
@@ -97,7 +98,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <div className="ambient-glow" aria-hidden="true" />
-        {children}
+        <I18nProvider>
+          {children}
+        </I18nProvider>
         <Analytics />
       </body>
     </html>

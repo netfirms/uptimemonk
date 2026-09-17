@@ -11,15 +11,16 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { events } from "@/lib/analytics";
-import EmailAuth from "./EmailAuth";
 import AuthModal from "./AuthModal";
+import LanguagePicker from "./LanguagePicker";
+import { useI18n } from "@/lib/i18n/context";
 
 /**
  * Public marketing landing page for UptimeMonke.
  *
- * Implements Phase 1 and Phase 2 enhancements:
+ * Implements multi-locale i18n support (English, Japanese, Korean, Malay, Indonesian, Burmese):
  * - Ambient dark glowing aesthetic with developer grid pattern
- * - Sticky navigation bar with anchor links
+ * - Sticky navigation bar with anchor links & language picker
  * - Interactive Live Edge Probes sandbox with real-time animated ping pulses and uptime bars
  * - Multi-channel alert showcase (Slack, Discord, Email, Webhook)
  * - Why UptimeMonke 4-feature grid
@@ -32,14 +33,13 @@ export default function Landing({
 }: {
   onSignedIn?: (user?: User) => void;
 }) {
+  const { t } = useI18n();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"signup" | "signin">("signup");
   const [quickUrl, setQuickUrl] = useState("");
-  /** Google stays the one-click path; email is a disclosure beneath it. */
-  const [showEmailAuth, setShowEmailAuth] = useState(false);
 
   // Interactive Live Edge Probes Tab
   const [demoTab, setDemoTab] = useState<"http" | "ssl" | "ports" | "heartbeat">("http");
@@ -151,17 +151,20 @@ export default function Landing({
 
         {/* Navigation Anchor Links */}
         <nav className="landing-nav" aria-label="Main Navigation">
-          <a href="#features" className="landing-nav-link">Features</a>
-          <a href="#demo" className="landing-nav-link">Live Demo</a>
-          <a href="#alerts" className="landing-nav-link">Alerts</a>
-          <a href="#pricing" className="landing-nav-link">Pricing</a>
-          <a href="#faq" className="landing-nav-link">FAQ</a>
+          <a href="#features" className="landing-nav-link">{t("navFeatures")}</a>
+          <a href="#demo" className="landing-nav-link">{t("navDemo")}</a>
+          <a href="#alerts" className="landing-nav-link">{t("navAlerts")}</a>
+          <a href="#pricing" className="landing-nav-link">{t("navPricing")}</a>
+          <a href="#faq" className="landing-nav-link">{t("navFaq")}</a>
         </nav>
 
-        <div className="row" style={{ gap: "10px" }}>
+        <div className="row" style={{ gap: "10px", alignItems: "center" }}>
+          {/* Language Picker Dropdown */}
+          <LanguagePicker />
+
           <span className="status-pill up" style={{ fontSize: "0.74rem" }} title="Global edge workers active">
             <span className="status-dot up pulse" />
-            Probes Live
+            {t("probesLive")}
           </span>
           {currentUser ? (
             <a
@@ -169,7 +172,7 @@ export default function Landing({
               className="primary"
               style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px" }}
             >
-              <span>Dashboard</span>
+              <span>{t("dashboardBtn")}</span>
               <span>→</span>
             </a>
           ) : (
@@ -182,7 +185,7 @@ export default function Landing({
                   setAuthModalOpen(true);
                 }}
               >
-                Log In
+                {t("logIn")}
               </button>
               <button
                 type="button"
@@ -192,7 +195,7 @@ export default function Landing({
                   setAuthModalOpen(true);
                 }}
               >
-                Start Free
+                {t("startFree")}
               </button>
             </div>
           )}
@@ -205,15 +208,15 @@ export default function Landing({
 
         <div className="hero-tag">
           <span className="status-dot up pulse" />
-          <span>Sub-Minute Edge Checks · 100% Free Forever</span>
+          <span>{t("heroTag")}</span>
         </div>
 
         <h1 className="hero-title">
-          Keep your websites &amp; APIs <span className="hero-green">online</span>.
+          {t("heroTitle1")}<span className="hero-green">{t("heroTitleHighlight")}</span>{t("heroTitle2")}
         </h1>
 
         <p className="hero-desc">
-          Continuous HTTP, SSL expiry, TCP ping, and cron heartbeat monitoring with sub-minute checks and instant multi-channel alerts before your users notice downtime.
+          {t("heroDesc")}
         </p>
 
         {/* Interactive Quickstart Form */}
@@ -250,13 +253,13 @@ export default function Landing({
               <input
                 type="text"
                 className="hero-quickstart-input"
-                placeholder="Enter your website or API (e.g. example.com)"
+                placeholder={t("heroPlaceholder")}
                 value={quickUrl}
                 onChange={(e) => setQuickUrl(e.target.value)}
-                aria-label="Enter your website URL to monitor"
+                aria-label={t("heroPlaceholder")}
               />
               <button type="submit" className="hero-quickstart-btn">
-                <span>Start Monitoring</span>
+                <span>{t("heroStartBtn")}</span>
                 <span className="arrow-icon">→</span>
               </button>
             </div>
@@ -281,7 +284,7 @@ export default function Landing({
                 <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z" />
                 <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
               </svg>
-              <span>{isSigningIn ? "Connecting…" : "Continue with Google"}</span>
+              <span>{isSigningIn ? t("heroConnecting") : t("continueWithGoogle")}</span>
             </button>
 
             <button
@@ -292,16 +295,16 @@ export default function Landing({
                 setAuthModalOpen(true);
               }}
             >
-              <span>✉️ Sign up with Email</span>
+              <span>✉️ {t("signUpWithEmail")}</span>
             </button>
           </div>
 
           <div className="hero-feature-tags">
-            <span>⚡ 60s Check Intervals</span>
+            <span>{t("featureIntervals")}</span>
             <span>•</span>
-            <span>🔒 Free SSL Expiry Alerts</span>
+            <span>{t("featureSsl")}</span>
             <span>•</span>
-            <span>🚫 No Credit Card Required</span>
+            <span>{t("featureNoCard")}</span>
           </div>
         </div>
 
@@ -312,33 +315,33 @@ export default function Landing({
               <circle cx="12" cy="12" r="10" />
               <path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4 10 15 15 0 0 1 4-10z" />
             </svg>
-            <span>HTTP(S) &amp; APIs</span>
+            <span>{t("pillHttp")}</span>
           </div>
           <div className="feature-pill">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
             </svg>
-            <span>SSL Expiry (30d/14d/7d)</span>
+            <span>{t("pillSsl")}</span>
           </div>
           <div className="feature-pill">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
             </svg>
-            <span>Ping (ICMP) &amp; TCP</span>
+            <span>{t("pillPing")}</span>
           </div>
           <div className="feature-pill">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
-            <span>Cron Heartbeats</span>
+            <span>{t("pillCron")}</span>
           </div>
           <div className="feature-pill">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
               <rect width="18" height="18" x="3" y="3" rx="2" />
               <path d="M7 8h10M7 12h10" />
             </svg>
-            <span>Public Status Pages</span>
+            <span>{t("pillStatusPage")}</span>
           </div>
         </div>
       </section>
@@ -346,9 +349,9 @@ export default function Landing({
       {/* 3. INTERACTIVE "LIVE EDGE PROBES" SANDBOX */}
       <section className="demo-section" id="demo">
         <div className="section-head">
-          <span className="section-tag">Interactive Sandbox</span>
-          <h2>See How UptimeMonke Probes Your Stack</h2>
-          <p className="dim">Real-time edge probes dispatched from AWS Lightsail Singapore with sub-minute resolution.</p>
+          <span className="section-tag">{t("demoTag")}</span>
+          <h2>{t("demoTitle")}</h2>
+          <p className="dim">{t("demoDesc")}</p>
         </div>
 
         <div className="preview-box preview-box-interactive">
@@ -363,7 +366,7 @@ export default function Landing({
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z" />
               </svg>
-              <span>HTTP &amp; APIs</span>
+              <span>{t("tabHttp")}</span>
             </button>
             <button
               type="button"
@@ -373,7 +376,7 @@ export default function Landing({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
               </svg>
-              <span>SSL Certificates</span>
+              <span>{t("tabSsl")}</span>
             </button>
             <button
               type="button"
@@ -384,7 +387,7 @@ export default function Landing({
                 <rect width="18" height="18" x="3" y="3" rx="2" />
                 <path d="M8 12h8" />
               </svg>
-              <span>TCP &amp; DNS</span>
+              <span>{t("tabPorts")}</span>
             </button>
             <button
               type="button"
@@ -395,7 +398,7 @@ export default function Landing({
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
-              <span>Cron Heartbeats</span>
+              <span>{t("tabHeartbeat")}</span>
             </button>
           </div>
 
@@ -406,7 +409,7 @@ export default function Landing({
               <span className="preview-dot-mac" />
             </div>
             <div className="row" style={{ gap: "8px" }}>
-              <span className="dim" style={{ fontSize: "0.72rem" }}>Worker: sg-1 (ap-southeast-1a)</span>
+              <span className="dim" style={{ fontSize: "0.72rem" }}>{t("demoWorkerLocation")}</span>
               <span className="status-dot up pulse" />
             </div>
           </div>
@@ -421,8 +424,7 @@ export default function Landing({
                       <span className="status-dot up pulse" />
                       <strong className="preview-target">https://api.uptimemonke.com/healthz</strong>
                     </div>
-                    {/* Simulated 30-day mini uptime bar */}
-                    <div className="uptime-spark-row" title="30-Day Uptime: 99.99%">
+                    <div className="uptime-spark-row" title={t("demoUptime30d")}>
                       {Array.from({ length: 30 }).map((_, i) => (
                         <span key={i} className="spark-bar up" />
                       ))}
@@ -440,7 +442,7 @@ export default function Landing({
                       <span className="status-dot up pulse" />
                       <strong className="preview-target">https://auth.acme-corp.dev/oauth/token</strong>
                     </div>
-                    <div className="uptime-spark-row" title="30-Day Uptime: 100.00%">
+                    <div className="uptime-spark-row" title={t("demoUptime30d")}>
                       {Array.from({ length: 30 }).map((_, i) => (
                         <span key={i} className="spark-bar up" />
                       ))}
@@ -458,7 +460,7 @@ export default function Landing({
                       <span className="status-dot up pulse" />
                       <strong className="preview-target">https://checkout.mystore.io/api/v1/pay</strong>
                     </div>
-                    <div className="uptime-spark-row" title="30-Day Uptime: 99.98%">
+                    <div className="uptime-spark-row" title={t("demoUptime30d")}>
                       {Array.from({ length: 30 }).map((_, i) => (
                         <span key={i} className={`spark-bar ${i === 18 ? "warn" : "up"}`} />
                       ))}
@@ -480,10 +482,10 @@ export default function Landing({
                       <span className="status-dot up" />
                       <strong className="preview-target">api.uptimemonke.com</strong>
                     </div>
-                    <span className="dim" style={{ fontSize: "0.75rem" }}>Issuer: Let's Encrypt · TLS 1.3 · SNI Verified</span>
+                    <span className="dim" style={{ fontSize: "0.75rem" }}>Issuer: Let&apos;s Encrypt · TLS 1.3 · SNI Verified</span>
                   </div>
                   <div className="preview-meta-col">
-                    <span className="ssl-badge valid">Valid (84 days)</span>
+                    <span className="ssl-badge valid">{t("demoSslValid")}</span>
                   </div>
                 </div>
 
@@ -496,7 +498,7 @@ export default function Landing({
                     <span className="dim" style={{ fontSize: "0.75rem" }}>Issuer: DigiCert Global G2 · Monitored daily</span>
                   </div>
                   <div className="preview-meta-col">
-                    <span className="ssl-badge valid">Valid (29 days)</span>
+                    <span className="ssl-badge valid">{t("demoSslValid")}</span>
                   </div>
                 </div>
 
@@ -509,7 +511,7 @@ export default function Landing({
                     <span className="dim" style={{ fontSize: "0.75rem" }}>Alert queued to Slack &amp; Email on day 7</span>
                   </div>
                   <div className="preview-meta-col">
-                    <span className="ssl-badge alert">Expiring in 4 days</span>
+                    <span className="ssl-badge alert">{t("demoSslExpiring")}</span>
                   </div>
                 </div>
               </>
@@ -526,7 +528,7 @@ export default function Landing({
                     <span className="dim" style={{ fontSize: "0.75rem" }}>Protocol: TCP Socket Connection</span>
                   </div>
                   <div className="preview-meta-col">
-                    <span className="badge-code-200">PORT OPEN</span>
+                    <span className="badge-code-200">{t("demoPortOpen")}</span>
                     <span className="latency-val latency-fast">14 ms</span>
                   </div>
                 </div>
@@ -540,7 +542,7 @@ export default function Landing({
                     <span className="dim" style={{ fontSize: "0.75rem" }}>Protocol: TCP Handshake Probe</span>
                   </div>
                   <div className="preview-meta-col">
-                    <span className="badge-code-200">PORT OPEN</span>
+                    <span className="badge-code-200">{t("demoPortOpen")}</span>
                     <span className="latency-val latency-fast">9 ms</span>
                   </div>
                 </div>
@@ -554,7 +556,7 @@ export default function Landing({
                     <span className="dim" style={{ fontSize: "0.75rem" }}>Query: A Record Resolution</span>
                   </div>
                   <div className="preview-meta-col">
-                    <span className="badge-code-200">RESOLVED</span>
+                    <span className="badge-code-200">{t("demoResolved")}</span>
                     <span className="latency-val latency-fast">6 ms</span>
                   </div>
                 </div>
@@ -569,10 +571,10 @@ export default function Landing({
                       <span className="status-dot up pulse" />
                       <strong className="preview-target">nightly-postgres-backup.sh</strong>
                     </div>
-                    <span className="dim" style={{ fontSize: "0.75rem" }}>Last ping: 4m ago · Expected interval: 24h · Grace: 30m</span>
+                    <span className="dim" style={{ fontSize: "0.75rem" }}>{t("demoLastPing")}</span>
                   </div>
                   <div className="preview-meta-col">
-                    <span className="badge-code-200">HEALTHY</span>
+                    <span className="badge-code-200">{t("demoHealthy")}</span>
                   </div>
                 </div>
 
@@ -582,16 +584,16 @@ export default function Landing({
                       <span className="status-dot up pulse" />
                       <strong className="preview-target">stripe-settlement-sync</strong>
                     </div>
-                    <span className="dim" style={{ fontSize: "0.75rem" }}>Last ping: 19s ago · Expected interval: 1h · Grace: 5m</span>
+                    <span className="dim" style={{ fontSize: "0.75rem" }}>{t("demoLastPing")}</span>
                   </div>
                   <div className="preview-meta-col">
-                    <span className="badge-code-200">HEALTHY</span>
+                    <span className="badge-code-200">{t("demoHealthy")}</span>
                   </div>
                 </div>
 
                 {/* Command snippet */}
                 <div className="heartbeat-snippet-row">
-                  <span className="dim" style={{ fontSize: "0.74rem" }}>Simple cron integration:</span>
+                  <span className="dim" style={{ fontSize: "0.74rem" }}>{t("demoCronSnippet")}</span>
                   <code className="heartbeat-code">
                     0 3 * * * /scripts/backup.sh &amp;&amp; curl -fsS -m 10 https://api.uptimemonke.com/heartbeat/{`{token}`}
                   </code>
@@ -605,9 +607,9 @@ export default function Landing({
       {/* 4. MULTI-CHANNEL ALERT SHOWCASE */}
       <section className="alerts-section" id="alerts">
         <div className="section-head">
-          <span className="section-tag">Instant Incident Notification</span>
-          <h2>Alert Your Team Before Customers Complain</h2>
-          <p className="dim">Zero-delay alert dispatch across the tools your engineering team already lives in.</p>
+          <span className="section-tag">{t("alertsTag")}</span>
+          <h2>{t("alertsTitle")}</h2>
+          <p className="dim">{t("alertsDesc")}</p>
         </div>
 
         {/* Channel Selector */}
@@ -661,12 +663,12 @@ export default function Landing({
                     <span className="dim">14:02</span>
                   </div>
                   <div className="slack-attachment danger">
-                    <p className="slack-alert-title">🚨 <strong>Production API is DOWN</strong></p>
+                    <p className="slack-alert-title">🚨 <strong>{t("alertDownTitle")}</strong></p>
                     <p className="dim" style={{ fontSize: "0.82rem", margin: "4px 0" }}>
                       Target: <code>https://api.acme-corp.dev/healthz</code>
                     </p>
                     <p style={{ color: "#ef4444", fontSize: "0.82rem" }}>
-                      Reason: HTTP 502 Bad Gateway (Response time: 10,024 ms)
+                      {t("alertReason")}
                     </p>
                   </div>
                 </div>
@@ -680,15 +682,15 @@ export default function Landing({
                   <div className="slack-meta">
                     <strong>UptimeMonke APP</strong>
                     <span className="slack-badge">BOT</span>
-                    <span className="dim">14:04 (2m later)</span>
+                    <span className="dim">14:04</span>
                   </div>
                   <div className="slack-attachment success">
-                    <p className="slack-alert-title">✅ <strong>Production API has RECOVERED</strong></p>
+                    <p className="slack-alert-title">✅ <strong>{t("alertRecoveredTitle")}</strong></p>
                     <p className="dim" style={{ fontSize: "0.82rem", margin: "4px 0" }}>
                       Target: <code>https://api.acme-corp.dev/healthz</code>
                     </p>
                     <p style={{ color: "#3BD671", fontSize: "0.82rem" }}>
-                      Status: 200 OK (32 ms) · Incident closed. Downtime duration: 2m 14s.
+                      {t("alertClosed")}
                     </p>
                   </div>
                 </div>
@@ -709,7 +711,7 @@ export default function Landing({
               <div className="discord-embed">
                 <div className="discord-embed-bar" />
                 <div className="discord-embed-content">
-                  <h4 style={{ color: "#ef4444", margin: "0 0 6px 0" }}>[ALERT] Monitor DOWN: checkout-service</h4>
+                  <h4 style={{ color: "#ef4444", margin: "0 0 6px 0" }}>[ALERT] {t("alertDownTitle")}: checkout-service</h4>
                   <p className="dim" style={{ fontSize: "0.82rem" }}>
                     HTTP status code <strong>500 Internal Server Error</strong> returned from Singapore edge worker.
                   </p>
@@ -784,9 +786,9 @@ export default function Landing({
       {/* 5. WHY UPTIMEMONKE / FEATURES GRID */}
       <section className="features-grid-section" id="features">
         <div className="section-head">
-          <span className="section-tag">Engineered for Developers</span>
-          <h2>Why Teams Choose UptimeMonke</h2>
-          <p className="dim">No artificial paywalls, no bloated enterprise contracts. Just fast, dependable infrastructure monitoring.</p>
+          <span className="section-tag">{t("whyTag")}</span>
+          <h2>{t("whyTitle")}</h2>
+          <p className="dim">{t("whyDesc")}</p>
         </div>
 
         <div className="why-grid">
@@ -797,9 +799,9 @@ export default function Landing({
                 <polyline points="12 6 12 12 16 14" />
               </svg>
             </div>
-            <h3>Sub-Minute Edge Checks</h3>
+            <h3>{t("why1Title")}</h3>
             <p className="dim">
-              Traditional monitoring platforms lock free accounts to 5-minute intervals. UptimeMonke lets you run sub-minute checks right out of the box so you know about failures instantly.
+              {t("why1Desc")}
             </p>
           </div>
 
@@ -809,9 +811,9 @@ export default function Landing({
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
               </svg>
             </div>
-            <h3>SSRF-Hardened Cloud Fleet</h3>
+            <h3>{t("why2Title")}</h3>
             <p className="dim">
-              Engineered with strict RFC1918 link-local defense, AWS IMDSv2 metadata attack prevention, and DNS rebinding guards. Safe for corporate internal targets.
+              {t("why2Desc")}
             </p>
           </div>
 
@@ -822,9 +824,9 @@ export default function Landing({
                 <path d="M7 8h10M7 12h10" />
               </svg>
             </div>
-            <h3>Branded Public Status Pages</h3>
+            <h3>{t("why3Title")}</h3>
             <p className="dim">
-              Publish a clean status page at <code>/status/:slug</code> with 90-day historical uptime bars and active incident feeds. Keeps your customers informed during outages.
+              {t("why3Desc")}
             </p>
           </div>
 
@@ -835,9 +837,9 @@ export default function Landing({
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
             </div>
-            <h3>Multi-Channel Alerts</h3>
+            <h3>{t("why4Title")}</h3>
             <p className="dim">
-              Deliver alerts to Slack, Discord, Telegram, custom Webhooks, and Mailgun emails with zero configuration pain. Verified contacts prevent alert spoofing.
+              {t("why4Desc")}
             </p>
           </div>
         </div>
@@ -846,29 +848,29 @@ export default function Landing({
       {/* 6. TRANSPARENT CAPACITY PRICING */}
       <section className="donate-strip" id="pricing">
         <div className="section-head">
-          <span className="section-tag">Zero Subscriptions</span>
-          <h2>There Is No Paid Plan</h2>
+          <span className="section-tag">{t("pricingTag")}</span>
+          <h2>{t("pricingTitle")}</h2>
           <p className="donate-lede">
-            Every single feature works on a free account — all check types, sub-minute intervals, public status pages, and alerting. What an optional donation pays for is <strong>capacity</strong>, because that is the only part that costs real server resources.
+            {t("pricingLede")}
           </p>
         </div>
 
         <div className="donate-grid">
           <div className="donate-card">
-            <span className="donate-label">Free, forever</span>
+            <span className="donate-label">{t("freeForeverLabel")}</span>
             <strong className="donate-figure">14,400</strong>
-            <span className="dim">checks a day</span>
+            <span className="dim">{t("checksPerDay")}</span>
             <p className="dim">
-              Ten monitors at one minute. Or fifty at five minutes. Or one at six seconds — it is the exact same compute load, so it is the exact same free price.
+              {t("freeDesc")}
             </p>
           </div>
 
           <div className="donate-card accent">
-            <span className="donate-label">One $2.99 coffee adds</span>
+            <span className="donate-label">{t("coffeeAddsLabel")}</span>
             <strong className="donate-figure">897,000</strong>
-            <span className="dim">checks</span>
+            <span className="dim">{t("checksUnit")}</span>
             <p className="dim">
-              Around a month of twenty monitors at one minute, or ten at thirty seconds. Unused capacity rolls over with zero subscriptions — buy another whenever you run low.
+              {t("coffeeDesc")}
             </p>
             <button
               type="button"
@@ -878,94 +880,84 @@ export default function Landing({
               disabled={isSigningIn}
             >
               <span aria-hidden>☕</span>
-              {isSigningIn ? "Signing in…" : "Buy me a coffee"}
+              {isSigningIn ? t("heroConnecting") : t("buyCoffeeBtn")}
             </button>
             <p className="dim" style={{ marginTop: 8, fontSize: "0.72rem" }}>
-              Sign-in first, so capacity lands on your workspace rather than disappearing.
+              {t("coffeeNotice")}
             </p>
           </div>
 
           <div className="donate-card">
-            <span className="donate-label">If credit runs out</span>
-            <strong className="donate-figure">Nothing</strong>
+            <span className="donate-label">{t("ifCreditRunsOutLabel")}</span>
+            <strong className="donate-figure">{t("nothingDeletedFigure")}</strong>
             <span className="dim">is deleted</span>
             <p className="dim">
-              A week of grace at full capacity, then a seamless fallback to the free 14,400 daily allowance. Your monitors keep running throughout.
+              {t("graceDesc")}
             </p>
           </div>
         </div>
 
         <p className="donate-why">
-          Why checks and not monitors? A five-second check is twelve times the work of a one-minute one. Charging per monitor would price those the same — and it would stop a free account running a single fast check that costs no more than ten slow ones.
+          {t("whyCapacityExplanation")}
         </p>
       </section>
 
       {/* 7. SEMANTIC ACCESSIBLE FAQ ACCORDION */}
       <section className="faq-section" id="faq">
         <div className="section-head">
-          <span className="section-tag">Frequently Asked Questions</span>
-          <h2>Everything You Need to Know</h2>
-          <p className="dim">Honest answers to common developer questions about UptimeMonke.</p>
+          <span className="section-tag">{t("faqTag")}</span>
+          <h2>{t("faqTitle")}</h2>
+          <p className="dim">{t("faqDesc")}</p>
         </div>
 
         <div className="faq-accordion-wrap">
           <details name="faq" className="faq-item" open>
             <summary className="faq-summary">
-              <span>Is UptimeMonke really free? Do I need a credit card?</span>
+              <span>{t("faq1Q")}</span>
               <span className="faq-chevron" aria-hidden="true">▾</span>
             </summary>
             <div className="faq-content">
-              <p>
-                Yes! Every account receives <strong>14,400 free checks every single day</strong> forever. No credit card is ever required. You can monitor 10 endpoints at 1-minute intervals or 50 endpoints at 5-minute intervals completely free.
-              </p>
+              <p>{t("faq1A")}</p>
             </div>
           </details>
 
           <details name="faq" className="faq-item">
             <summary className="faq-summary">
-              <span>How is UptimeMonke different from traditional tools like UptimeRobot?</span>
+              <span>{t("faq2Q")}</span>
               <span className="faq-chevron" aria-hidden="true">▾</span>
             </summary>
             <div className="faq-content">
-              <p>
-                Legacy monitoring services restrict free accounts to slow 5-minute check intervals and paywall critical features like SSL certificate expiry warnings and cron heartbeat monitoring behind monthly recurring subscriptions. UptimeMonke provides sub-minute intervals, SSL tracking, heartbeats, and public status pages on the free tier, supported by optional one-off $2.99 coffee donations instead of subscriptions.
-              </p>
+              <p>{t("faq2A")}</p>
             </div>
           </details>
 
           <details name="faq" className="faq-item">
             <summary className="faq-summary">
-              <span>Where are monitoring probes dispatched from?</span>
+              <span>{t("faq3Q")}</span>
               <span className="faq-chevron" aria-hidden="true">▾</span>
             </summary>
             <div className="faq-content">
-              <p>
-                Probes originate from hardened AWS Lightsail edge instances (currently in Singapore <code>ap-southeast-1a</code>). Our probe engine runs with HTTP keep-alive disabled to measure genuine first-packet connection times (DNS + TCP handshake + TLS) just like real visitors experience.
-              </p>
+              <p>{t("faq3A")}</p>
             </div>
           </details>
 
           <details name="faq" className="faq-item">
             <summary className="faq-summary">
-              <span>What happens if my workspace runs out of donated credit?</span>
+              <span>{t("faq4Q")}</span>
               <span className="faq-chevron" aria-hidden="true">▾</span>
             </summary>
             <div className="faq-content">
-              <p>
-                Your monitors are <strong>never paused or deleted</strong>. When your credit reaches zero, you enter a 7-day grace window at full service, after which your workspace smoothly transitions back to the 14,400 daily free allowance. Existing monitors continue checking uninterrupted.
-              </p>
+              <p>{t("faq4A")}</p>
             </div>
           </details>
 
           <details name="faq" className="faq-item">
             <summary className="faq-summary">
-              <span>Can I create a public status page for my clients or users?</span>
+              <span>{t("faq5Q")}</span>
               <span className="faq-chevron" aria-hidden="true">▾</span>
             </summary>
             <div className="faq-content">
-              <p>
-                Yes. Every workspace has an instantly shareable public status page at <code>/status/:slug</code>. It features real-time 90-day uptime bars, overall operational status, and automated incident logs with sensitive target URLs safely withheld.
-              </p>
+              <p>{t("faq5A")}</p>
             </div>
           </details>
         </div>
@@ -974,10 +966,10 @@ export default function Landing({
       {/* 8. FRICTIONLESS BOTTOM CONVERSION BANNER */}
       <section className="cta-banner">
         <div className="cta-banner-content">
-          <div className="cta-tag">Get Started Today</div>
-          <h2>Ready to eliminate undetected downtime?</h2>
+          <div className="cta-tag">{t("ctaTag")}</div>
+          <h2>{t("ctaTitle")}</h2>
           <p className="dim">
-            Join developers keeping their critical web applications and APIs online. Setup takes under 30 seconds.
+            {t("ctaDesc")}
           </p>
           {currentUser ? (
             <a
@@ -985,7 +977,7 @@ export default function Landing({
               className="primary"
               style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "8px", padding: "12px 28px", fontSize: "1rem" }}
             >
-              <span>Go to Dashboard</span>
+              <span>{t("dashboardBtn")}</span>
               <span>→</span>
             </a>
           ) : (
@@ -1014,7 +1006,7 @@ export default function Landing({
                     d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
                   />
                 </svg>
-                <span>{isSigningIn ? "Connecting…" : "Continue with Google"}</span>
+                <span>{isSigningIn ? t("heroConnecting") : t("continueWithGoogle")}</span>
               </button>
 
               <button
@@ -1026,23 +1018,24 @@ export default function Landing({
                   setAuthModalOpen(true);
                 }}
               >
-                <span>Start Free Monitoring →</span>
+                <span>{t("startFreeMonitoring")}</span>
               </button>
             </div>
           )}
           <span className="dim" style={{ fontSize: "0.78rem" }}>
-            14,400 free checks every day · No credit card required · Instant setup
+            {t("ctaFooterNotice")}
           </span>
         </div>
       </section>
 
       {/* 9. MINIMAL FOOTER */}
       <footer className="app-footer">
-        <div className="row" style={{ gap: "10px" }}>
-          <span>UptimeMonke · Lightweight Infrastructure Monitoring</span>
+        <div className="row" style={{ gap: "10px", alignItems: "center" }}>
+          <span>{t("footerTagline")}</span>
         </div>
-        <div className="row" style={{ gap: "16px" }}>
-          <a href="#hero" className="dim" style={{ fontSize: "0.8rem", textDecoration: "none" }}>Back to top ↑</a>
+        <div className="row" style={{ gap: "16px", alignItems: "center" }}>
+          <LanguagePicker compact />
+          <a href="#hero" className="dim" style={{ fontSize: "0.8rem", textDecoration: "none" }}>{t("backToTop")}</a>
           <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
         </div>
       </footer>

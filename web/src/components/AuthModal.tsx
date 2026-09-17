@@ -15,6 +15,8 @@ import {
 import { auth } from "@/lib/firebase";
 import { events } from "@/lib/analytics";
 import { prewarmRecaptcha } from "@/lib/recaptcha";
+import { useI18n } from "@/lib/i18n/context";
+import LanguagePicker from "./LanguagePicker";
 
 export type AuthMode = "signup" | "signin" | "reset";
 
@@ -62,6 +64,7 @@ export default function AuthModal({
   targetUrl,
   onSignedIn,
 }: AuthModalProps) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -206,15 +209,18 @@ export default function AuthModal({
         aria-modal="true"
         aria-labelledby="auth-modal-title"
       >
-        {/* Close Button */}
-        <button
-          type="button"
-          className="auth-modal-close"
-          onClick={onClose}
-          aria-label="Close dialog"
-        >
-          ✕
-        </button>
+        {/* Top bar with language switcher and close button */}
+        <div className="auth-modal-top-bar">
+          <LanguagePicker compact />
+          <button
+            type="button"
+            className="auth-modal-close"
+            onClick={onClose}
+            aria-label="Close dialog"
+          >
+            ✕
+          </button>
+        </div>
 
         {/* Brand Mascot & Heading */}
         <div className="auth-modal-header">
@@ -224,19 +230,19 @@ export default function AuthModal({
           </div>
           <h2 id="auth-modal-title" className="auth-modal-title">
             {mode === "signup"
-              ? "Start monitoring in seconds"
+              ? t("authStartMonitoring")
               : mode === "reset"
-              ? "Reset your password"
-              : "Welcome back"}
+              ? t("authResetPassword")
+              : t("authWelcomeBack")}
           </h2>
           <p className="auth-modal-subtitle">
             {mode === "signup"
               ? targetUrl
                 ? `Ready to monitor ${targetUrl.replace(/^https?:\/\//, "")} on the edge.`
-                : "14,400 free checks daily forever. No credit card required."
+                : t("authSubtitleSignUp")
               : mode === "reset"
-              ? "Enter your email to receive a recovery link."
-              : "Access your monitors, incidents, and status pages."}
+              ? t("authSubtitleReset")
+              : t("authSubtitleSignIn")}
           </p>
         </div>
 
@@ -254,7 +260,7 @@ export default function AuthModal({
                   setError(null);
                 }}
               >
-                Create Account
+                {t("authCreateAccountTab")}
               </button>
               <button
                 type="button"
@@ -266,7 +272,7 @@ export default function AuthModal({
                   setError(null);
                 }}
               >
-                Sign In
+                {t("authSignInTab")}
               </button>
             </div>
           )}
@@ -319,11 +325,11 @@ export default function AuthModal({
                     d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
                   />
                 </svg>
-                <span>{googleBusy ? "Connecting to Google…" : "Continue with Google"}</span>
+                <span>{googleBusy ? t("heroConnecting") : t("continueWithGoogle")}</span>
               </button>
 
               <div className="auth-divider">
-                <span>or continue with email</span>
+                <span>{t("authOrContinueEmail")}</span>
               </div>
             </div>
           )}
@@ -332,7 +338,7 @@ export default function AuthModal({
           <form className="auth-modal-form" onSubmit={handleSubmit}>
             {mode === "signup" && (
               <div className="auth-field">
-                <label htmlFor="auth-name">Your Name</label>
+                <label htmlFor="auth-name">{t("authYourName")}</label>
                 <div className="auth-input-wrap">
                   <svg className="auth-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -352,7 +358,7 @@ export default function AuthModal({
             )}
 
             <div className="auth-field">
-              <label htmlFor="auth-email">Work or Personal Email</label>
+              <label htmlFor="auth-email">{t("authWorkEmail")}</label>
               <div className="auth-input-wrap">
                 <svg className="auth-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
@@ -375,7 +381,7 @@ export default function AuthModal({
             {mode !== "reset" && (
               <div className="auth-field">
                 <div className="auth-label-row">
-                  <label htmlFor="auth-password">Password</label>
+                  <label htmlFor="auth-password">{t("authPassword")}</label>
                   {mode === "signin" && (
                     <button
                       type="button"
@@ -385,7 +391,7 @@ export default function AuthModal({
                         setError(null);
                       }}
                     >
-                      Forgot password?
+                      {t("authForgotPassword")}
                     </button>
                   )}
                 </div>
@@ -403,7 +409,7 @@ export default function AuthModal({
                     autoComplete={mode === "signup" ? "new-password" : "current-password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={mode === "signup" ? "At least 6 characters" : "Enter password"}
+                    placeholder={mode === "signup" ? "At least 6 characters" : "••••••••"}
                   />
                   <button
                     type="button"
@@ -435,10 +441,10 @@ export default function AuthModal({
                     </div>
                     <span className={`strength-text ${password.length >= 10 ? "strong" : password.length >= 6 ? "medium" : "weak"}`}>
                       {password.length >= 10
-                        ? "Great password"
+                        ? t("pwdGreat")
                         : password.length >= 6
-                        ? "Decent password"
-                        : "Too short (min 6 characters)"}
+                        ? t("pwdDecent")
+                        : t("pwdTooShort")}
                     </span>
                   </div>
                 )}
@@ -451,13 +457,13 @@ export default function AuthModal({
               disabled={busy || googleBusy}
             >
               {busy ? (
-                <span>Processing…</span>
+                <span>{t("authProcessing")}</span>
               ) : mode === "signup" ? (
-                <span>Create Free Account →</span>
+                <span>{t("authCreateFreeAccountBtn")}</span>
               ) : mode === "reset" ? (
-                <span>Send Reset Instructions</span>
+                <span>{t("authSendResetBtn")}</span>
               ) : (
-                <span>Sign In to Dashboard →</span>
+                <span>{t("authSignInDashboardBtn")}</span>
               )}
             </button>
           </form>
@@ -473,11 +479,11 @@ export default function AuthModal({
                   setError(null);
                 }}
               >
-                ← Back to sign in
+                {t("authBackToSignIn")}
               </button>
             ) : mode === "signin" ? (
               <p>
-                Don't have an account yet?{" "}
+                {t("authNoAccountPrompt")}{" "}
                 <button
                   type="button"
                   className="auth-link-highlight"
@@ -486,12 +492,12 @@ export default function AuthModal({
                     setError(null);
                   }}
                 >
-                  Sign up for free
+                  {t("authSignUpFreeLink")}
                 </button>
               </p>
             ) : (
               <p>
-                Already have an account?{" "}
+                {t("authHaveAccountPrompt")}{" "}
                 <button
                   type="button"
                   className="auth-link-highlight"
@@ -500,7 +506,7 @@ export default function AuthModal({
                     setError(null);
                   }}
                 >
-                  Sign in here
+                  {t("authSignInLink")}
                 </button>
               </p>
             )}
