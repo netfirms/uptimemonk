@@ -1560,7 +1560,6 @@ button.btn-outline-red {
 
 @media (max-width: 640px) {
   .hero-title { font-size: 2.2rem; }
-  .monitor-card { flex-direction: column; align-items: flex-start; gap: 12px; }
   .filter-row { flex-direction: column; align-items: stretch; }
   .search-box { max-width: 100%; }
 }
@@ -2463,23 +2462,103 @@ button.btn-outline-red {
     box-sizing: border-box;
   }
 
-  /* Monitor Cards */
+  /* Monitor Cards
+     ---------------------------------------------------------------
+     A grid, not a column of six stacked children. Stacking made every
+     card ~250px tall — two monitors to a phone screen — and
+     `align-items: stretch` on a column flex container is what made the
+     status pill span the full width as a green bar. */
   .monitor-card {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    padding: 14px;
+    display: grid;
+    /* The name and URL get a row to themselves, because they are the only
+       parts whose length is unbounded — every attempt to seat them in a
+       column beside the pill and three buttons truncated both. The short,
+       fixed-width things share the row below.
+
+       An `auto` column sizes to the widest item in it across *all* rows, so
+       putting metrics under the pill stretched that column to 174px of a
+       375px screen. Metrics now has its own column. */
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "status  name     name"
+      "metrics metrics  actions";
+    align-items: center;
+    gap: 8px 10px;
+    padding: 12px 13px;
+  }
+
+  /* The pill sizes to its text instead of stretching across the card. */
+  .monitor-card > .status-pill {
+    grid-area: status;
+    justify-self: start;
+    align-self: start;
+    margin-top: 2px;
+    padding: 3px 8px;
+    font-size: 0.68rem;
+  }
+
+  /* The protocol tag beside the name already says HTTP or SSL, and the
+     icon costs a 36px column that the name needs more. */
+  .monitor-card > .monitor-type-badge {
+    display: none;
   }
 
   .monitor-card .grow {
+    grid-area: name;
+    min-width: 0;
+  }
+
+  .monitor-card .monitor-actions {
+    grid-area: actions;
+    justify-self: end;
+    gap: 6px;
+  }
+
+  /* 34px, not the desktop 30: small enough to sit on one row with the
+     name, large enough to hit. */
+  .monitor-card .monitor-actions .btn-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  /* Metrics run along the bottom as one line, sharing the width. */
+  /* Spans two columns so the three figures fit on one line. In a 150px
+     column each wrapped to two lines and "never checked" ran under the
+     buttons. */
+  .monitor-card .monitor-metrics {
+    grid-area: metrics;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
     width: 100%;
     min-width: 0;
+    text-align: left;
+    justify-content: flex-start;
+    gap: 10px;
+  }
+
+  /* None of these read as anything but noise broken across lines. */
+  .monitor-card .monitor-metrics > * {
+    white-space: nowrap;
+  }
+
+  /* Uptime is the one that gives way if the line runs out: the detail panel
+     carries it, and "is it up right now" is the other two. */
+  .monitor-card .monitor-metrics > .dim {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .monitor-card .monitor-checked {
+    margin-left: auto;
   }
 
   .monitor-name {
     flex-wrap: wrap;
-    gap: 6px;
-    font-size: 0.95rem;
+    gap: 5px;
+    font-size: 0.9rem;
   }
 
   .monitor-target {
@@ -2487,35 +2566,17 @@ button.btn-outline-red {
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 100%;
+    font-size: 0.72rem;
   }
 
-  .monitor-card .monitor-metrics {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    width: 100%;
-    text-align: left !important;
-    min-width: 0 !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    padding-top: 8px;
-  }
-
-  .monitor-card .monitor-actions {
-    width: 100%;
-    gap: 8px;
-    margin-top: 4px;
-  }
-
-  /* Touch targets, not 28px squares, once the row has stacked. */
-  .monitor-card .monitor-actions .btn-icon {
-    flex: 1;
-    height: 38px;
-  }
-
-  .monitor-card .monitor-metrics {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 10px;
+  /* The tint reaches across a narrow card rather than stopping at a
+     fixed 220px, which on a phone covered most of it. */
+  .monitor-card.is-down {
+    background: linear-gradient(
+      90deg,
+      rgba(239, 68, 68, 0.09) 0%,
+      var(--surface-card) 60%
+    );
   }
 
   /* Landing Page Elements */
