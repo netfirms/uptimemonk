@@ -53,14 +53,58 @@ export async function checkSsl(
         const expiresAt = new Date(cert.valid_to).getTime();
         const daysLeft = Math.floor((expiresAt - Date.now()) / 86_400_000);
         const authorized = socket.authorized;
+        const protocol = socket.getProtocol() || "unknown";
+        const fingerprint256 = cert.fingerprint256;
+
+        const meta = {
+          expiresAt,
+          daysLeft,
+          issuer: cert.issuer?.O,
+          fingerprint256,
+          protocol,
+        };
 
         if (!authorized) {
           return finish({
             ok: false,
             error: `Certificate not trusted: ${socket.authorizationError}`,
-            meta: { expiresAt, daysLeft, issuer: cert.issuer?.O },
+            meta,
           });
         }
+
+        // Fingerprint pinning verification
+        if (monitor.sslExpectedFingerprint && fingerprint256) {
+          const normExpected = monitor.sslExpectedFingerprint.replace(/[:\s]/g, "").toUpperCase();
+          const normActual = fingerprint256.replace(/[:\s]/g, "").toUpperCase();
+          if (normExpected !== normActual) {
+            return finish({
+              ok: false,
+              error: `Certificate fingerprint mismatch: expected ${monitor.sslExpectedFingerprint}, got ${fingerprint256}`,
+              meta,
+            });
+          }
+        }
+
+        // Minimum TLS version verification
+        if (monitor.sslMinVersion) {
+          const isTls13 = protocol === "TLSv1.3";
+          const isTls12 = protocol === "TLSv1.2";
+          if (monitor.sslMinVersion === "TLSv1.3" && !isTls13) {
+            return finish({
+              ok: false,
+              error: `Negotiated protocol ${protocol} does not meet minimum ${monitor.sslMinVersion}`,
+              meta,
+            });
+          }
+          if (monitor.sslMinVersion === "TLSv1.2" && !isTls12 && !isTls13) {
+            return finish({
+              ok: false,
+              error: `Negotiated protocol ${protocol} does not meet minimum ${monitor.sslMinVersion}`,
+              meta,
+            });
+          }
+        }
+
         if (daysLeft < warnDays) {
           return finish({
             ok: false,
@@ -68,12 +112,12 @@ export async function checkSsl(
               daysLeft < 0
                 ? `Certificate expired ${Math.abs(daysLeft)} days ago`
                 : `Certificate expires in ${daysLeft} days`,
-            meta: { expiresAt, daysLeft, issuer: cert.issuer?.O },
+            meta,
           });
         }
         return finish({
           ok: true,
-          meta: { expiresAt, daysLeft, issuer: cert.issuer?.O },
+          meta,
         });
       }
     );

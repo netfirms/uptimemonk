@@ -165,6 +165,21 @@ export interface EditableMonitor {
   intervalSeconds?: number;
   port?: number;
   keyword?: string;
+  keywordRegex?: boolean;
+  jsonPath?: string;
+  jsonPathExpected?: string;
+  maxResponseTimeMs?: number;
+  method?: string;
+  sslExpiryWarningDays?: number;
+  sslExpectedFingerprint?: string;
+  sslMinVersion?: string;
+  tcpPayload?: string;
+  tcpExpectedResponse?: string;
+  dnsRecordType?: string;
+  dnsExpectedValue?: string;
+  dnsServer?: string;
+  icmpPacketCount?: number;
+  icmpMaxLossPercent?: number;
   publicOnStatusPage?: boolean;
   muteAlerts?: boolean;
   alertContactIds?: string[];
@@ -202,6 +217,25 @@ export default function NewMonitorForm({
   /** Empty means "everyone verified", which is what the server does too. */
   const [contactIds, setContactIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+
+  // Advanced Options
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [method, setMethod] = useState("GET");
+  const [maxResponseTimeMs, setMaxResponseTimeMs] = useState("");
+  const [keywordRegex, setKeywordRegex] = useState(false);
+  const [jsonPath, setJsonPath] = useState("");
+  const [jsonPathExpected, setJsonPathExpected] = useState("");
+  const [sslExpiryWarningDays, setSslExpiryWarningDays] = useState("14");
+  const [sslExpectedFingerprint, setSslExpectedFingerprint] = useState("");
+  const [sslMinVersion, setSslMinVersion] = useState("none");
+  const [tcpPayload, setTcpPayload] = useState("");
+  const [tcpExpectedResponse, setTcpExpectedResponse] = useState("");
+  const [dnsRecordType, setDnsRecordType] = useState("A");
+  const [dnsExpectedValue, setDnsExpectedValue] = useState("");
+  const [dnsServer, setDnsServer] = useState("");
+  const [icmpPacketCount, setIcmpPacketCount] = useState("3");
+  const [icmpMaxLossPercent, setIcmpMaxLossPercent] = useState("50");
+
   // The plan's floor, so the form never offers a value the server would clamp.
   const [minInterval, setMinInterval] = useState(60);
   const [planLabel, setPlanLabel] = useState<string | null>(null);
@@ -222,6 +256,22 @@ export default function NewMonitorForm({
       setIsPublic(monitor.publicOnStatusPage === true);
       setMuteAlerts(monitor.muteAlerts === true);
       setContactIds(monitor.alertContactIds ?? []);
+
+      setMethod(monitor.method ?? (monitor.type === "keyword" ? "GET" : "HEAD"));
+      setMaxResponseTimeMs(monitor.maxResponseTimeMs ? String(monitor.maxResponseTimeMs) : "");
+      setKeywordRegex(monitor.keywordRegex === true);
+      setJsonPath(monitor.jsonPath ?? "");
+      setJsonPathExpected(monitor.jsonPathExpected ?? "");
+      setSslExpiryWarningDays(String(monitor.sslExpiryWarningDays ?? 14));
+      setSslExpectedFingerprint(monitor.sslExpectedFingerprint ?? "");
+      setSslMinVersion(monitor.sslMinVersion ?? "none");
+      setTcpPayload(monitor.tcpPayload ?? "");
+      setTcpExpectedResponse(monitor.tcpExpectedResponse ?? "");
+      setDnsRecordType(monitor.dnsRecordType ?? "A");
+      setDnsExpectedValue(monitor.dnsExpectedValue ?? "");
+      setDnsServer(monitor.dnsServer ?? "");
+      setIcmpPacketCount(String(monitor.icmpPacketCount ?? 3));
+      setIcmpMaxLossPercent(String(monitor.icmpMaxLossPercent ?? 50));
     } else {
       setType("http");
       setName("");
@@ -233,6 +283,23 @@ export default function NewMonitorForm({
       setIsPublic(false);
       setMuteAlerts(false);
       setContactIds([]);
+
+      setMethod("GET");
+      setMaxResponseTimeMs("");
+      setKeywordRegex(false);
+      setJsonPath("");
+      setJsonPathExpected("");
+      setSslExpiryWarningDays("14");
+      setSslExpectedFingerprint("");
+      setSslMinVersion("none");
+      setTcpPayload("");
+      setTcpExpectedResponse("");
+      setDnsRecordType("A");
+      setDnsExpectedValue("");
+      setDnsServer("");
+      setIcmpPacketCount("3");
+      setIcmpMaxLossPercent("50");
+      setShowAdvanced(false);
     }
     setError(null);
   }, [open, monitor?.id]);
@@ -295,7 +362,7 @@ export default function NewMonitorForm({
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const payload = {
+    const payload: Record<string, unknown> = {
       type,
       name: name || target || selectedOption.label,
       target,
@@ -305,14 +372,49 @@ export default function NewMonitorForm({
       alertContactIds: contactIds,
       ...(needsKeyword ? { keyword } : {}),
       ...(needsPort ? { port: Number(port) } : {}),
+      ...(maxResponseTimeMs ? { maxResponseTimeMs: Number(maxResponseTimeMs) } : {}),
+      ...(type === "http" || type === "keyword" ? { method } : {}),
+      ...(type === "keyword"
+        ? {
+            keywordRegex,
+            ...(jsonPath ? { jsonPath } : {}),
+            ...(jsonPathExpected ? { jsonPathExpected } : {}),
+          }
+        : {}),
+      ...(type === "ssl"
+        ? {
+            sslExpiryWarningDays: Number(sslExpiryWarningDays) || 14,
+            ...(sslExpectedFingerprint ? { sslExpectedFingerprint } : {}),
+            ...(sslMinVersion !== "none" ? { sslMinVersion } : {}),
+          }
+        : {}),
+      ...(type === "tcp"
+        ? {
+            ...(tcpPayload ? { tcpPayload } : {}),
+            ...(tcpExpectedResponse ? { tcpExpectedResponse } : {}),
+          }
+        : {}),
+      ...(type === "dns"
+        ? {
+            dnsRecordType,
+            ...(dnsExpectedValue ? { dnsExpectedValue } : {}),
+            ...(dnsServer ? { dnsServer } : {}),
+          }
+        : {}),
+      ...(type === "icmp"
+        ? {
+            icmpPacketCount: Number(icmpPacketCount) || 3,
+            icmpMaxLossPercent: Number(icmpMaxLossPercent) || 50,
+          }
+        : {}),
     };
 
     try {
       if (monitor) {
-        await api.updateMonitor(monitor.id, payload);
+        await api.updateMonitor(monitor.id, payload as any);
         void events.monitorEdited(type);
       } else {
-        await api.createMonitor(payload);
+        await api.createMonitor(payload as any);
         void events.monitorCreated(type, Number(intervalSeconds));
       }
 
@@ -619,6 +721,345 @@ export default function NewMonitorForm({
                     </span>
                   </label>
                 </>
+              )}
+            </div>
+
+            {/* Advanced Configuration Accordion */}
+            <div style={{ marginTop: "16px", marginBottom: "16px" }}>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 14px",
+                  background: "rgba(255, 255, 255, 0.03)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "8px",
+                  color: "var(--text-main, #e2e8f0)",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                  <span>⚙️</span>
+                  <span>Advanced Options ({selectedOption.label})</span>
+                </span>
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted, #94a3b8)" }}>
+                  {showAdvanced ? "Hide ▲" : "Configure ▼"}
+                </span>
+              </button>
+
+              {showAdvanced && (
+                <div
+                  style={{
+                    marginTop: "8px",
+                    padding: "14px",
+                    background: "rgba(0, 0, 0, 0.2)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: "8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  {/* HTTP & Keyword Advanced */}
+                  {(type === "http" || type === "keyword") && (
+                    <>
+                      <div className="field">
+                        <label htmlFor="nm-method">HTTP Method</label>
+                        <select
+                          id="nm-method"
+                          value={method}
+                          onChange={(e) => setMethod(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            background: "var(--bg-input, rgba(255,255,255,0.05))",
+                            border: "1px solid rgba(255,255,255,0.15)",
+                            borderRadius: "6px",
+                            color: "#fff",
+                          }}
+                        >
+                          <option value="GET">GET (Standard)</option>
+                          {type === "http" && <option value="HEAD">HEAD (Fast, No Body)</option>}
+                          <option value="POST">POST</option>
+                          <option value="PUT">PUT</option>
+                          <option value="PATCH">PATCH</option>
+                          <option value="DELETE">DELETE</option>
+                          {type === "http" && <option value="OPTIONS">OPTIONS</option>}
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="nm-sla">Response Time SLA Threshold (ms)</label>
+                        <input
+                          id="nm-sla"
+                          type="number"
+                          min={50}
+                          max={60000}
+                          value={maxResponseTimeMs}
+                          onChange={(e) => setMaxResponseTimeMs(e.target.value)}
+                          placeholder="e.g. 2500 (leave blank for standard timeout)"
+                        />
+                        <span className="dim" style={{ fontSize: "0.75rem", marginTop: "2px" }}>
+                          Alerts if response time exceeds this threshold, even if HTTP status is 200 OK.
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Keyword Advanced */}
+                  {type === "keyword" && (
+                    <>
+                      <label className="check-row" htmlFor="nm-kw-regex">
+                        <input
+                          id="nm-kw-regex"
+                          type="checkbox"
+                          checked={keywordRegex}
+                          onChange={(e) => setKeywordRegex(e.target.checked)}
+                        />
+                        <span>
+                          <strong>Regular Expression (Regex)</strong>
+                          <span className="dim" style={{ display: "block" }}>
+                            Evaluates keyword as a regex pattern (e.g. <code>/v[0-9]+\.[0-9]+/i</code>).
+                          </span>
+                        </span>
+                      </label>
+
+                      <div className="field">
+                        <label htmlFor="nm-json-path">JSON Path Assertion (Optional)</label>
+                        <input
+                          id="nm-json-path"
+                          value={jsonPath}
+                          onChange={(e) => setJsonPath(e.target.value)}
+                          placeholder="e.g. status or services.database.healthy"
+                        />
+                        <span className="dim" style={{ fontSize: "0.75rem", marginTop: "2px" }}>
+                          Validates API response JSON property directly without full HTML scanning.
+                        </span>
+                      </div>
+
+                      {jsonPath && (
+                        <div className="field">
+                          <label htmlFor="nm-json-expected">Expected JSON Value</label>
+                          <input
+                            id="nm-json-expected"
+                            value={jsonPathExpected}
+                            onChange={(e) => setJsonPathExpected(e.target.value)}
+                            placeholder="e.g. ok or true or 1"
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* SSL Advanced */}
+                  {type === "ssl" && (
+                    <>
+                      <div className="field">
+                        <label htmlFor="nm-ssl-warn">Expiry Warning Window (Days)</label>
+                        <input
+                          id="nm-ssl-warn"
+                          type="number"
+                          min={1}
+                          max={365}
+                          value={sslExpiryWarningDays}
+                          onChange={(e) => setSslExpiryWarningDays(e.target.value)}
+                        />
+                        <span className="dim" style={{ fontSize: "0.75rem" }}>
+                          Triggers an alert when the certificate is within this many days of expiration.
+                        </span>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="nm-ssl-minver">Minimum TLS Protocol Version</label>
+                        <select
+                          id="nm-ssl-minver"
+                          value={sslMinVersion}
+                          onChange={(e) => setSslMinVersion(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            background: "var(--bg-input, rgba(255,255,255,0.05))",
+                            border: "1px solid rgba(255,255,255,0.15)",
+                            borderRadius: "6px",
+                            color: "#fff",
+                          }}
+                        >
+                          <option value="none">Any Supported TLS Version</option>
+                          <option value="TLSv1.2">Enforce TLS 1.2+ (Reject TLS 1.0/1.1)</option>
+                          <option value="TLSv1.3">Enforce TLS 1.3 Only</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="nm-ssl-fp">Certificate SHA-256 Fingerprint Pinning (Optional)</label>
+                        <input
+                          id="nm-ssl-fp"
+                          value={sslExpectedFingerprint}
+                          onChange={(e) => setSslExpectedFingerprint(e.target.value)}
+                          placeholder="e.g. AA:BB:CC:DD:... (Hex SHA-256)"
+                        />
+                        <span className="dim" style={{ fontSize: "0.75rem" }}>
+                          Alerts immediately if the certificate fingerprint changes.
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* TCP Advanced */}
+                  {type === "tcp" && (
+                    <>
+                      <div className="field">
+                        <label htmlFor="nm-tcp-payload">Send Payload / Handshake String (Optional)</label>
+                        <input
+                          id="nm-tcp-payload"
+                          value={tcpPayload}
+                          onChange={(e) => setTcpPayload(e.target.value)}
+                          placeholder="e.g. PING\r\n or EHLO domain\r\n"
+                        />
+                        <span className="dim" style={{ fontSize: "0.75rem" }}>
+                          Sends raw bytes over the TCP socket immediately upon connection.
+                        </span>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="nm-tcp-banner">Expected Response Banner (Optional)</label>
+                        <input
+                          id="nm-tcp-banner"
+                          value={tcpExpectedResponse}
+                          onChange={(e) => setTcpExpectedResponse(e.target.value)}
+                          placeholder="e.g. +PONG, 220, or SSH-2.0-"
+                        />
+                        <span className="dim" style={{ fontSize: "0.75rem" }}>
+                          Asserts that the daemon responds with the expected protocol banner.
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* DNS Advanced */}
+                  {type === "dns" && (
+                    <>
+                      <div className="field">
+                        <label htmlFor="nm-dns-type">Record Type</label>
+                        <select
+                          id="nm-dns-type"
+                          value={dnsRecordType}
+                          onChange={(e) => setDnsRecordType(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            background: "var(--bg-input, rgba(255,255,255,0.05))",
+                            border: "1px solid rgba(255,255,255,0.15)",
+                            borderRadius: "6px",
+                            color: "#fff",
+                          }}
+                        >
+                          {["A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA", "SOA", "PTR", "SRV"].map((rt) => (
+                            <option key={rt} value={rt}>
+                              {rt} Record
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="nm-dns-expected">Expected Value or Substring</label>
+                        <input
+                          id="nm-dns-expected"
+                          value={dnsExpectedValue}
+                          onChange={(e) => setDnsExpectedValue(e.target.value)}
+                          placeholder="e.g. 192.0.2.1 or v=spf1"
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="nm-dns-server">Custom Nameserver / Resolver IP (Optional)</label>
+                        <input
+                          id="nm-dns-server"
+                          value={dnsServer}
+                          onChange={(e) => setDnsServer(e.target.value)}
+                          placeholder="e.g. 1.1.1.1, 8.8.8.8, or authoritative NS IP"
+                        />
+                        <span className="dim" style={{ fontSize: "0.75rem" }}>
+                          Leave blank to use default high-availability resolvers (Cloudflare &amp; Google).
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* ICMP Advanced */}
+                  {type === "icmp" && (
+                    <>
+                      <div className="field">
+                        <label htmlFor="nm-icmp-count">Ping Packet Train Count</label>
+                        <select
+                          id="nm-icmp-count"
+                          value={icmpPacketCount}
+                          onChange={(e) => setIcmpPacketCount(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            background: "var(--bg-input, rgba(255,255,255,0.05))",
+                            border: "1px solid rgba(255,255,255,0.15)",
+                            borderRadius: "6px",
+                            color: "#fff",
+                          }}
+                        >
+                          <option value="1">1 Packet (Fastest)</option>
+                          <option value="3">3 Packets (Recommended, measures loss %)</option>
+                          <option value="5">5 Packets (High precision)</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="nm-icmp-loss">Max Tolerable Packet Loss (%)</label>
+                        <input
+                          id="nm-icmp-loss"
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={icmpMaxLossPercent}
+                          onChange={(e) => setIcmpMaxLossPercent(e.target.value)}
+                          placeholder="e.g. 50"
+                        />
+                        <span className="dim" style={{ fontSize: "0.75rem" }}>
+                          Alerts if packet loss exceeds this threshold (e.g. 33% or 50%).
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Heartbeat Advanced */}
+                  {type === "heartbeat" && (
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted, #94a3b8)" }}>
+                      <p style={{ marginBottom: "6px" }}>
+                        💡 <strong>Heartbeat Push API:</strong>
+                      </p>
+                      <div
+                        style={{
+                          background: "rgba(0,0,0,0.4)",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          fontFamily: "monospace",
+                          fontSize: "0.75rem",
+                          lineHeight: "1.4",
+                        }}
+                      >
+                        # Success check-in:<br />
+                        curl https://api.uptimemonke.com/heartbeat/&lt;token&gt;<br /><br />
+                        # Immediate failure report:<br />
+                        curl -X POST https://api.uptimemonke.com/heartbeat/&lt;token&gt; -d &#39;&#123;&quot;status&quot;:&quot;fail&quot;,&quot;error&quot;:&quot;Job crashed&quot;&#125;&#39;
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

@@ -39,21 +39,35 @@ export interface Monitor {
   /** URL for http/keyword/ssl, hostname for tcp/dns/icmp, unused for heartbeat. */
   target: string;
   port?: number;
-  method?: "GET" | "HEAD" | "POST";
+  method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
   requestHeaders?: Record<string, string>;
   requestBody?: string;
   acceptedStatusCodes?: string[];
   followRedirects?: boolean;
+  maxResponseTimeMs?: number;
+  httpAuthType?: "none" | "basic" | "bearer";
 
   keyword?: string;
   keywordInverted?: boolean;
   /** Default false: matching ignores case, which is what people expect. */
   keywordCaseSensitive?: boolean;
+  keywordRegex?: boolean;
+  jsonPath?: string;
+  jsonPathExpected?: string;
 
-  dnsRecordType?: "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "NS";
+  dnsRecordType?: "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "NS" | "CAA" | "SOA" | "PTR" | "SRV";
   dnsExpectedValue?: string;
+  dnsServer?: string;
 
   sslExpiryWarningDays?: number;
+  sslExpectedFingerprint?: string;
+  sslMinVersion?: "TLSv1.2" | "TLSv1.3";
+
+  tcpPayload?: string;
+  tcpExpectedResponse?: string;
+
+  icmpPacketCount?: number;
+  icmpMaxLossPercent?: number;
 
   heartbeatToken?: string;
   heartbeatGraceSeconds?: number;

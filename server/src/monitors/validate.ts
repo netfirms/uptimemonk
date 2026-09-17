@@ -62,9 +62,21 @@ export interface MonitorInput {
   keyword?: string;
   keywordInverted?: boolean;
   keywordCaseSensitive?: boolean;
+  keywordRegex?: boolean;
+  jsonPath?: string;
+  jsonPathExpected?: string;
+  maxResponseTimeMs?: number;
+  httpAuthType?: string;
   dnsRecordType?: string;
   dnsExpectedValue?: string;
+  dnsServer?: string;
   sslExpiryWarningDays?: number;
+  sslExpectedFingerprint?: string;
+  sslMinVersion?: string;
+  tcpPayload?: string;
+  tcpExpectedResponse?: string;
+  icmpPacketCount?: number;
+  icmpMaxLossPercent?: number;
   heartbeatGraceSeconds?: number;
   intervalSeconds?: number;
   timeoutSeconds?: number;
@@ -165,16 +177,22 @@ export async function buildMonitor(
     // plus a keyword is not a preference, it is a contradiction that reports a
     // permanent false outage. The default used to be HEAD for both types,
     // which made every keyword monitor fail from the moment it was created.
-    const requested = input.method ?? existing?.method;
+    const VALID_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
+    if (input.method && !VALID_METHODS.includes(input.method.toUpperCase())) {
+      throw new ValidationError(`Unsupported HTTP method: ${input.method}`);
+    }
+    const requested = (input.method ?? existing?.method)?.toUpperCase();
     if (type === "keyword") {
-      if (input.method && input.method !== "GET" && input.method !== "POST") {
+      if (input.method && input.method.toUpperCase() === "HEAD") {
         throw new ValidationError(
-          `A keyword monitor must use GET or POST — ${input.method} returns no body to search`
+          `A keyword monitor cannot use HEAD — HEAD returns no body to search`
         );
       }
       // Treat a stored HEAD as legacy data rather than intent: the form never
       // offered the choice, so the value came from the old default.
-      monitor.method = (requested === "POST" ? "POST" : "GET") as Monitor["method"];
+      monitor.method = (requested && ["POST", "PUT", "PATCH", "DELETE"].includes(requested)
+        ? requested
+        : "GET") as Monitor["method"];
     } else {
       monitor.method = (requested ?? "HEAD") as Monitor["method"];
     }
@@ -185,6 +203,17 @@ export async function buildMonitor(
     monitor.acceptedStatusCodes =
       input.acceptedStatusCodes ?? existing?.acceptedStatusCodes ?? ["2xx", "3xx"];
     monitor.followRedirects = input.followRedirects ?? existing?.followRedirects ?? true;
+
+    const maxRt = input.maxResponseTimeMs ?? existing?.maxResponseTimeMs;
+    if (maxRt !== undefined && maxRt !== null && maxRt !== 0) {
+      monitor.maxResponseTimeMs = clamp(Number(maxRt), 50, 60000);
+    }
+    if (input.httpAuthType ?? existing?.httpAuthType) {
+      const authType = input.httpAuthType ?? existing?.httpAuthType;
+      if (["none", "basic", "bearer"].includes(authType!)) {
+        monitor.httpAuthType = authType as Monitor["httpAuthType"];
+      }
+    }
   }
   if (type === "keyword") {
     const keyword = input.keyword ?? existing?.keyword;
@@ -193,12 +222,34 @@ export async function buildMonitor(
     monitor.keywordInverted = input.keywordInverted ?? existing?.keywordInverted ?? false;
     monitor.keywordCaseSensitive =
       input.keywordCaseSensitive ?? existing?.keywordCaseSensitive ?? false;
+    monitor.keywordRegex = input.keywordRegex ?? existing?.keywordRegex ?? false;
+    if (monitor.keywordRegex) {
+      try {
+        new RegExp(keyword);
+      } catch (err) {
+        throw new ValidationError(`Invalid regular expression in keyword: ${(err as Error).message}`);
+      }
+    }
+    if (input.jsonPath !== undefined || existing?.jsonPath !== undefined) {
+      monitor.jsonPath = (input.jsonPath ?? existing?.jsonPath)?.trim();
+      monitor.jsonPathExpected = input.jsonPathExpected ?? existing?.jsonPathExpected;
+    }
   }
   if (type === "dns") {
-    monitor.dnsRecordType = (input.dnsRecordType ??
-      existing?.dnsRecordType ??
-      "A") as Monitor["dnsRecordType"];
+    const VALID_DNS = ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA", "SOA", "PTR", "SRV"];
+    const recType = (input.dnsRecordType ?? existing?.dnsRecordType ?? "A").toUpperCase();
+    if (!VALID_DNS.includes(recType)) {
+      throw new ValidationError(`Unsupported DNS record type: ${recType}`);
+    }
+    monitor.dnsRecordType = recType as Monitor["dnsRecordType"];
     monitor.dnsExpectedValue = input.dnsExpectedValue ?? existing?.dnsExpectedValue;
+
+    const dnsServer = input.dnsServer ?? existing?.dnsServer;
+    if (dnsServer) {
+      const serverHost = hostFromTarget(dnsServer);
+      await assertPublicHost(serverHost);
+      monitor.dnsServer = serverHost;
+    }
   }
   if (type === "ssl") {
     monitor.sslExpiryWarningDays = clamp(
@@ -206,6 +257,33 @@ export async function buildMonitor(
       1,
       365
     );
+    const fp = input.sslExpectedFingerprint ?? existing?.sslExpectedFingerprint;
+    if (fp) monitor.sslExpectedFingerprint = fp.trim().toUpperCase();
+
+    const minVer = input.sslMinVersion ?? existing?.sslMinVersion;
+    if (minVer === "TLSv1.2" || minVer === "TLSv1.3") {
+      monitor.sslMinVersion = minVer;
+    }
+  }
+  if (type === "tcp") {
+    if (input.tcpPayload !== undefined || existing?.tcpPayload !== undefined) {
+      monitor.tcpPayload = String(input.tcpPayload ?? existing?.tcpPayload ?? "").slice(0, 1024);
+    }
+    if (input.tcpExpectedResponse !== undefined || existing?.tcpExpectedResponse !== undefined) {
+      monitor.tcpExpectedResponse = String(
+        input.tcpExpectedResponse ?? existing?.tcpExpectedResponse ?? ""
+      ).slice(0, 1024);
+    }
+  }
+  if (type === "icmp") {
+    const pktCount = input.icmpPacketCount ?? existing?.icmpPacketCount;
+    if (pktCount !== undefined) {
+      monitor.icmpPacketCount = clamp(Number(pktCount) || 3, 1, 5);
+    }
+    const maxLoss = input.icmpMaxLossPercent ?? existing?.icmpMaxLossPercent;
+    if (maxLoss !== undefined) {
+      monitor.icmpMaxLossPercent = clamp(Number(maxLoss) || 50, 1, 100);
+    }
   }
   if (type === "heartbeat") {
     monitor.heartbeatToken = existing?.heartbeatToken ?? randomBytes(24).toString("base64url");

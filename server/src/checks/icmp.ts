@@ -42,14 +42,20 @@ export async function checkIcmp(
     };
   }
 
+  const packetCount = Math.max(1, Math.min(5, monitor.icmpPacketCount ?? 1));
+  const maxLossPercent = monitor.icmpMaxLossPercent ?? 100;
+
   return new Promise<CheckResult>((resolve) => {
     execFile(
       "ping",
-      ["-c", "1", "-n", "-W", String(timeoutSeconds), "--", host],
-      { timeout: (timeoutSeconds + 2) * 1000, killSignal: "SIGKILL" },
+      ["-c", String(packetCount), "-n", "-W", String(timeoutSeconds), "--", host],
+      { timeout: (timeoutSeconds + 4) * 1000, killSignal: "SIGKILL" },
       (err, stdout) => {
         const elapsed = Date.now() - started;
-        if (err) {
+        const lossMatch = stdout.match(/([\d.]+)%\s*packet loss/i);
+        const packetLoss = lossMatch ? parseFloat(lossMatch[1]) : err ? 100 : 0;
+
+        if (err && packetLoss >= 100) {
           return resolve({
             ok: false,
             responseTimeMs: elapsed,
@@ -62,20 +68,44 @@ export async function checkIcmp(
                 ? "DNS lookup failed (host not found)"
                 : `No ICMP reply within ${timeoutSeconds}s — the host may be down, ` +
                   `or may block ping (common behind a CDN; try an HTTP check)`,
+            meta: { source: "icmp", packetLossPercent: 100, packetCount },
             region,
             checkedAt: started,
           });
         }
 
-        // Prefer ping's own round-trip figure over our wall clock, which
-        // includes process spawn time and would inflate every reading.
-        const match = stdout.match(/time[=<]\s*([\d.]+)\s*ms/i);
-        const rtt = match ? Math.round(Number(match[1])) : elapsed;
+        // Parse round-trip stats: min/avg/max
+        const rttStatsMatch = stdout.match(/(?:rtt|round-trip)\s+min\/avg\/max\/(?:mdev|stddev)\s*=\s*([\d.]+)\/([\d.]+)\/([\d.]+)/i);
+        let minRtt: number | undefined;
+        let avgRtt: number | undefined;
+        let maxRtt: number | undefined;
+
+        if (rttStatsMatch) {
+          minRtt = Math.round(Number(rttStatsMatch[1]));
+          avgRtt = Math.round(Number(rttStatsMatch[2]));
+          maxRtt = Math.round(Number(rttStatsMatch[3]));
+        } else {
+          const match = stdout.match(/time[=<]\s*([\d.]+)\s*ms/i);
+          avgRtt = match ? Math.round(Number(match[1])) : elapsed;
+        }
+
+        const lossExceeded = packetLoss > maxLossPercent;
+        const ok = !lossExceeded && packetLoss < 100;
 
         resolve({
-          ok: true,
-          responseTimeMs: rtt,
-          meta: { source: "icmp" },
+          ok,
+          responseTimeMs: avgRtt ?? elapsed,
+          error: ok
+            ? undefined
+            : `Packet loss ${packetLoss}% exceeded threshold of ${maxLossPercent}%`,
+          meta: {
+            source: "icmp",
+            packetLossPercent: packetLoss,
+            packetCount,
+            minMs: minRtt,
+            avgMs: avgRtt,
+            maxMs: maxRtt,
+          },
           region,
           checkedAt: started,
         });

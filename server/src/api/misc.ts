@@ -86,36 +86,64 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
    * curl to this URL; receiving it pushes the due time forward by the grace
    * period, so the scheduler only ever sees it as due when the job did not run.
    */
-  app.get<{ Params: { token: string } }>("/heartbeat/:token", async (req, reply) => {
-    const { token } = req.params;
-    if (!token || token.length < 16) {
-      return reply.code(400).send("Malformed heartbeat token");
-    }
+    const handleHeartbeat = async (req: any, reply: any) => {
+      const { token } = req.params;
+      if (!token || token.length < 16) {
+        return reply.code(400).send("Malformed heartbeat token");
+      }
 
-    const monitor = getMonitorByHeartbeatToken(token);
-    if (!monitor) return reply.code(404).send("Unknown heartbeat token");
+      const monitor = getMonitorByHeartbeatToken(token);
+      if (!monitor) return reply.code(404).send("Unknown heartbeat token");
 
-    const now = Date.now();
-    const grace = Math.max(60, monitor.heartbeatGraceSeconds ?? monitor.intervalSeconds ?? 300);
-    setDueAt(monitor.id, now + grace * 1000);
+      const query = (req.query || {}) as Record<string, string | undefined>;
+      const body = (req.body || {}) as Record<string, unknown>;
 
-    recordResult(monitor, {
-      ok: true,
-      responseTimeMs: 0,
-      region: REGION,
-      checkedAt: now,
-      meta: { source: "heartbeat" },
-    });
+      const isFailure =
+        query.status === "fail" ||
+        query.status === "error" ||
+        body.status === "fail" ||
+        body.status === "error";
 
-    // Flush synchronously. The buffered write-behind belongs to the worker,
-    // which owns the flush timer; in the API process a buffered result would
-    // sit in memory until 500 accumulated. That meant a heartbeat monitor that
-    // had gone down never recorded its recovery — due_at kept being pushed
-    // forward, so it was never re-checked either, and it stayed red forever.
-    flush();
+      const errorMsg =
+        (body.error as string) ||
+        query.error ||
+        (isFailure ? "Heartbeat reported execution failure" : undefined);
 
-    return reply.code(200).send("ok");
-  });
+      const durationMs = Number(body.durationMs ?? query.durationMs) || 0;
+      const now = Date.now();
+
+      if (isFailure) {
+        recordResult(monitor, {
+          ok: false,
+          responseTimeMs: durationMs,
+          error: errorMsg,
+          region: REGION,
+          checkedAt: now,
+          meta: { source: "heartbeat", explicitFailure: true, durationMs },
+        });
+        flush();
+        return reply.code(200).send({ status: "failure-recorded", monitorId: monitor.id });
+      }
+
+      const grace = Math.max(60, monitor.heartbeatGraceSeconds ?? monitor.intervalSeconds ?? 300);
+      setDueAt(monitor.id, now + grace * 1000);
+
+      recordResult(monitor, {
+        ok: true,
+        responseTimeMs: durationMs,
+        region: REGION,
+        checkedAt: now,
+        meta: { source: "heartbeat", durationMs },
+      });
+
+      // Flush synchronously so recovery lands immediately.
+      flush();
+
+      return reply.code(200).send("ok");
+    };
+
+    app.get<{ Params: { token: string } }>("/heartbeat/:token", handleHeartbeat);
+    app.post<{ Params: { token: string } }>("/heartbeat/:token", handleHeartbeat);
 
   /**
    * Cross-region confirmation. The peer box asks us for a second opinion

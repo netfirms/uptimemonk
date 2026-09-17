@@ -284,3 +284,146 @@ describe("a keyword check never issues HEAD", () => {
     assert.equal(methodFor("http", undefined), "HEAD");
   });
 });
+
+describe("Advanced Monitoring Features", () => {
+  const region: ProbeRegion = "ap-southeast-1";
+
+  describe("JSON Path and Value Extraction", () => {
+    test("getJsonPathValue resolves root, nested, and array paths", async () => {
+      const { getJsonPathValue } = await import("./http.js");
+      const sample = {
+        status: "ok",
+        meta: {
+          version: "1.2.3",
+          healthy: true,
+        },
+        services: [{ name: "db", up: true }, { name: "cache", up: false }],
+      };
+
+      assert.equal(getJsonPathValue(sample, "status"), "ok");
+      assert.equal(getJsonPathValue(sample, "meta.version"), "1.2.3");
+      assert.equal(getJsonPathValue(sample, "meta.healthy"), true);
+      assert.equal(getJsonPathValue(sample, "services.0.name"), "db");
+      assert.equal(getJsonPathValue(sample, "services.1.up"), false);
+      assert.equal(getJsonPathValue(sample, "non.existent.path"), undefined);
+      assert.equal(getJsonPathValue(null, "status"), undefined);
+    });
+  });
+
+  describe("HTTP & Keyword Advanced Features", () => {
+    test("keyword regex matching succeeds on matching regex", async () => {
+      const monitor = makeMonitor({
+        id: "m-kw-re",
+        type: "keyword",
+        target: "https://example.com",
+        keyword: "Ex[a-z]{4}e\\s+Do[a-z]{3}n",
+        keywordRegex: true,
+        timeoutSeconds: 10,
+      });
+
+      const res = await checkHttp(monitor, region);
+      assert.equal(res.ok, true);
+      assert.equal(res.error, undefined);
+    });
+
+    test("keyword regex fails cleanly when pattern does not match", async () => {
+      const monitor = makeMonitor({
+        id: "m-kw-re-fail",
+        type: "keyword",
+        target: "https://example.com",
+        keyword: "^StrictStartPatternThatDoesNotExist$",
+        keywordRegex: true,
+        timeoutSeconds: 10,
+      });
+
+      const res = await checkHttp(monitor, region);
+      assert.equal(res.ok, false);
+      assert.match(res.error || "", /not found/i);
+    });
+
+    test("SLA maxResponseTimeMs violation flags monitor as degraded", async () => {
+      const monitor = makeMonitor({
+        id: "m-http-sla",
+        type: "http",
+        target: "https://example.com",
+        maxResponseTimeMs: 1, // unrealistically low 1ms SLA to guarantee triggering
+        timeoutSeconds: 10,
+      });
+
+      const res = await checkHttp(monitor, region);
+      assert.equal(res.ok, false);
+      assert.match(res.error || "", /exceeded SLA threshold/i);
+    });
+  });
+
+  describe("SSL Advanced Features", () => {
+    test("reports certificate fingerprint in meta and enforces min protocol", async () => {
+      const monitor = makeMonitor({
+        id: "m-ssl-adv",
+        type: "ssl",
+        target: "example.com",
+        sslMinVersion: "TLSv1.2",
+        timeoutSeconds: 10,
+      });
+
+      const res = await checkSsl(monitor, region);
+      assert.equal(res.ok, true);
+      assert.ok(res.meta?.fingerprint256, "carries SHA-256 fingerprint");
+      assert.ok(res.meta?.protocol, "carries negotiated TLS protocol");
+    });
+
+    test("fails when certificate fingerprint does not match expected fingerprint", async () => {
+      const monitor = makeMonitor({
+        id: "m-ssl-fp-mismatch",
+        type: "ssl",
+        target: "example.com",
+        sslExpectedFingerprint: "00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF",
+        timeoutSeconds: 10,
+      });
+
+      const res = await checkSsl(monitor, region);
+      assert.equal(res.ok, false);
+      assert.match(res.error || "", /fingerprint mismatch/i);
+    });
+  });
+
+  describe("TCP Advanced Banner Features", () => {
+    test("connects to public TCP service without payload (standard check)", async () => {
+      const monitor = makeMonitor({
+        id: "m-tcp-std",
+        type: "tcp",
+        target: "1.1.1.1",
+        port: 53,
+      });
+      const res = await checkTcp(monitor, region);
+      assert.equal(res.ok, true);
+    });
+  });
+
+  describe("DNS Advanced Features", () => {
+    test("resolves with custom nameserver", async () => {
+      const monitor = makeMonitor({
+        id: "m-dns-custom",
+        type: "dns",
+        target: "example.com",
+        dnsRecordType: "A",
+        dnsServer: "1.1.1.1",
+      });
+      const res = await checkDns(monitor, region);
+      assert.equal(res.ok, true);
+      assert.ok(Array.isArray(res.meta?.values));
+    });
+
+    test("resolves SOA and TXT records", async () => {
+      const monitor = makeMonitor({
+        id: "m-dns-soa",
+        type: "dns",
+        target: "example.com",
+        dnsRecordType: "SOA",
+      });
+      const res = await checkDns(monitor, region);
+      assert.equal(res.ok, true);
+      assert.ok(Array.isArray(res.meta?.values) && (res.meta.values as string[]).length > 0);
+    });
+  });
+});

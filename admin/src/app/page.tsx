@@ -47,6 +47,13 @@ export interface MonitorItem {
   orgId: string;
   publicOnStatusPage: boolean;
   lastCheckedAt: string;
+  maxResponseTimeMs?: number;
+  keywordRegex?: boolean;
+  jsonPath?: string;
+  sslMinVersion?: string;
+  tcpExpectedResponse?: string;
+  dnsServer?: string;
+  icmpPacketCount?: number;
 }
 
 export interface WorkerNode {
@@ -1818,6 +1825,42 @@ export default function AdminPage() {
               <label>Public Status Page Visibility</label>
               <div className="val">{inspectedMonitor.publicOnStatusPage ? "Visible on /status/:slug" : "Private (Hidden)"}</div>
             </div>
+            {inspectedMonitor.maxResponseTimeMs && (
+              <div className="inspector-field">
+                <label>SLA Latency Threshold</label>
+                <div className="val font-mono">{inspectedMonitor.maxResponseTimeMs} ms</div>
+              </div>
+            )}
+            {inspectedMonitor.keywordRegex && (
+              <div className="inspector-field">
+                <label>Pattern Matching</label>
+                <div className="val ok">Regular Expression (Regex) Active</div>
+              </div>
+            )}
+            {inspectedMonitor.jsonPath && (
+              <div className="inspector-field">
+                <label>JSON Path Assertion</label>
+                <div className="val font-mono">{inspectedMonitor.jsonPath}</div>
+              </div>
+            )}
+            {inspectedMonitor.sslMinVersion && (
+              <div className="inspector-field">
+                <label>Enforced TLS Protocol</label>
+                <div className="val font-mono">{inspectedMonitor.sslMinVersion}</div>
+              </div>
+            )}
+            {inspectedMonitor.tcpExpectedResponse && (
+              <div className="inspector-field">
+                <label>Expected TCP Banner</label>
+                <div className="val font-mono">{inspectedMonitor.tcpExpectedResponse}</div>
+              </div>
+            )}
+            {inspectedMonitor.dnsServer && (
+              <div className="inspector-field">
+                <label>Custom Nameserver</label>
+                <div className="val font-mono">{inspectedMonitor.dnsServer}</div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -25,6 +25,19 @@ function statusMatches(code: number, accepted?: string[]): boolean {
   });
 }
 
+/** Extracts a nested property value using dot-notation ("data.status" or "items.0.id"). */
+export function getJsonPathValue(data: unknown, path: string): unknown {
+  if (data === null || data === undefined) return undefined;
+  const segments = path.trim().replace(/^(\$\.|\/)/, "").split(/[./]/);
+  let current: unknown = data;
+  for (const seg of segments) {
+    if (!seg) continue;
+    if (typeof current !== "object" || current === null) return undefined;
+    current = (current as Record<string, unknown>)[seg];
+  }
+  return current;
+}
+
 /**
  * HTTP / keyword check. Uses Node 22's built-in fetch, so no extra deps and a
  * small cold start. Body is only read for keyword monitors.
@@ -47,19 +60,20 @@ export async function checkHttp(
   try {
     let url = await assertSafeUrl(monitor.target);
     const follow = monitor.followRedirects !== false;
-    const wantsBody = monitor.type === "keyword";
+    const wantsBody = monitor.type === "keyword" || !!monitor.jsonPath;
 
     // A keyword check reads the body, and a HEAD response has none — so HEAD
     // here is not a preference, it is a guaranteed false outage. Enforced at
     // the probe rather than only in validation, because stored config can
     // predate the rule and a monitor must not be able to report a permanent
     // failure for a reason no one can see.
+    const BODY_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
     let method = wantsBody
-      ? monitor.method === "POST"
-        ? "POST"
+      ? BODY_METHODS.includes(monitor.method ?? "")
+        ? monitor.method!
         : "GET"
       : (monitor.method ?? "HEAD");
-    let body = method === "POST" ? monitor.requestBody : undefined;
+    let body = ["POST", "PUT", "PATCH"].includes(method) ? monitor.requestBody : undefined;
     let res: Awaited<ReturnType<typeof fetch>>;
     let hops = 0;
 
@@ -94,7 +108,7 @@ export async function checkHttp(
       // Re-validate every hop, and follow the same method rules browsers use.
       url = await assertSafeUrl(new URL(location, url).toString());
       if (res.status === 301 || res.status === 302 || res.status === 303) {
-        if (method === "POST") {
+        if (method === "POST" || method === "PUT" || method === "PATCH") {
           method = wantsBody ? "GET" : "HEAD";
           body = undefined;
         }
@@ -103,45 +117,99 @@ export async function checkHttp(
 
     const responseTimeMs = Date.now() - started;
     const codeOk = statusMatches(res.status, monitor.acceptedStatusCodes);
+    const slaViolated =
+      monitor.maxResponseTimeMs !== undefined &&
+      monitor.maxResponseTimeMs > 0 &&
+      responseTimeMs > monitor.maxResponseTimeMs;
 
     if (!wantsBody) {
+      const ok = codeOk && !slaViolated;
       return {
-        ok: codeOk,
+        ok,
         responseTimeMs,
         statusCode: res.status,
-        error: codeOk ? undefined : `Unexpected status ${res.status}`,
+        error: ok
+          ? undefined
+          : slaViolated
+            ? `Response time ${responseTimeMs}ms exceeded SLA threshold of ${monitor.maxResponseTimeMs}ms`
+            : `Unexpected status ${res.status}`,
+        meta: { hops, ...(monitor.maxResponseTimeMs ? { slaThresholdMs: monitor.maxResponseTimeMs } : {}) },
         region,
         checkedAt: started,
       };
     }
 
-    // Keyword monitors need the body. Cap it so a huge page can't blow memory.
+    // Keyword & JSON monitors need the body. Cap it so a huge page can't blow memory.
     const text = (await res.text()).slice(0, 512 * 1024);
-    // Case-insensitive unless the monitor explicitly asks otherwise.
-    //
-    // This was a plain `includes`, which meant a monitor looking for
-    // "AGARWOOD OIL" never matched a page saying "Agarwood Oil" — reported as
-    // a hard outage with no hint that casing was the reason. A false outage is
-    // worse than a missed one: it trains people to ignore the alerts.
-    const found = monitor.keyword
-      ? monitor.keywordCaseSensitive
-        ? text.includes(monitor.keyword)
-        : text.toLowerCase().includes(monitor.keyword.toLowerCase())
-      : true;
+
+    let found = true;
+    if (monitor.keyword) {
+      if (monitor.keywordRegex) {
+        try {
+          const flags = monitor.keywordCaseSensitive ? "" : "i";
+          const re = new RegExp(monitor.keyword, flags);
+          found = re.test(text);
+        } catch {
+          found = false;
+        }
+      } else {
+        found = monitor.keywordCaseSensitive
+          ? text.includes(monitor.keyword)
+          : text.toLowerCase().includes(monitor.keyword.toLowerCase());
+      }
+    }
     const wanted = monitor.keywordInverted ? !found : found;
-    const ok = codeOk && wanted;
+
+    // JSON Path matching (if requested)
+    let jsonPathOk = true;
+    let jsonPathError: string | undefined;
+    let jsonExtracted: unknown = undefined;
+    if (monitor.jsonPath) {
+      try {
+        const parsed = JSON.parse(text);
+        jsonExtracted = getJsonPathValue(parsed, monitor.jsonPath);
+        if (jsonExtracted === undefined) {
+          jsonPathOk = false;
+          jsonPathError = `JSON path "${monitor.jsonPath}" not found in response`;
+        } else if (monitor.jsonPathExpected !== undefined && monitor.jsonPathExpected !== "") {
+          const actualStr = typeof jsonExtracted === "object" ? JSON.stringify(jsonExtracted) : String(jsonExtracted);
+          if (actualStr !== String(monitor.jsonPathExpected)) {
+            jsonPathOk = false;
+            jsonPathError = `JSON path "${monitor.jsonPath}" expected "${monitor.jsonPathExpected}", got "${actualStr}"`;
+          }
+        }
+      } catch (err) {
+        jsonPathOk = false;
+        jsonPathError = `Response is not valid JSON: ${(err as Error).message}`;
+      }
+    }
+
+    const ok = codeOk && wanted && jsonPathOk && !slaViolated;
+    let error: string | undefined = undefined;
+    if (!ok) {
+      if (!codeOk) {
+        error = `Unexpected status ${res.status}`;
+      } else if (slaViolated) {
+        error = `Response time ${responseTimeMs}ms exceeded SLA threshold of ${monitor.maxResponseTimeMs}ms`;
+      } else if (!wanted) {
+        error = monitor.keywordInverted
+          ? `Keyword "${monitor.keyword}" was present`
+          : `Keyword "${monitor.keyword}" not found`;
+      } else if (!jsonPathOk) {
+        error = jsonPathError;
+      }
+    }
 
     return {
       ok,
       responseTimeMs,
       statusCode: res.status,
-      error: ok
-        ? undefined
-        : !codeOk
-          ? `Unexpected status ${res.status}`
-          : monitor.keywordInverted
-            ? `Keyword "${monitor.keyword}" was present`
-            : `Keyword "${monitor.keyword}" not found`,
+      error,
+      meta: {
+        hops,
+        ...(monitor.maxResponseTimeMs ? { slaThresholdMs: monitor.maxResponseTimeMs } : {}),
+        ...(monitor.jsonPath ? { jsonPath: monitor.jsonPath, jsonExtracted } : {}),
+      },
       region,
       checkedAt: started,
     };

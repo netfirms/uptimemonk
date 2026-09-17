@@ -51,9 +51,46 @@ export async function checkTcp(
 
     const socket = net.createConnection({ host, port });
     socket.setTimeout(timeoutMs);
-    socket.once("connect", () => finish(true));
+
+    let receivedData = "";
+    const expectsResponse = !!monitor.tcpExpectedResponse;
+
+    socket.once("connect", () => {
+      if (monitor.tcpPayload) {
+        const payload = monitor.tcpPayload.replace(/\\r/g, "\r").replace(/\\n/g, "\n");
+        socket.write(payload);
+      }
+
+      if (!expectsResponse) {
+        finish(true);
+      }
+    });
+
+    if (expectsResponse) {
+      socket.on("data", (chunk) => {
+        receivedData += chunk.toString("utf8");
+        if (receivedData.includes(monitor.tcpExpectedResponse!)) {
+          finish(true);
+        }
+      });
+
+      socket.once("end", () => {
+        if (!receivedData.includes(monitor.tcpExpectedResponse!)) {
+          finish(
+            false,
+            `TCP response ended without expected banner "${monitor.tcpExpectedResponse}" (received: "${receivedData.slice(0, 100)}")`
+          );
+        }
+      });
+    }
+
     socket.once("timeout", () =>
-      finish(false, `Timed out after ${monitor.timeoutSeconds}s`)
+      finish(
+        false,
+        expectsResponse && !receivedData.includes(monitor.tcpExpectedResponse!)
+          ? `Timed out waiting for TCP banner "${monitor.tcpExpectedResponse}" after ${monitor.timeoutSeconds}s`
+          : `Timed out after ${monitor.timeoutSeconds}s`
+      )
     );
     socket.once("error", (err: NodeJS.ErrnoException) =>
       finish(false, `${err.code ?? "Error"}: connect to ${monitor.target}:${port} failed`)

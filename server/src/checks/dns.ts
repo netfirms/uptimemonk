@@ -12,7 +12,11 @@ export async function checkDns(
 ): Promise<CheckResult> {
   const started = Date.now();
   const resolver = new Resolver({ timeout: monitor.timeoutSeconds * 1000, tries: 1 });
-  resolver.setServers(["1.1.1.1", "8.8.8.8"]);
+  if (monitor.dnsServer) {
+    resolver.setServers([monitor.dnsServer]);
+  } else {
+    resolver.setServers(["1.1.1.1", "8.8.8.8"]);
+  }
 
   const host = monitor.target.replace(/^\w+:\/\//, "").split("/")[0];
   const type = monitor.dnsRecordType ?? "A";
@@ -38,6 +42,24 @@ export async function checkDns(
       case "MX":
         values = (await resolver.resolveMx(host)).map(
           (r) => `${r.priority} ${r.exchange}`
+        );
+        break;
+      case "CAA":
+        values = (await resolver.resolveCaa(host)).map(
+          (r) => `${r.critical ? "critical " : ""}${r.issue || r.issuewild || r.iodef || ""}`
+        );
+        break;
+      case "SOA": {
+        const soa = await resolver.resolveSoa(host);
+        values = [`${soa.nsname} ${soa.hostmaster} ${soa.serial}`];
+        break;
+      }
+      case "PTR":
+        values = await resolver.resolvePtr(host);
+        break;
+      case "SRV":
+        values = (await resolver.resolveSrv(host)).map(
+          (r) => `${r.priority} ${r.weight} ${r.port} ${r.name}`
         );
         break;
     }
