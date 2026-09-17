@@ -83,6 +83,20 @@ beforeEach(async () => {
       monitorId: "m1",
       status: "open",
     });
+    await setDoc(doc(db, "users/uid-org-a"), {
+      email: "a@example.com",
+      orgId: ORG_A,
+      role: "owner",
+    });
+    await setDoc(doc(db, "users/uid-org-b"), {
+      email: "b@example.com",
+      orgId: ORG_B,
+      role: "owner",
+    });
+    await setDoc(doc(db, "system/config"), {
+      mailgunApiKey: "super-secret-key-123",
+      stripeSecretKey: "sk_live_secret",
+    });
   });
 });
 
@@ -229,3 +243,42 @@ describe("incidents", () => {
     await assertFails(deleteDoc(doc(asOrg(ORG_A), "incidents/i1")));
   });
 });
+
+describe("user and admin system data isolation", () => {
+  test("a user reads their own user profile", async () => {
+    await assertSucceeds(getDoc(doc(asOrg(ORG_A), "users/uid-org-a")));
+  });
+
+  test("a user cannot read another user's profile", async () => {
+    await assertFails(getDoc(doc(asOrg(ORG_A), "users/uid-org-b")));
+  });
+
+  test("a user cannot overwrite another user's profile", async () => {
+    await assertFails(
+      setDoc(doc(asOrg(ORG_A), "users/uid-org-b"), { email: "attacker@test.com" })
+    );
+  });
+
+  test("system credentials cannot be read by customers or owners", async () => {
+    await assertFails(getDoc(doc(asOrg(ORG_A), "system/config")));
+    await assertFails(getDoc(doc(asOrg(ORG_B), "system/config")));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "system/config")));
+  });
+
+  test("system credentials cannot be modified directly via Firestore", async () => {
+    await assertFails(
+      setDoc(doc(asOrg(ORG_A), "system/config"), { mailgunApiKey: "stolen" })
+    );
+    await assertFails(
+      updateDoc(doc(asOrg(ORG_A), "system/config"), { mailgunApiKey: "stolen" })
+    );
+  });
+
+  test("status slugs cannot be read or hijacked directly", async () => {
+    await assertFails(getDoc(doc(asOrg(ORG_A), "statusSlugs/custom-slug")));
+    await assertFails(
+      setDoc(doc(asOrg(ORG_A), "statusSlugs/custom-slug"), { orgId: ORG_A })
+    );
+  });
+});
+

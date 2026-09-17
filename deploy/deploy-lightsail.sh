@@ -12,6 +12,7 @@
 # Options:
 #   --skip-tests           Skip local tests before building and shipping
 #   --no-restart-worker    Only restart uptimemonk-api, not the probe worker
+#   --skip-bump, --no-bump Skip automatic version bump before deployment
 #   --health-port <port>   Port for localhost healthcheck on remote host (default: 8080)
 #   --help, -h             Show this help message
 #
@@ -23,6 +24,7 @@ cd "$REPO_ROOT"
 
 RUN_TESTS=true
 RESTART_WORKER="${RESTART_WORKER:-auto}"
+SKIP_BUMP="${SKIP_BUMP:-false}"
 HEALTH_PORT=8080
 HOSTS=()
 
@@ -34,6 +36,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-restart-worker)
       RESTART_WORKER="no"
+      shift
+      ;;
+    --skip-bump|--no-bump)
+      SKIP_BUMP=true
       shift
       ;;
     --health-port)
@@ -80,6 +86,13 @@ echo "  UptimeMonk — AWS Lightsail Deployment"
 echo "=========================================="
 echo "Target hosts: ${HOSTS[*]}"
 echo ""
+
+# 0. Version Bump
+if [[ "$SKIP_BUMP" == "false" && -z "${UPTIMEMONK_ALREADY_BUMPED:-}" ]]; then
+  echo "==> [0/4] Bumping version before deployment..."
+  node "$REPO_ROOT/scripts/bump-version.mjs"
+  export UPTIMEMONK_ALREADY_BUMPED=1
+fi
 
 # 1. Local Build & Test
 echo "==> [1/4] Preparing server build..."

@@ -127,6 +127,8 @@ export default function EmailAuth({
     }
   }
 
+  const [showPassword, setShowPassword] = useState(false);
+
   const heading =
     mode === "signup"
       ? "Create an account"
@@ -174,18 +176,32 @@ export default function EmailAuth({
 
       {mode !== "reset" && (
         <label className="email-auth-field">
-          <span>Password</span>
-          <input
-            type="password"
-            required
-            minLength={6}
-            /* Tells a password manager to offer a new one rather than
-               autofilling the existing account's. */
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
-          />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>Password</span>
+            <button
+              type="button"
+              className="pwd-toggle-btn"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              style={{ background: "none", border: "none", color: "var(--muted, #888)", fontSize: "0.78rem", cursor: "pointer", padding: "0" }}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+          <div className="auth-input-wrap" style={{ position: "relative" }}>
+            <input
+              type={showPassword ? "text" : "password"}
+              required
+              minLength={6}
+              /* Tells a password manager to offer a new one rather than
+                 autofilling the existing account's. */
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
+              style={{ width: "100%" }}
+            />
+          </div>
         </label>
       )}
 

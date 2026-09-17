@@ -28,7 +28,14 @@ function ensureApp() {
   return app;
 }
 
+let customDb: Firestore | null = null;
+
+export function setCustomDb(mock: Firestore | null): void {
+  customDb = mock;
+}
+
 export function db(): Firestore {
+  if (customDb) return customDb;
   return getFirestore(ensureApp());
 }
 

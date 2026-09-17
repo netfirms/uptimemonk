@@ -9,6 +9,9 @@ import {
   PROBE_CONCURRENCY,
   RETENTION_DAYS,
   STRIPE_SECRET_KEY,
+  RECAPTCHA_SITE_KEY,
+  RECAPTCHA_SECRET,
+  RECAPTCHA_MIN_SCORE,
   USER_AGENT,
   getEffectiveConfig,
   getConfigMetadata,
@@ -39,6 +42,9 @@ describe("dynamic app configuration", () => {
       donationLinkCents: 500,
       donationLinkRecurring: true,
       stripeSecretKey: "sk_live_custom99",
+      recaptchaSiteKey: "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
+      recaptchaSecret: "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe",
+      recaptchaMinScore: 0.7,
       userAgent: "CustomUptimeBot/2.0",
     });
 
@@ -51,6 +57,9 @@ describe("dynamic app configuration", () => {
     assert.equal(config.donationLinkCents, 500);
     assert.equal(config.donationLinkRecurring, true);
     assert.equal(config.stripeSecretKey, "sk_live_custom99");
+    assert.equal(config.recaptchaSiteKey, "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI");
+    assert.equal(config.recaptchaSecret, "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe");
+    assert.equal(config.recaptchaMinScore, 0.7);
     assert.equal(config.userAgent, "CustomUptimeBot/2.0");
 
     // Check live exported ESM bindings
@@ -62,6 +71,9 @@ describe("dynamic app configuration", () => {
     assert.equal(DONATION_LINK_CENTS, 500);
     assert.equal(DONATION_LINK_RECURRING, true);
     assert.equal(STRIPE_SECRET_KEY, "sk_live_custom99");
+    assert.equal(RECAPTCHA_SITE_KEY, "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI");
+    assert.equal(RECAPTCHA_SECRET, "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe");
+    assert.equal(RECAPTCHA_MIN_SCORE, 0.7);
     assert.equal(USER_AGENT, "CustomUptimeBot/2.0");
   });
 
@@ -122,8 +134,9 @@ describe("seeding the dynamic config", () => {
     // A new credential added to AppConfig must be excluded deliberately, not
     // by being forgotten.
     const { getEffectiveConfig, SECRET_CONFIG_KEYS } = await import("./config.js");
-    const suspicious = Object.keys(getEffectiveConfig()).filter((k) =>
-      /key|secret|token|password/i.test(k)
+    // recaptchaSiteKey is a public frontend site key, not a backend secret
+    const suspicious = Object.keys(getEffectiveConfig()).filter(
+      (k) => /key|secret|token|password/i.test(k) && k !== "recaptchaSiteKey"
     );
     for (const key of suspicious) {
       assert.ok(

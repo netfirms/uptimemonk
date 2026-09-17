@@ -13,6 +13,7 @@
 #   --project <id>         Firebase project ID (defaults to .firebaserc)
 #   --skip-tests           Skip pre-deploy tests
 #   --no-restart-worker    Skip restarting the probe worker on Lightsail (API only)
+#   --skip-bump            Skip automatic version bump before deployment
 #   --help, -h             Show this help message
 #
 # Examples:
@@ -34,6 +35,7 @@ DEPLOY_TARGET="all"
 SKIP_TESTS=false
 FIREBASE_PROJECT=""
 NO_RESTART_WORKER=false
+SKIP_BUMP="${SKIP_BUMP:-false}"
 HOSTS=()
 
 while [[ $# -gt 0 ]]; do
@@ -62,6 +64,10 @@ while [[ $# -gt 0 ]]; do
       NO_RESTART_WORKER=true
       shift
       ;;
+    --skip-bump|--no-bump)
+      SKIP_BUMP=true
+      shift
+      ;;
     -h|--help)
       sed -ne '/^#/!q; 2,$p' "$0" | sed 's/^# \?//'
       exit 0
@@ -81,6 +87,13 @@ echo "========================================================"
 echo "          UptimeMonk — Unified Deployment"
 echo "========================================================"
 echo "Mode: $DEPLOY_TARGET"
+
+# 0. Version Bump
+if [[ "$SKIP_BUMP" == "false" && -z "${UPTIMEMONK_ALREADY_BUMPED:-}" ]]; then
+  echo "==> Bumping version before unified deployment..."
+  node "$SCRIPT_DIR/../scripts/bump-version.mjs"
+  export UPTIMEMONK_ALREADY_BUMPED=1
+fi
 
 # 1. Firebase deployment
 if [[ "$DEPLOY_TARGET" == "all" || "$DEPLOY_TARGET" == "firebase" ]]; then

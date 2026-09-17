@@ -11,7 +11,8 @@ import { orgRoutes } from "./api/org.js";
 import { adminRoutes } from "./api/admin.js";
 import { seedSystemConfig, startSystemConfigListener } from "./sync/configListener.js";
 import { log } from "./lib/log.js";
-import { API_VERSION, APP_URL, PORT } from "./config.js";
+import { API_VERSION, PORT } from "./config.js";
+import { ALLOWED_ORIGINS } from "./lib/cors.js";
 
 /**
  * The API process.
@@ -39,17 +40,9 @@ async function main(): Promise<void> {
   });
 
   await app.register(cors, {
-    // APP_URL is the real dashboard origin; the Firebase Hosting domains stay
-    // allowed because the app is served from there until the custom domain is
-    // attached. Anything else is rejected.
-    origin: [
-      APP_URL,
-      "https://www.uptimemonke.com",
-      "https://uptimemonke.com",
-      /\.web\.app$/,
-      /\.firebaseapp\.com$/,
-      /localhost:\d+$/,
-    ],
+    // Allows customer dashboard, internal ops console (ops.uptimemonke.com),
+    // preview deployments, and local dev environments.
+    origin: ALLOWED_ORIGINS,
     credentials: true,
   });
 

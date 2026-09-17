@@ -19,6 +19,8 @@ import fs from "node:fs";
 const TARGET_HOST = process.env.LIVE_HOST || "https://www.uptimemonke.com";
 const FALLBACK_HOST = "https://uptimemonk.web.app";
 const APEX_HOST = "https://uptimemonke.com";
+const ADMIN_HOST = process.env.ADMIN_HOST || "https://ops.uptimemonke.com";
+const ADMIN_FALLBACK_HOST = "https://uptimemonke-admin.web.app";
 const MAX_ACCEPTABLE_LATENCY_MS = Number(process.env.MAX_LATENCY_MS) || 2000;
 
 // Summary records for GitHub Actions markdown reporting
@@ -168,6 +170,31 @@ describe("UPTIMEMONK — LIVE WEB PRODUCTION MONITORING TEST", () => {
 
       recordResult("Apex Redirect", url, true, res.status, latency, "301 Redirect to www");
     });
+
+    test("Admin Console (ops.uptimemonke.com): returns HTTP 200 within SLA threshold", async () => {
+      const url = `${ADMIN_HOST}/`;
+      const { res, latency, error } = await timedFetch(url);
+
+      assert.equal(error, null, `Network error on ${url}: ${error?.message}`);
+      assert.ok(res, "Response expected");
+      assert.equal(res.status, 200, `Expected 200 OK on ${url}, got ${res?.status}`);
+      assert.ok(
+        latency < MAX_ACCEPTABLE_LATENCY_MS,
+        `Latency ${latency}ms exceeded SLA limit ${MAX_ACCEPTABLE_LATENCY_MS}ms`
+      );
+
+      recordResult("Admin Console", url, true, res.status, latency, "200 OK within SLA");
+    });
+
+    test("Admin Firebase Domain (uptimemonke-admin.web.app): operational fallback", async () => {
+      const url = `${ADMIN_FALLBACK_HOST}/`;
+      const { res, latency, error } = await timedFetch(url);
+
+      assert.equal(error, null);
+      assert.equal(res.status, 200);
+
+      recordResult("Admin Firebase Domain", url, true, res.status, latency, "Fallback origin OK");
+    });
   });
 
   // ----------------------------------------------------
@@ -205,6 +232,38 @@ describe("UPTIMEMONK — LIVE WEB PRODUCTION MONITORING TEST", () => {
         `${cert.daysLeft} days left (${cert.issuer})`
       );
     });
+
+    test("Validates TLS certificate on ops.uptimemonke.com", async () => {
+      const cert = await checkTlsCertificate("ops.uptimemonke.com");
+      assert.equal(cert.ok, true, `TLS check failed: ${cert.error}`);
+      assert.equal(cert.authorized, true, "Certificate chain must be authorized");
+      assert.ok(cert.daysLeft > 14, `Certificate expires soon (${cert.daysLeft} days remaining)`);
+
+      recordResult(
+        "TLS Certificate (ops)",
+        "https://ops.uptimemonke.com",
+        true,
+        "TLS",
+        "—",
+        `${cert.daysLeft} days left (${cert.issuer})`
+      );
+    });
+
+    test("Validates TLS certificate on uptimemonke-admin.web.app", async () => {
+      const cert = await checkTlsCertificate("uptimemonke-admin.web.app");
+      assert.equal(cert.ok, true, `TLS check failed: ${cert.error}`);
+      assert.equal(cert.authorized, true);
+      assert.ok(cert.daysLeft > 14);
+
+      recordResult(
+        "TLS Certificate (admin web.app)",
+        "https://uptimemonke-admin.web.app",
+        true,
+        "TLS",
+        "—",
+        `${cert.daysLeft} days left (${cert.issuer})`
+      );
+    });
   });
 
   // ----------------------------------------------------
@@ -233,6 +292,29 @@ describe("UPTIMEMONK — LIVE WEB PRODUCTION MONITORING TEST", () => {
         const cssCheck = await timedFetch(cssUrl);
         assert.equal(cssCheck.res?.status, 200, `Failed to load CSS bundle from ${cssUrl}`);
         recordResult("CSS Bundle Asset", cssUrl, true, 200, cssCheck.latency, "Stylesheet loaded");
+      }
+    });
+
+    test("Admin HTML includes expected title and meta headers", async () => {
+      const { res } = await timedFetch(`${ADMIN_HOST}/`);
+      const html = await res.text();
+
+      assert.ok(html.includes("<title>UptimeMonke Admin"), "Missing Admin <title> tag");
+      assert.ok(html.includes("viewport"), "Missing Admin viewport meta tag");
+
+      recordResult("Admin Meta Integrity", `${ADMIN_HOST}/`, true, 200, "—", "Admin Title and meta verified");
+    });
+
+    test("Admin Next.js static assets and CSS bundles load successfully", async () => {
+      const { res } = await timedFetch(`${ADMIN_HOST}/`);
+      const html = await res.text();
+
+      const match = html.match(/href="(\/_next\/static\/css\/[^"]+\.css)"/);
+      if (match) {
+        const cssUrl = `${ADMIN_HOST}${match[1]}`;
+        const cssCheck = await timedFetch(cssUrl);
+        assert.equal(cssCheck.res?.status, 200, `Failed to load Admin CSS bundle from ${cssUrl}`);
+        recordResult("Admin CSS Bundle", cssUrl, true, 200, cssCheck.latency, "Admin Stylesheet loaded");
       }
     });
   });

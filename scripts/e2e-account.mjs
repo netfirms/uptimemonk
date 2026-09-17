@@ -19,8 +19,8 @@ import assert from "node:assert/strict";
  * works around.
  */
 
-const EMAIL = process.env.UPTIMEMONK_E2E_EMAIL;
-const PASSWORD = process.env.UPTIMEMONK_E2E_PASSWORD;
+const EMAIL = process.env.UPTIMEMONK_E2E_EMAIL ?? "jidaso4157@findize.com";
+const PASSWORD = process.env.UPTIMEMONK_E2E_PASSWORD ?? "123456";
 const API = process.env.UPTIMEMONK_E2E_API ?? "https://api.uptimemonke.com";
 const WEB_KEY = process.env.UPTIMEMONK_E2E_WEB_KEY ?? "AIzaSyDBco29lK8EeJ6eD7Rf0JSX2Mqb4yKlRjc";
 

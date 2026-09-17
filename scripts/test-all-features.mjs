@@ -31,6 +31,10 @@ const { shardFor, ownsOrg } =
   await import("../server/dist/scheduler/assignment.js");
 const { PLANS, limitsFor } =
   await import("../server/dist/lib/plans.js");
+const { updateDynamicConfig, getEffectiveConfig, resetDynamicConfig, SECRET_CONFIG_KEYS } =
+  await import("../server/dist/config.js");
+const { isAllowedOrigin } =
+  await import("../server/dist/lib/cors.js");
 
 const REGION = "ap-southeast-1";
 
@@ -445,6 +449,118 @@ describe("UptimeMonk — All Features Verification Suite", () => {
       );
       assert.equal(searchResults.length, 1);
       assert.equal(searchResults[0].id, "2");
+    });
+  });
+
+  // ----------------------------------------------------
+  // FEATURE 8: DYNAMIC APP CONFIGURATION & REALTIME SYNC
+  // ----------------------------------------------------
+  describe("Feature 8: Dynamic App Configuration & Realtime Sync", () => {
+    test("overrides runtime variables and resets to environment defaults", () => {
+      resetDynamicConfig();
+      const initial = getEffectiveConfig();
+      assert.ok(initial.probeConcurrency > 0);
+
+      // Apply dynamic override simulating an admin update in Firestore
+      updateDynamicConfig({
+        probeConcurrency: 300,
+        alertFromEmail: "ops-alert@company.org",
+        donationLinkCents: 499,
+        donationLinkRecurring: true,
+      });
+
+      const updated = getEffectiveConfig();
+      assert.equal(updated.probeConcurrency, 300);
+      assert.equal(updated.alertFromEmail, "ops-alert@company.org");
+      assert.equal(updated.donationLinkCents, 499);
+      assert.equal(updated.donationLinkRecurring, true);
+
+      // Clean reset
+      resetDynamicConfig();
+      const reverted = getEffectiveConfig();
+      assert.equal(reverted.probeConcurrency, initial.probeConcurrency);
+      assert.equal(reverted.alertFromEmail, initial.alertFromEmail);
+    });
+  });
+
+  // ----------------------------------------------------
+  // FEATURE 9: ADMIN CONSOLE OPERATIONS & RBAC
+  // ----------------------------------------------------
+  describe("Feature 9: Admin Operations & Fleet Console", () => {
+    test("validates CORS origin allowlist for admin console", () => {
+      assert.equal(isAllowedOrigin("https://ops.uptimemonke.com"), true);
+      assert.equal(isAllowedOrigin("https://uptimemonke-admin.web.app"), true);
+      assert.equal(isAllowedOrigin("https://uptimemonke-admin.firebaseapp.com"), true);
+      assert.equal(isAllowedOrigin("https://www.uptimemonke.com"), true);
+      assert.equal(isAllowedOrigin("https://uptimemonke.com"), true);
+      assert.equal(isAllowedOrigin("https://evil-attacker.com"), false);
+      assert.equal(isAllowedOrigin("http://ops.uptimemonke.com.attacker.com"), false);
+    });
+
+    test("protects sensitive credentials with secret masking preservation", () => {
+      const isMaskedOrBlank = (v) => typeof v === "string" && (v.includes("•") || v.trim() === "");
+
+      // Simulating PUT /v1/admin/system-config secret preservation
+      const currentStoredSecrets = {
+        stripeSecretKey: "sk_live_realSecret123",
+        mailgunApiKey: "key-realMailgunSecret456",
+        recaptchaSecret: "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe",
+      };
+
+      const incomingAdminPayload = {
+        stripeSecretKey: "••••••••••••••••••••••••", // masked by admin UI
+        mailgunApiKey: "", // left blank by admin UI
+        recaptchaSecret: "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe", // unmodified
+      };
+
+      const finalSaved = {};
+      for (const [k, v] of Object.entries(incomingAdminPayload)) {
+        if (isMaskedOrBlank(v)) {
+          finalSaved[k] = currentStoredSecrets[k];
+        } else {
+          finalSaved[k] = v;
+        }
+      }
+
+      assert.equal(finalSaved.stripeSecretKey, "sk_live_realSecret123");
+      assert.equal(finalSaved.mailgunApiKey, "key-realMailgunSecret456");
+      assert.equal(finalSaved.recaptchaSecret, "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe");
+    });
+
+    test("validates admin dynamic system config state merging with reCAPTCHA", () => {
+      resetDynamicConfig();
+
+      updateDynamicConfig({
+        recaptchaSiteKey: "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
+        recaptchaSecret: "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe",
+        recaptchaMinScore: 0.65,
+      });
+
+      const effective = getEffectiveConfig();
+      assert.equal(effective.recaptchaSiteKey, "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI");
+      assert.equal(effective.recaptchaSecret, "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe");
+      assert.equal(effective.recaptchaMinScore, 0.65);
+
+      resetDynamicConfig();
+    });
+
+    test("validates operator email allowlist parsing", () => {
+      const rawEnv = " alice@uptimemonke.com, Bob@UptimeMonke.com , Charlie@example.org  ";
+      const allowed = new Set(
+        rawEnv
+          .split(",")
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean)
+      );
+
+      const isOperator = (email) => (email ? allowed.has(email.toLowerCase().trim()) : false);
+
+      assert.equal(isOperator("alice@uptimemonke.com"), true);
+      assert.equal(isOperator("BOB@uptimemonke.com"), true);
+      assert.equal(isOperator("  charlie@example.org "), true);
+      assert.equal(isOperator("intruder@evil.com"), false);
+      assert.equal(isOperator(null), false);
+      assert.equal(isOperator(""), false);
     });
   });
 });

@@ -103,6 +103,7 @@ export interface AppConfig {
   donationLinkCents: number;
   donationLinkRecurring: boolean;
   stripeSecretKey: string;
+  recaptchaSiteKey: string;
   recaptchaSecret: string;
   recaptchaMinScore: number;
   stripeWebhookSecret: string;
@@ -138,6 +139,7 @@ const envDefaults: AppConfig = {
   donationLinkCents: int("DONATION_LINK_CENTS", 299),
   donationLinkRecurring: process.env.DONATION_LINK_RECURRING === "true",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
+  recaptchaSiteKey: optional("RECAPTCHA_SITE_KEY", process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? ""),
   recaptchaSecret: process.env.RECAPTCHA_SECRET ?? "",
   // 0.5 is Google's own suggested cut. Below it is "probably a bot", not
   // "definitely" — which is why a failure here blocks a signup rather than
@@ -184,6 +186,7 @@ export const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
+export let RECAPTCHA_SITE_KEY = envDefaults.recaptchaSiteKey;
 export let RECAPTCHA_SECRET = envDefaults.recaptchaSecret;
 export let RECAPTCHA_MIN_SCORE = envDefaults.recaptchaMinScore;
 export let STRIPE_WEBHOOK_SECRET = envDefaults.stripeWebhookSecret;
@@ -260,11 +263,14 @@ export function updateDynamicConfig(data?: Record<string, unknown> | null): void
     if (typeof data.donationLinkRecurring === "boolean") {
       activeOverrides.donationLinkRecurring = data.donationLinkRecurring;
     }
+    if (typeof data.recaptchaSiteKey === "string") {
+      activeOverrides.recaptchaSiteKey = data.recaptchaSiteKey.trim();
+    }
     if (typeof data.recaptchaSecret === "string") {
       activeOverrides.recaptchaSecret = data.recaptchaSecret.trim();
     }
-    if (typeof data.recaptchaMinScore === "number") {
-      activeOverrides.recaptchaMinScore = data.recaptchaMinScore;
+    if (data.recaptchaMinScore != null && !Number.isNaN(Number(data.recaptchaMinScore))) {
+      activeOverrides.recaptchaMinScore = Number(data.recaptchaMinScore);
     }
     if (typeof data.stripeSecretKey === "string") {
       activeOverrides.stripeSecretKey = data.stripeSecretKey.trim();
@@ -305,6 +311,7 @@ export function updateDynamicConfig(data?: Record<string, unknown> | null): void
   DONATION_LINK_CENTS = activeOverrides.donationLinkCents ?? envDefaults.donationLinkCents;
   DONATION_LINK_RECURRING = activeOverrides.donationLinkRecurring ?? envDefaults.donationLinkRecurring;
   STRIPE_SECRET_KEY = activeOverrides.stripeSecretKey ?? envDefaults.stripeSecretKey;
+  RECAPTCHA_SITE_KEY = activeOverrides.recaptchaSiteKey ?? envDefaults.recaptchaSiteKey;
   RECAPTCHA_SECRET = activeOverrides.recaptchaSecret ?? envDefaults.recaptchaSecret;
   RECAPTCHA_MIN_SCORE = activeOverrides.recaptchaMinScore ?? envDefaults.recaptchaMinScore;
   STRIPE_WEBHOOK_SECRET = activeOverrides.stripeWebhookSecret ?? envDefaults.stripeWebhookSecret;
@@ -369,6 +376,7 @@ export function getEffectiveConfig(): AppConfig {
     telegramBotToken: TELEGRAM_BOT_TOKEN,
     alertFromEmail: ALERT_FROM_EMAIL,
 
+    recaptchaSiteKey: RECAPTCHA_SITE_KEY,
     recaptchaSecret: RECAPTCHA_SECRET,
     recaptchaMinScore: RECAPTCHA_MIN_SCORE,
 

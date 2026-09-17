@@ -9,6 +9,7 @@
 #   --project <id>     Firebase project ID (defaults to project in .firebaserc)
 #   --only <targets>   Comma-separated deploy targets (default: firestore:rules,firestore:indexes)
 #   --skip-tests       Skip running Firestore rules unit tests before deploy
+#   --skip-bump        Skip automatic version bump before deployment
 #   --help, -h         Show this help message
 #
 
@@ -20,6 +21,7 @@ cd "$REPO_ROOT"
 PROJECT=""
 TARGETS="firestore,hosting"
 RUN_TESTS=true
+SKIP_BUMP="${SKIP_BUMP:-false}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -33,6 +35,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-tests)
       RUN_TESTS=false
+      shift
+      ;;
+    --skip-bump|--no-bump)
+      SKIP_BUMP=true
       shift
       ;;
     -h|--help)
@@ -56,6 +62,13 @@ fi
 echo "=========================================="
 echo "  UptimeMonk — Firebase Deployment"
 echo "=========================================="
+
+# 0. Version Bump
+if [[ "$SKIP_BUMP" == "false" && -z "${UPTIMEMONK_ALREADY_BUMPED:-}" ]]; then
+  echo "==> Bumping version before deployment..."
+  node "$REPO_ROOT/scripts/bump-version.mjs"
+  export UPTIMEMONK_ALREADY_BUMPED=1
+fi
 
 # 1. Pre-deploy checks & tests
 if [[ "$RUN_TESTS" == "true" && "$TARGETS" == *"firestore"* ]]; then

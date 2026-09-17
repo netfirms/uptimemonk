@@ -159,6 +159,10 @@ export interface SystemConfigState {
 
   appUrl: string;
   apiUrl: string;
+
+  recaptchaSiteKey: string;
+  recaptchaSecret: string;
+  recaptchaMinScore: string;
 }
 
 const CONFIG_DEFAULTS: SystemConfigState = {
@@ -190,6 +194,10 @@ const CONFIG_DEFAULTS: SystemConfigState = {
 
   appUrl: "https://uptimemonke.com",
   apiUrl: "https://api.uptimemonke.com",
+
+  recaptchaSiteKey: "",
+  recaptchaSecret: "",
+  recaptchaMinScore: "0.5",
 };
 
 export default function AdminPage() {
@@ -637,6 +645,10 @@ export default function AdminPage() {
 
             appUrl: data.appUrl != null ? String(data.appUrl) : envDefaults.appUrl,
             apiUrl: data.apiUrl != null ? String(data.apiUrl) : envDefaults.apiUrl,
+
+            recaptchaSiteKey: data.recaptchaSiteKey != null ? String(data.recaptchaSiteKey) : envDefaults.recaptchaSiteKey,
+            recaptchaSecret: data.recaptchaSecret != null ? String(data.recaptchaSecret) : envDefaults.recaptchaSecret,
+            recaptchaMinScore: data.recaptchaMinScore != null ? String(data.recaptchaMinScore) : envDefaults.recaptchaMinScore,
           });
         } else {
           setRawConfigFromDb(null);
@@ -700,6 +712,10 @@ export default function AdminPage() {
 
           appUrl: String(defaults.appUrl ?? CONFIG_DEFAULTS.appUrl),
           apiUrl: String(defaults.apiUrl ?? CONFIG_DEFAULTS.apiUrl),
+
+          recaptchaSiteKey: String(defaults.recaptchaSiteKey ?? CONFIG_DEFAULTS.recaptchaSiteKey),
+          recaptchaSecret: String(defaults.recaptchaSecret ?? CONFIG_DEFAULTS.recaptchaSecret),
+          recaptchaMinScore: String(defaults.recaptchaMinScore ?? CONFIG_DEFAULTS.recaptchaMinScore),
         };
         setEnvDefaults(merged);
         setEnvDefaultsLoaded(true);
@@ -749,6 +765,10 @@ export default function AdminPage() {
         appUrl: configForm.appUrl.trim(),
         apiUrl: configForm.apiUrl.trim(),
 
+        recaptchaSiteKey: configForm.recaptchaSiteKey.trim(),
+        recaptchaSecret: configForm.recaptchaSecret.trim(),
+        recaptchaMinScore: Number(configForm.recaptchaMinScore) || 0.5,
+
         updatedAt: new Date().toISOString(),
         updatedBy: currentUser?.email || "admin",
       };
@@ -776,7 +796,12 @@ export default function AdminPage() {
       );
       setTimeout(() => setConfigSuccess(null), 5000);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to save configuration";
+      const msg =
+        err instanceof Error
+          ? err.message === "Failed to fetch"
+            ? "Failed to connect to API server (network or CORS error)"
+            : err.message
+          : "Failed to save configuration";
       setConfigError(msg);
     } finally {
       setConfigSaving(false);
@@ -2659,6 +2684,89 @@ export default function AdminPage() {
                   placeholder={envDefaults.apiUrl}
                 />
                 <span className="config-hint">Public entrypoint for probe heartbeats, monitoring CRUD, and status pages.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 6: GOOGLE RECAPTCHA BOT PROTECTION */}
+          <div className="config-card">
+            <div className="config-card-header">
+              <div>
+                <div className="config-card-title">
+                  <span>🤖 Google reCAPTCHA v3 Bot Protection</span>
+                </div>
+                <div className="config-card-desc">
+                  Invisible bot verification and automated abuse prevention for public endpoints and registrations.
+                </div>
+              </div>
+              <span className="badge-pill ok" style={{ color: "var(--emerald)", borderColor: "rgba(52,211,153,0.3)" }}>
+                Bot Shield
+              </span>
+            </div>
+
+            <div className="config-grid">
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">reCAPTCHA Site Key (RECAPTCHA_SITE_KEY)</label>
+                  <span className={`config-badge ${isFieldCustom("recaptchaSiteKey") ? "custom" : "default"}`}>
+                    {isFieldCustom("recaptchaSiteKey") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  className="config-input font-mono"
+                  value={configForm.recaptchaSiteKey}
+                  onChange={(e) => setConfigForm({ ...configForm, recaptchaSiteKey: e.target.value })}
+                  placeholder={envDefaults.recaptchaSiteKey || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
+                />
+                <span className="config-hint">Public site key loaded by client browsers to execute reCAPTCHA v3 challenges.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">reCAPTCHA Secret Key (RECAPTCHA_SECRET)</label>
+                  <span className={`config-badge ${isFieldCustom("recaptchaSecret") ? "custom" : "default"}`}>
+                    {isFieldCustom("recaptchaSecret") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <div className="config-input-wrap">
+                  <input
+                    type={visibleSecrets.recaptchaSecret ? "text" : "password"}
+                    className="config-input config-input-secret font-mono"
+                    value={configForm.recaptchaSecret}
+                    onChange={(e) => setConfigForm({ ...configForm, recaptchaSecret: e.target.value })}
+                    placeholder={envDefaults.recaptchaSecret || "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"}
+                  />
+                  <button
+                    type="button"
+                    className="config-secret-toggle"
+                    onClick={() => toggleSecret("recaptchaSecret")}
+                    title={visibleSecrets.recaptchaSecret ? "Hide secret" : "Show secret"}
+                  >
+                    {visibleSecrets.recaptchaSecret ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <span className="config-hint">Private secret key used by backend servers to verify tokens with Google siteverify API.</span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Minimum Bot Score (RECAPTCHA_MIN_SCORE)</label>
+                  <span className={`config-badge ${isFieldCustom("recaptchaMinScore") ? "custom" : "default"}`}>
+                    {isFieldCustom("recaptchaMinScore") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  step="0.05"
+                  min="0.0"
+                  max="1.0"
+                  className="config-input"
+                  value={configForm.recaptchaMinScore}
+                  onChange={(e) => setConfigForm({ ...configForm, recaptchaMinScore: e.target.value })}
+                  placeholder={envDefaults.recaptchaMinScore || "0.5"}
+                />
+                <span className="config-hint">Score threshold between 0.0 (likely bot) and 1.0 (human interaction). Default is 0.5.</span>
               </div>
             </div>
           </div>

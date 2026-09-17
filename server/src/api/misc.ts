@@ -326,6 +326,36 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  /** Update user profile (username / displayName). */
+  app.patch<{ Body: { displayName?: string } }>(
+    "/v1/me",
+    { preHandler: requireAuth() },
+    async (req, reply) => {
+      const raw = req.body?.displayName;
+      if (typeof raw !== "string" || !raw.trim()) {
+        return reply.code(400).send({ error: "Username cannot be empty" });
+      }
+      const trimmed = raw.trim();
+      if (trimmed.length < 2) {
+        return reply.code(400).send({ error: "Username must be at least 2 characters" });
+      }
+      if (trimmed.length > 50) {
+        return reply.code(400).send({ error: "Username cannot exceed 50 characters" });
+      }
+
+      const uid = req.user!.uid;
+      try {
+        await auth().updateUser(uid, { displayName: trimmed });
+      } catch (err) {
+        log.warn({ uid, err }, "failed to update auth user displayName");
+      }
+      await col.users().doc(uid).set({ displayName: trimmed }, { merge: true });
+      log.info({ uid, displayName: trimmed }, "user updated displayName");
+
+      return { uid, displayName: trimmed };
+    }
+  );
+
   /**
    * Admin configuration metadata.
    *

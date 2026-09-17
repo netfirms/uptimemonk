@@ -193,12 +193,16 @@ export default function NewMonitorForm({
   onClose,
   onCreated,
   monitor,
+  initialType,
+  initialTarget,
 }: {
   isOpen?: boolean;
   onClose?: () => void;
   onCreated?: () => void;
   /** Present = edit that monitor. Absent = create a new one. */
   monitor?: EditableMonitor | null;
+  initialType?: MonitorType;
+  initialTarget?: string;
 }) {
   const isEditing = !!monitor;
   const [internalOpen, setInternalOpen] = useState(false);
@@ -290,9 +294,23 @@ export default function NewMonitorForm({
       setIcmpPacketCount(String(monitor.icmpPacketCount ?? 3));
       setIcmpMaxLossPercent(String(monitor.icmpMaxLossPercent ?? 50));
     } else {
-      setType("http");
-      setName("");
-      setTarget("");
+      const defaultT = initialType ?? "http";
+      const defaultTarget = initialTarget ?? "";
+      setType(defaultT);
+      if (defaultTarget) {
+        setTarget(defaultTarget);
+        try {
+          const u = defaultTarget.startsWith("http://") || defaultTarget.startsWith("https://")
+            ? new URL(defaultTarget)
+            : new URL("https://" + defaultTarget);
+          setName(u.hostname || defaultTarget);
+        } catch {
+          setName(defaultTarget);
+        }
+      } else {
+        setName("");
+        setTarget("");
+      }
       setKeyword("");
       setPort("443");
       setIntervalSeconds("300");
@@ -320,7 +338,7 @@ export default function NewMonitorForm({
       setShowAdvanced(false);
     }
     setError(null);
-  }, [open, monitor?.id]);
+  }, [open, monitor?.id, initialType, initialTarget]);
 
   // Fetch the plan floor when the dialog opens. Previously the form offered a
   // 1-minute interval to a free account, the server clamped it to the plan

@@ -373,6 +373,13 @@ export const api = {
     }>("/v1/me");
   },
 
+  updateProfile: (displayName: string) =>
+    request<{ uid: string; displayName: string }>("/v1/me", {
+      method: "PATCH",
+      body: JSON.stringify({ displayName }),
+      signal: AbortSignal.timeout(MUTATION_TIMEOUT_MS),
+    }),
+
   version: async () => {
     try {
       const res = await fetch(`${API_URL}/version`, { signal: AbortSignal.timeout(2000) });

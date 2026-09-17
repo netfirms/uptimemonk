@@ -12,6 +12,7 @@ import {
 import { auth } from "@/lib/firebase";
 import { events } from "@/lib/analytics";
 import EmailAuth from "./EmailAuth";
+import AuthModal from "./AuthModal";
 
 /**
  * Public marketing landing page for UptimeMonke.
@@ -34,6 +35,9 @@ export default function Landing({
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<"signup" | "signin">("signup");
+  const [quickUrl, setQuickUrl] = useState("");
   /** Google stays the one-click path; email is a disclosure beneath it. */
   const [showEmailAuth, setShowEmailAuth] = useState(false);
 
@@ -154,7 +158,7 @@ export default function Landing({
           <a href="#faq" className="landing-nav-link">FAQ</a>
         </nav>
 
-        <div className="row">
+        <div className="row" style={{ gap: "10px" }}>
           <span className="status-pill up" style={{ fontSize: "0.74rem" }} title="Global edge workers active">
             <span className="status-dot up pulse" />
             Probes Live
@@ -169,9 +173,28 @@ export default function Landing({
               <span>→</span>
             </a>
           ) : (
-            <button className="primary" onClick={() => handleGoogleSignIn()} disabled={isSigningIn}>
-              {isSigningIn ? "Connecting…" : "Sign In with Google"}
-            </button>
+            <div className="row" style={{ gap: "8px" }}>
+              <button
+                type="button"
+                className="btn-topbar-login"
+                onClick={() => {
+                  setAuthModalMode("signin");
+                  setAuthModalOpen(true);
+                }}
+              >
+                Log In
+              </button>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => {
+                  setAuthModalMode("signup");
+                  setAuthModalOpen(true);
+                }}
+              >
+                Start Free
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -193,74 +216,93 @@ export default function Landing({
           Continuous HTTP, SSL expiry, TCP ping, and cron heartbeat monitoring with sub-minute checks and instant multi-channel alerts before your users notice downtime.
         </p>
 
-        {/* Primary CTA */}
-        <div className="hero-cta-wrap">
+        {/* Interactive Quickstart Form */}
+        <div className="hero-quickstart-container">
           {authError && (
-            <div className="hero-auth-error" role="alert">
+            <div className="hero-auth-error" role="alert" style={{ marginBottom: "16px" }}>
               {authError}
             </div>
           )}
 
-          {currentUser ? (
-            <a
-              href="/dashboard"
-              className="google-btn-light"
-              style={{ textDecoration: "none", gap: "8px" }}
-            >
-              <span>Go to Dashboard</span>
-              <span>→</span>
-            </a>
-          ) : (
-            <button className="google-btn-light" onClick={() => handleGoogleSignIn()} disabled={isSigningIn}>
-              {isSigningIn ? (
-                <span>Connecting to Google…</span>
-              ) : (
-                <>
-                  <svg width="18" height="18" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                    />
-                  </svg>
-                  <span>Continue with Google</span>
-                </>
-              )}
-            </button>
-          )}
-          {/* Not everyone has a Google account, and plenty of people will
-              not use one to sign in to a third-party service. Refusing them
-              an account over it costs a customer. */}
-          {!currentUser && (
-            <div className="hero-auth-alt">
-              {showEmailAuth ? (
-                <EmailAuth onSignedIn={(u) => (onSignedIn ? onSignedIn(u) : (window.location.href = "/dashboard"))} />
-              ) : (
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={() => setShowEmailAuth(true)}
-                >
-                  or use an email address
-                </button>
-              )}
+          <form
+            className="hero-quickstart-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              let target = quickUrl.trim();
+              if (!target) {
+                setAuthModalMode("signup");
+                setAuthModalOpen(true);
+                return;
+              }
+              if (!target.startsWith("http://") && !target.startsWith("https://")) {
+                target = "https://" + target;
+              }
+              if (currentUser) {
+                window.location.href = `/dashboard?new=${encodeURIComponent(target)}`;
+              } else {
+                setAuthModalMode("signup");
+                setAuthModalOpen(true);
+              }
+            }}
+          >
+            <div className="hero-quickstart-bar">
+              <span className="hero-quickstart-icon">🌐</span>
+              <input
+                type="text"
+                className="hero-quickstart-input"
+                placeholder="Enter your website or API (e.g. example.com)"
+                value={quickUrl}
+                onChange={(e) => setQuickUrl(e.target.value)}
+                aria-label="Enter your website URL to monitor"
+              />
+              <button type="submit" className="hero-quickstart-btn">
+                <span>Start Monitoring</span>
+                <span className="arrow-icon">→</span>
+              </button>
             </div>
-          )}
+          </form>
 
-          <p className="hero-subtext">
-            <span>Free forever</span> · <span>No credit card</span> · <span>No feature paywalled</span>
-          </p>
+          {/* Social / Direct Auth Options */}
+          <div className="hero-social-strip">
+            <button
+              type="button"
+              className="google-btn-light"
+              onClick={() => {
+                const target = quickUrl.trim()
+                  ? (quickUrl.trim().startsWith("http") ? quickUrl.trim() : "https://" + quickUrl.trim())
+                  : "";
+                handleGoogleSignIn(target ? `/dashboard?new=${encodeURIComponent(target)}` : "/dashboard");
+              }}
+              disabled={isSigningIn}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z" />
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z" />
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
+              </svg>
+              <span>{isSigningIn ? "Connecting…" : "Continue with Google"}</span>
+            </button>
+
+            <button
+              type="button"
+              className="hero-email-btn"
+              onClick={() => {
+                setAuthModalMode("signup");
+                setAuthModalOpen(true);
+              }}
+            >
+              <span>✉️ Sign up with Email</span>
+            </button>
+          </div>
+
+          <div className="hero-feature-tags">
+            <span>⚡ 60s Check Intervals</span>
+            <span>•</span>
+            <span>🔒 Free SSL Expiry Alerts</span>
+            <span>•</span>
+            <span>🚫 No Credit Card Required</span>
+          </div>
         </div>
 
         {/* Feature Badges Strip */}
@@ -940,40 +982,53 @@ export default function Landing({
           {currentUser ? (
             <a
               href="/dashboard"
-              className="google-btn-light"
-              style={{ textDecoration: "none", gap: "8px" }}
+              className="primary"
+              style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "8px", padding: "12px 28px", fontSize: "1rem" }}
             >
               <span>Go to Dashboard</span>
               <span>→</span>
             </a>
           ) : (
-            <button className="google-btn-light" onClick={() => handleGoogleSignIn()} disabled={isSigningIn}>
-              {isSigningIn ? (
-                <span>Connecting to Google…</span>
-              ) : (
-                <>
-                  <svg width="18" height="18" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                    />
-                  </svg>
-                  <span>Continue with Google</span>
-                </>
-              )}
-            </button>
+            <div className="row" style={{ gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="google-btn-light"
+                onClick={() => handleGoogleSignIn()}
+                disabled={isSigningIn}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                  />
+                </svg>
+                <span>{isSigningIn ? "Connecting…" : "Continue with Google"}</span>
+              </button>
+
+              <button
+                type="button"
+                className="primary"
+                style={{ padding: "12px 28px", fontSize: "1rem" }}
+                onClick={() => {
+                  setAuthModalMode("signup");
+                  setAuthModalOpen(true);
+                }}
+              >
+                <span>Start Free Monitoring →</span>
+              </button>
+            </div>
           )}
           <span className="dim" style={{ fontSize: "0.78rem" }}>
             14,400 free checks every day · No credit card required · Instant setup
@@ -991,6 +1046,32 @@ export default function Landing({
           <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
         </div>
       </footer>
+
+      {/* Modern Accessible Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        initialMode={authModalMode}
+        targetUrl={
+          quickUrl.trim()
+            ? quickUrl.trim().startsWith("http")
+              ? quickUrl.trim()
+              : "https://" + quickUrl.trim()
+            : undefined
+        }
+        onSignedIn={(u) => {
+          if (onSignedIn) {
+            onSignedIn(u);
+          } else {
+            const target = quickUrl.trim()
+              ? quickUrl.trim().startsWith("http")
+                ? quickUrl.trim()
+                : "https://" + quickUrl.trim()
+              : "";
+            window.location.href = target ? `/dashboard?new=${encodeURIComponent(target)}` : "/dashboard";
+          }
+        }}
+      />
     </main>
   );
 }

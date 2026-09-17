@@ -15,10 +15,12 @@ export default function OrgSettings({
   isOpen,
   onClose,
   onRenamed,
+  onOpenProfile,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onRenamed?: (name: string) => void;
+  onOpenProfile?: () => void;
 }) {
   const [data, setData] = useState<Settings | null>(null);
   const [name, setName] = useState("");
@@ -206,6 +208,26 @@ export default function OrgSettings({
                   {busy === "page" ? "Saving…" : "Save status page"}
                 </button>
               </form>
+
+              {onOpenProfile && (
+                <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <div>
+                    <strong style={{ fontSize: "0.85rem", display: "block", color: "#ffffff" }}>Want to change your personal username?</strong>
+                    <span className="dim" style={{ fontSize: "0.78rem" }}>Update your display name, avatar, and account details.</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    onClick={() => {
+                      onClose();
+                      onOpenProfile();
+                    }}
+                    style={{ whiteSpace: "nowrap" }}
+                  >
+                    👤 Profile Settings →
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

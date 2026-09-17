@@ -17,6 +17,7 @@ import NewMonitorForm, {
 import MonitorDetail from "./MonitorDetail";
 import Landing from "@/components/Landing";
 import VerifyEmailGate from "@/components/VerifyEmailGate";
+import ProfileModal from "@/components/ProfileModal";
 import { events, identify } from "@/lib/analytics";
 
 type Status = "up" | "down" | "pending" | "paused";
@@ -90,17 +91,21 @@ function compactChecks(n: number): string {
 
 export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [monitors, setMonitors] = useState<MonitorConfig[]>([]);
   const [live, setLive] = useState<Record<string, LiveState>>({});
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newInitialType, setNewInitialType] = useState<MonitorType>("http");
+  const [newInitialTarget, setNewInitialTarget] = useState("");
   const [editing, setEditing] = useState<MonitorConfig | null>(null);
   const publicCount = monitors.filter((m) => m.publicOnStatusPage).length;
   const [contactsOpen, setContactsOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [workspaceName, setWorkspaceName] = useState<string | null>(null);
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
 
@@ -141,14 +146,22 @@ export default function Dashboard() {
     };
   }, [orgId]);
 
-  // Arriving from the landing page's donate button, which signs in first so
-  // the payment can be tagged with a workspace.
+  // Arriving from the landing page's donate or hero quick-start button
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (new URLSearchParams(window.location.search).get("donate") !== "1") return;
-    setSupportOpen(true);
-    // Drop the parameter so a refresh does not reopen the panel.
-    window.history.replaceState({}, "", window.location.pathname);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("donate") === "1") {
+      setSupportOpen(true);
+    }
+    const newTarget = params.get("new");
+    if (newTarget) {
+      setNewInitialTarget(decodeURIComponent(newTarget));
+      setNewInitialType("http");
+      setIsCreateModalOpen(true);
+    }
+    if (params.get("donate") || params.get("new")) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   }, []);
   // What this workspace's monitors cost per day, mirroring the server's sum.
   const usedChecksPerDay = monitors
@@ -162,6 +175,7 @@ export default function Dashboard() {
     () =>
       onAuthStateChanged(auth, async (u) => {
         setCurrentUser(u);
+        setUserDisplayName(u?.displayName ?? null);
         if (!u) return setOrgId(null);
 
         let token = await u.getIdTokenResult();
@@ -196,6 +210,19 @@ export default function Dashboard() {
       }),
     []
   );
+
+  // Keyboard shortcut: '/' focuses the search box unless already inside an input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "/" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        const searchInput = document.getElementById("dashboard-search-input");
+        searchInput?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Configuration listener.
   useEffect(() => {
@@ -363,20 +390,40 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="row">
-          {/* Name first, falling back to the email local-part rather than the
-              whole address — the full address crowds the bar and the person
-              already knows which account they are in. */}
-          <div className="who">
-            <span className="who-name">
-              {currentUser.displayName || currentUser.email?.split("@")[0] || "Signed in"}
-            </span>
-            {!!billing?.credits && (
-              <span className="who-credit" title="Donated capacity remaining">
-                {compactChecks(billing.credits)} checks left
+        <div className="row" style={{ gap: "10px" }}>
+          {/* User Profile Chip (Avatar + Name + Credit count) */}
+          <button
+            type="button"
+            className="user-profile-chip"
+            onClick={() => setProfileOpen(true)}
+            title="Account & Profile Settings — Change username"
+            aria-label="Account and profile settings"
+          >
+            <div className="user-avatar-small">
+              {currentUser.photoURL ? (
+                <img src={currentUser.photoURL} alt="" />
+              ) : (
+                <span>
+                  {(userDisplayName || currentUser.displayName || currentUser.email || "U")
+                    .charAt(0)
+                    .toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div className="who">
+              <span className="who-name">
+                {userDisplayName || currentUser.displayName || currentUser.email?.split("@")[0] || "Signed in"}
               </span>
-            )}
-          </div>
+              {!!billing?.credits && (
+                <span className="who-credit" title="Donated capacity remaining">
+                  {compactChecks(billing.credits)} checks left
+                </span>
+              )}
+            </div>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="user-chevron">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
 
           <button
             className="coffee-btn coffee-btn-nav"
@@ -528,10 +575,24 @@ export default function Dashboard() {
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
+              id="dashboard-search-input"
               placeholder="Search monitors…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery ? (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+                title="Clear search"
+              >
+                ×
+              </button>
+            ) : (
+              <span className="search-kbd-hint" title="Press / to search">/</span>
+            )}
           </div>
 
           {orgId && (
@@ -806,32 +867,81 @@ export default function Dashboard() {
 
         {/* Empty State */}
         {!filteredMonitors.length && (
-          <div className="empty-state">
+          <div className="empty-state onboarding-empty-state">
             <div className="empty-icon">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2a2 2 0 0 1 2 2v1h1a3 3 0 0 1 3 3v2h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1v4a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3v-4H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h1V8a3 3 0 0 1 3-3h1V4a2 2 0 0 1 2-2zM9 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-6 6h6v-1.5H9V16z" />
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="m9 12 2 2 4-4" />
               </svg>
             </div>
-            <h3 style={{ fontWeight: 700, fontSize: "1.15rem" }}>
-              {searchQuery ? "No monitors match your search" : "You don't have any monitors yet"}
+            <h3 style={{ fontWeight: 700, fontSize: "1.25rem", marginBottom: "8px" }}>
+              {searchQuery ? "No monitors match your search" : "Welcome to your Workspace!"}
             </h3>
-            <p className="muted" style={{ maxWidth: "440px", margin: "8px auto 20px" }}>
+            <p className="muted" style={{ maxWidth: "480px", margin: "0 auto 20px", lineHeight: "1.6" }}>
               {searchQuery
                 ? "Try searching for a different name, host, or clear your active filter tab."
-                : "Create your first monitor to start checking uptime, HTTP response codes, SSL certificates, and ping latency."}
+                : "Your Lightsail worker fleet is ready. Monitor HTTP uptime, SSL certificates, or worker cron heartbeats with 1 click."}
             </p>
             {searchQuery ? (
               <button onClick={() => { setSearchQuery(""); setActiveTab("all"); }}>
                 Clear Search
               </button>
             ) : (
-              <button className="primary" onClick={() => setIsCreateModalOpen(true)}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                + Add New Monitor
-              </button>
+              <div className="quickstart-presets-grid">
+                <div
+                  className="preset-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setNewInitialType("http");
+                    setNewInitialTarget("");
+                    setIsCreateModalOpen(true);
+                  }}
+                >
+                  <div className="preset-icon http">
+                    <MonitorTypeIcon type="http" size={24} />
+                  </div>
+                  <h4>Website (HTTP/S)</h4>
+                  <p>Check status codes 2xx/3xx, response time, and keywords.</p>
+                  <span className="preset-action">Launch Monitor →</span>
+                </div>
+
+                <div
+                  className="preset-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setNewInitialType("ssl");
+                    setNewInitialTarget("");
+                    setIsCreateModalOpen(true);
+                  }}
+                >
+                  <div className="preset-icon ssl">
+                    <MonitorTypeIcon type="ssl" size={24} />
+                  </div>
+                  <h4>SSL Certificate</h4>
+                  <p>Automatic alerts before certificates expire (30, 14, 7, 1 days).</p>
+                  <span className="preset-action">Track Certificate →</span>
+                </div>
+
+                <div
+                  className="preset-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setNewInitialType("heartbeat");
+                    setNewInitialTarget("");
+                    setIsCreateModalOpen(true);
+                  }}
+                >
+                  <div className="preset-icon heartbeat">
+                    <MonitorTypeIcon type="heartbeat" size={24} />
+                  </div>
+                  <h4>Cron Heartbeat</h4>
+                  <p>Dead-man's switch for background jobs, backups, or daemons.</p>
+                  <span className="preset-action">Create Heartbeat →</span>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -846,6 +956,15 @@ export default function Dashboard() {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onRenamed={setWorkspaceName}
+        onOpenProfile={() => setProfileOpen(true)}
+      />
+
+      <ProfileModal
+        isOpen={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        currentUser={currentUser}
+        onUpdated={(name) => setUserDisplayName(name)}
+        onOpenWorkspaceSettings={() => setSettingsOpen(true)}
       />
 
       <AlertContacts isOpen={contactsOpen} onClose={() => setContactsOpen(false)} />
@@ -866,8 +985,18 @@ export default function Dashboard() {
 
       <NewMonitorForm
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onCreated={() => setIsCreateModalOpen(false)}
+        initialType={newInitialType}
+        initialTarget={newInitialTarget}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setNewInitialTarget("");
+          setNewInitialType("http");
+        }}
+        onCreated={() => {
+          setIsCreateModalOpen(false);
+          setNewInitialTarget("");
+          setNewInitialType("http");
+        }}
       />
 
       {/* Footer */}
