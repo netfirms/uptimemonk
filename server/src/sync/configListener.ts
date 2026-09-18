@@ -88,6 +88,8 @@ function toContact(id: string, d: Record<string, unknown>): AlertContact {
     name: String(d.name ?? ""),
     destination: String(d.destination ?? ""),
     telegramChatId: d.telegramChatId as string | undefined,
+    fcmToken: (d.fcmToken ?? (d.channel === "fcm" ? d.destination : undefined)) as string | undefined,
+    platform: d.platform as "ios" | "android" | undefined,
     enabled: d.enabled !== false,
     verified: d.verified === true,
   };

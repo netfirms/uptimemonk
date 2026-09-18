@@ -12,7 +12,7 @@ import type { AlertChannel } from "../types.js";
 
 export class InvalidContactError extends Error {}
 
-const CHANNELS: AlertChannel[] = ["email", "slack", "discord", "telegram", "webhook"];
+const CHANNELS: AlertChannel[] = ["email", "slack", "discord", "telegram", "webhook", "fcm"];
 
 /** Deliberately loose. Strict email regexes reject valid addresses, and the
  *  real proof of validity is that the confirmation arrives. */
@@ -23,6 +23,8 @@ export interface ContactInput {
   name?: string;
   destination?: string;
   telegramChatId?: string;
+  fcmToken?: string;
+  platform?: "ios" | "android";
   enabled?: boolean;
 }
 
@@ -31,6 +33,8 @@ export interface ValidContact {
   name: string;
   destination: string;
   telegramChatId?: string;
+  fcmToken?: string;
+  platform?: "ios" | "android";
   enabled: boolean;
 }
 
@@ -50,6 +54,12 @@ export async function validateContact(input: ContactInput): Promise<ValidContact
     case "email":
       if (!EMAIL.test(destination)) {
         throw new InvalidContactError("That does not look like an email address");
+      }
+      break;
+
+    case "fcm":
+      if (destination.length < 10) {
+        throw new InvalidContactError("Invalid device push token");
       }
       break;
 

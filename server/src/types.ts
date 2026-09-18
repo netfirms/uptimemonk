@@ -184,7 +184,8 @@ export type AlertChannel =
   | "webhook"
   | "slack"
   | "discord"
-  | "telegram";
+  | "telegram"
+  | "fcm";
 
 export interface AlertContact {
   id: string;
@@ -193,6 +194,8 @@ export interface AlertContact {
   name: string;
   destination: string;
   telegramChatId?: string;
+  fcmToken?: string;
+  platform?: "ios" | "android";
   enabled: boolean;
   verified: boolean;
 }

@@ -16,3 +16,9 @@ ui-debug.log*
 .env.local
 .env*.local
 creds/
+mobile/credentials/
+*.p8
+*.jks
+*.keystore
+keystore.properties
+local*.properties

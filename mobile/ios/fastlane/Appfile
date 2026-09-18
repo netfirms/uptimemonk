@@ -1,0 +1,8 @@
+app_identifier("com.mfx.uptimemonke") # The bundle identifier of your app
+apple_id("m.taweechai@gmail.com") # Your Apple email address
+
+itc_team_id("2028988") # App Store Connect Team ID
+team_id("KA8XY7F89Y") # Developer Portal Team ID
+
+# For more information about the Appfile, see:
+#     https://docs.fastlane.tools/advanced/#appfile

@@ -5,7 +5,7 @@ import { col } from "../sync/firebase.js";
 import { requireAuth } from "./auth.js";
 import { assertSafeUrl, BlockedTargetError } from "../lib/targetGuard.js";
 import { validateContact, InvalidContactError } from "../alerts/validateContact.js";
-import { deliver, type AlertPayload } from "../alerts/channels.js";
+import { deliver, sendFcm, type AlertPayload } from "../alerts/channels.js";
 import { log } from "../lib/log.js";
 import {
   ALERT_FROM_EMAIL,
@@ -184,6 +184,10 @@ async function deliverVerification(
       });
       return;
 
+    case "fcm":
+      await sendFcm(contact.destination, testPayload());
+      return;
+
     default:
       throw new Error(`Unknown channel: ${contact.channel}`);
   }
@@ -227,6 +231,7 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
         slack: "ready",
         discord: "ready",
         webhook: "ready",
+        fcm: "ready",
       },
       contacts: snap.docs
         .map((d) => {
@@ -237,6 +242,7 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
             name: c.name,
             destination: c.destination,
             telegramChatId: c.telegramChatId ?? null,
+            platform: c.platform ?? null,
             enabled: c.enabled !== false,
             verified: c.verified === true,
             // Lets the UI show "confirmation sent" without exposing the token.
@@ -545,4 +551,98 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
         page("Contact confirmed", `${contact.destination} will now receive downtime alerts.`)
       );
   });
+
+  /**
+   * Register or update a mobile device push token (iOS / Android Flutter app).
+   *
+   * Authenticated by the user's Firebase token. Auto-verifies the device since
+   * the token is registered directly from the authenticated client app.
+   */
+  app.post<{ Body: { token?: string; platform?: "ios" | "android"; name?: string } }>(
+    "/v1/devices",
+    { preHandler: requireAuth() },
+    async (req, reply) => {
+      const { orgId, uid } = req.user!;
+      const token = String(req.body?.token ?? "").trim();
+      const platform = req.body?.platform === "ios" ? "ios" : "android";
+      const name =
+        String(req.body?.name ?? "").trim().slice(0, 120) ||
+        `${platform === "ios" ? "iOS" : "Android"} Device`;
+
+      if (!token || token.length < 10) {
+        return reply.code(400).send({ error: "Invalid device token" });
+      }
+
+      // Check if this token is already registered in this org
+      const existingDoc = await col
+        .alertContacts()
+        .where("orgId", "==", orgId)
+        .where("channel", "==", "fcm")
+        .where("destination", "==", token)
+        .limit(1)
+        .get();
+
+      if (!existingDoc.empty) {
+        const doc = existingDoc.docs[0];
+        await doc.ref.update({
+          name,
+          platform,
+          enabled: true,
+          verified: true,
+          updatedAt: Timestamp.now(),
+        });
+        return reply.code(200).send({ id: doc.id, registered: true });
+      }
+
+      const existingCount = await col.alertContacts().where("orgId", "==", orgId).get();
+      if (existingCount.size >= MAX_CONTACTS) {
+        return reply
+          .code(409)
+          .send({ error: `An organisation can have at most ${MAX_CONTACTS} alert contacts` });
+      }
+
+      const ref = col.alertContacts().doc();
+      await ref.set({
+        orgId,
+        uid,
+        channel: "fcm",
+        name,
+        destination: token,
+        fcmToken: token,
+        platform,
+        enabled: true,
+        verified: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+
+      log.info({ contactId: ref.id, platform, orgId }, "mobile device registered for push alerts");
+      return reply.code(201).send({ id: ref.id, registered: true });
+    }
+  );
+
+  /** Unregister a device push token on logout or app removal */
+  app.delete<{ Params: { token: string } }>(
+    "/v1/devices/:token",
+    { preHandler: requireAuth() },
+    async (req, reply) => {
+      const { orgId } = req.user!;
+      const token = req.params.token;
+
+      const snap = await col
+        .alertContacts()
+        .where("orgId", "==", orgId)
+        .where("channel", "==", "fcm")
+        .where("destination", "==", token)
+        .get();
+
+      const batch = col.alertContacts().firestore.batch();
+      for (const d of snap.docs) {
+        batch.delete(d.ref);
+      }
+      await batch.commit();
+
+      return reply.code(200).send({ unregistered: true });
+    }
+  );
 }

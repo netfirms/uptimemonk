@@ -1,0 +1,59 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:ios)
+
+platform :ios do
+
+    desc "Prepare iOS app"
+    lane :prepare  do
+        build_number = number_of_commits()
+        Dir.chdir("..") do
+        sh("unset GEM_HOME && unset GEM_PATH && unset RUBYOPT && flutter build ios --release --no-codesign --build-name=1.0.#{build_number} --build-number=#{build_number}")
+        end
+        sh("pwd")
+    end
+
+      desc "Push a new release build to the Test Flight"
+      lane :testflightupload do
+        prepare
+        build_app(
+        workspace: "./Runner.xcworkspace",
+                        scheme: "Runner",
+                        export_method: "app-store",
+                        export_options: {
+                          provisioningProfiles: {
+                            "com.mfx.uptimemonke" => "uptimeMonke_Appstore"
+                          }
+                        })
+        app_store_connect_api_key(
+            key_id: "F3KGUW4ZSW",
+            issuer_id: "69a6de7b-1f65-47e3-e053-5b8c7c11a4d1",
+            key_filepath: "./fastlane/AuthKey_F3KGUW4ZSW.p8",
+            duration: 1200, # optional (maximum 1200)
+            in_house: false # optional but may be required if using match/sigh
+          )
+        upload_to_testflight(
+          skip_waiting_for_build_processing: true
+        )
+      end
+
+      desc "Push a new release build to the App Store"
+      lane :release do
+        prepare
+        #build_app(workspace: "Runner.xcworkspace", scheme: "Runner")
+        upload_to_app_store
+      end
+end

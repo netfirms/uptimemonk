@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "174268178454",
+    "project_id": "uptimemonk",
+    "storage_bucket": "uptimemonk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:174268178454:android:a545aa9de19972646ed537",
+        "android_client_info": {
+          "package_name": "com.mfx.uptimemonke"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "174268178454-cdldtbaa3enknq32qiie9qn4hrns9ibe.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDf-o5bOArsjOOCOFTNpH0eIUcbmwcppdg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "174268178454-cdldtbaa3enknq32qiie9qn4hrns9ibe.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "174268178454-d6kqgi3gh42tiupqnlr2299p1q3u8jvu.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.mfx.uptimemonke"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

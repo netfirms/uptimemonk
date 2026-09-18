@@ -596,6 +596,7 @@ function rowToContact(r: any): AlertContact {
     name: r.name,
     destination: r.destination,
     telegramChatId: r.telegram_chat_id ?? undefined,
+    fcmToken: r.channel === "fcm" ? r.destination : undefined,
     enabled: bool(r.enabled),
     verified: bool(r.verified),
   };

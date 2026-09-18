@@ -79,11 +79,22 @@ async function drainOnce(): Promise<void> {
         );
       } catch (err) {
         const message = (err as Error).message ?? "delivery failed";
-        markOutboxFailed(row.id, row.attempts, message);
-        log.warn(
-          { err, contactId: contact.id, attempts: row.attempts + 1 },
-          "alert delivery failed, will retry"
-        );
+        const isFcmExpired =
+          contact.channel === "fcm" &&
+          (message.includes("registration-token-not-registered") ||
+            message.includes("invalid-registration-token") ||
+            message.includes("Requested entity was not found"));
+
+        if (isFcmExpired) {
+          markOutboxFailed(row.id, 99, `FCM device token expired: ${message}`);
+          log.warn({ contactId: contact.id }, "FCM token unregistered or invalid, dropping");
+        } else {
+          markOutboxFailed(row.id, row.attempts, message);
+          log.warn(
+            { err, contactId: contact.id, attempts: row.attempts + 1 },
+            "alert delivery failed, will retry"
+          );
+        }
       }
     }
   } catch (err) {

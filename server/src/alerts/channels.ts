@@ -2,6 +2,7 @@ import { ALERT_FROM_EMAIL, APP_URL, USER_AGENT } from "../config.js";
 import { assertSafeUrl } from "../lib/targetGuard.js";
 import type { AlertContact, Incident, Monitor } from "../types.js";
 import { humanDuration } from "../lib/time.js";
+import { messaging } from "../sync/firebase.js";
 
 export interface AlertPayload {
   event: "down" | "up" | "cert";
@@ -251,6 +252,54 @@ export interface AlertSecrets {
   telegramToken?: string;
 }
 
+/**
+ * Mobile push notification via Firebase Cloud Messaging.
+ * High-priority alert with custom sound and structured data for Flutter routing.
+ */
+export async function sendFcm(token: string, p: AlertPayload): Promise<void> {
+  const title = subjectFor(p);
+  const body = bodyFor(p);
+
+  await messaging().send({
+    token,
+    notification: {
+      title,
+      body,
+    },
+    data: {
+      event: p.event,
+      monitorId: p.monitorId,
+      monitorName: p.monitor.name,
+      monitorTarget: p.monitor.target,
+      incidentId: p.incidentId,
+      startedAt: String(p.incident.startedAt ?? Date.now()),
+      resolvedAt: p.incident.resolvedAt ? String(p.incident.resolvedAt) : "",
+      cause: p.incident.cause || "",
+      click_action: "FLUTTER_NOTIFICATION_CLICK",
+    },
+    android: {
+      priority: "high",
+      notification: {
+        channelId: "uptime_alerts",
+        sound: "default",
+        priority: "max",
+        defaultVibrateTimings: true,
+      },
+    },
+    apns: {
+      headers: {
+        "apns-priority": "10",
+      },
+      payload: {
+        aps: {
+          sound: "default",
+          interruptionLevel: "time-sensitive",
+        },
+      },
+    },
+  });
+}
+
 export async function deliver(
   contact: AlertContact,
   p: AlertPayload,
@@ -272,6 +321,8 @@ export async function deliver(
       );
     case "webhook":
       return sendWebhook(contact.destination, p);
+    case "fcm":
+      return sendFcm(contact.fcmToken ?? contact.destination, p);
     default:
       throw new Error(`Unknown channel: ${contact.channel}`);
   }

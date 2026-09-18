@@ -1,6 +1,7 @@
 import { initializeApp, getApps, cert, applicationDefault } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getAuth, type Auth } from "firebase-admin/auth";
+import { getMessaging, type Messaging } from "firebase-admin/messaging";
 import { googleCredentials } from "../config.js";
 
 /**
@@ -48,6 +49,17 @@ export function setCustomAuth(mock: Auth | null): void {
 export function auth(): Auth {
   if (customAuth) return customAuth;
   return getAuth(ensureApp());
+}
+
+let customMessaging: Messaging | null = null;
+
+export function setCustomMessaging(mock: Messaging | null): void {
+  customMessaging = mock;
+}
+
+export function messaging(): Messaging {
+  if (customMessaging) return customMessaging;
+  return getMessaging(ensureApp());
 }
 
 export const col = {

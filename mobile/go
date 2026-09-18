@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+set -e
+set -o pipefail
+
+TASK=$1
+ARGS=${@:2}
+
+help__releaseToAndroidStore="Release to Android store"
+task_releaseToAndroidStore(){
+  echo "============== START =============="
+  cd android && fastlane android alpha_deploy
+  cd ..
+  echo "============== DONE =============="
+}
+
+help__releaseToHuaweiStore="Release to Huawei store"
+task_releaseToHuaweiStore(){
+  echo "============== START =============="
+  cd android && fastlane android huawei_deploy
+  cd ..
+  echo "============== DONE =============="
+}
+
+help__releaseToIosStore="Release to iOS store"
+task_releaseToIosStore(){
+  echo "============== START =============="
+  cd ./ios && fastlane ios testflightupload
+  cd ..
+  echo "============== DONE =============="
+}
+
+help__releaseToStore="Release to Android and iOS store"
+task_releaseToStore(){
+  echo "============== START =============="
+  cd android && fastlane android alpha_deploy
+  cd ../ios && fastlane ios testflight
+  cd ..
+  echo "============== DONE =============="
+}
+
+help__releaseAndroidFirebase="Release Android to Firebase"
+task_releaseAndroidFirebase(){
+  echo "============== START =============="
+  cd android && fastlane android firebase_deploy
+  cd ..
+  echo "============== DONE =============="
+}
+
+help__releaseIosFirebase="Release iOS to Firebase"
+task_releaseIosFirebase(){
+  echo "============== START =============="
+  cd ios && fastlane ios firease_app_distribute
+  cd ..
+  echo "============== DONE =============="
+}
+
+help__releaseFirebase="Release to Firebase"
+task_releaseFirebase(){
+  echo "============== START =============="
+  cd android && fastlane android firebase_deploy
+  cd ../ios && fastlane ios firease_app_distribute
+  cd ..
+  echo "============== DONE =============="
+}
+
+list_all_helps() {
+  compgen -v | egrep "^help__.*"
+}
+
+NEW_LINE=$'\n'
+if type -t "task_$TASK" &>/dev/null; then
+  task_$TASK $ARGS
+else
+  echo "usage: $0 <task> [<..args>]"
+  echo "task:"
+
+  HELPS=""
+  for help in $(list_all_helps)
+  do
+
+    HELPS="$HELPS    ${help/help__/} |-- ${!help}$NEW_LINE"
+  done
+
+  echo "$HELPS" | column -t -s "|"
+  exit 1
+fi
