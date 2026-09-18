@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { api, ApiError, type AlertContact } from "@/lib/api";
 import { events } from "@/lib/analytics";
+import { useI18n } from "@/lib/i18n/context";
 
 export type MonitorType = "http" | "keyword" | "tcp" | "dns" | "ssl" | "icmp" | "heartbeat";
 
@@ -204,6 +205,7 @@ export default function NewMonitorForm({
   initialType?: MonitorType;
   initialTarget?: string;
 }) {
+  const { t } = useI18n();
   const isEditing = !!monitor;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = isOpen !== undefined ? isOpen : internalOpen;
@@ -508,7 +510,7 @@ export default function NewMonitorForm({
       <div className="modal-content" role="dialog" aria-modal="true">
         <div className="modal-header">
           <div>
-            <h2>{isEditing ? "Edit Monitor" : "Create New Monitor"}</h2>
+            <h2>{isEditing ? t("formEditTitle") : t("formNewTitle")}</h2>
             <p className="dim" style={{ marginTop: "2px" }}>
               {isEditing
                 ? "Changes take effect on the next check."
@@ -650,7 +652,7 @@ export default function NewMonitorForm({
             <div className="modal-body">
             {/* Monitor Type Grid */}
             <div className="field">
-              <label>Monitor Protocol</label>
+              <label>{t("formMonitorType")}</label>
               <div className="type-grid">
                 {/* Locked while editing: an existing monitor's uptime history
                     and response times are only comparable within one protocol,
@@ -697,7 +699,7 @@ export default function NewMonitorForm({
             {needsTarget && (
               <div className="field">
                 <label htmlFor="nm-target">
-                  {type === "http" || type === "keyword" ? "URL to Monitor" : "Host or IP"}
+                  {type === "http" || type === "keyword" ? t("formTargetUrl") : t("formTargetHost")}
                 </label>
                 <input
                   id="nm-target"
@@ -713,12 +715,12 @@ export default function NewMonitorForm({
             {/* Keyword input */}
             {needsKeyword && (
               <div className="field">
-                <label htmlFor="nm-keyword">Expected Keyword on Page</label>
+                <label htmlFor="nm-keyword">{t("formKeyword")}</label>
                 <input
                   id="nm-keyword"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="e.g. Sign in, Welcome, Operational"
+                  placeholder={t("formKeywordPlaceholder")}
                   required
                 />
               </div>
@@ -727,7 +729,7 @@ export default function NewMonitorForm({
             {/* Port input */}
             {needsPort && (
               <div className="field">
-                <label htmlFor="nm-port">Target Port</label>
+                <label htmlFor="nm-port">{t("formPort")}</label>
                 <input
                   id="nm-port"
                   type="number"
@@ -742,18 +744,18 @@ export default function NewMonitorForm({
 
             {/* Monitor Friendly Name */}
             <div className="field">
-              <label htmlFor="nm-name">Friendly Name (Optional)</label>
+              <label htmlFor="nm-name">{t("formFriendlyName")}</label>
               <input
                 id="nm-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={target || "e.g. Production Web API"}
+                placeholder={target || t("formFriendlyNamePlaceholder")}
               />
             </div>
 
             {/* Check Frequency Chips */}
             <div className="field">
-              <label>Check Frequency</label>
+              <label>{t("formInterval")}</label>
               <div className="interval-chips">
                 {[
                   { label: "5 sec", value: "5" },
@@ -807,11 +809,9 @@ export default function NewMonitorForm({
                   onChange={(e) => setIsPublic(e.target.checked)}
                 />
                 <span>
-                  <strong>Show on public status page</strong>
+                  <strong>{t("formPublicStatus")}</strong>
                   <span className="dim" style={{ display: "block", marginTop: "2px" }}>
-                    Publishes this check&apos;s name, current state and 90-day
-                    uptime to your status page. The URL you are watching stays
-                    private.
+                    {t("formPublicStatusDesc")}
                   </span>
                 </span>
               </label>
@@ -851,7 +851,7 @@ export default function NewMonitorForm({
             )}
 
             <div className="field">
-              <label>Alerts</label>
+              <label>{t("formAlertContacts")}</label>
               {verified.length === 0 ? (
                 <p className="dim">
                   No confirmed contacts yet — nothing can be paged. Add one
@@ -868,7 +868,7 @@ export default function NewMonitorForm({
                         onChange={(e) => setContactIds(e.target.checked ? [] : verified.map((c) => c.id))}
                       />
                       <span>
-                        Alert everyone
+                        {t("formAllContacts")}
                         <span className="dim" style={{ display: "block", marginTop: "2px" }}>
                           All {verified.length} confirmed contact
                           {verified.length === 1 ? "" : "s"}, including any added later.
@@ -909,9 +909,9 @@ export default function NewMonitorForm({
                       onChange={(e) => setMuteAlerts(e.target.checked)}
                     />
                     <span>
-                      <strong>Mute alerts</strong>
+                      <strong>{t("formMuteAlerts")}</strong>
                       <span className="dim" style={{ display: "block", marginTop: "2px" }}>
-                        Keep checking and recording incidents, but page nobody.
+                        {t("formMuteAlertsDesc")}
                       </span>
                     </span>
                   </label>
@@ -1318,16 +1318,16 @@ export default function NewMonitorForm({
 
           <div className="modal-footer">
             <button type="button" onClick={handleClose} disabled={busy}>
-              Cancel
+              {t("formCancelBtn")}
             </button>
             <button className="primary" type="submit" disabled={busy}>
               {busy
                 ? isEditing
-                  ? "Saving…"
-                  : "Deploying Check…"
+                  ? t("formSaving")
+                  : t("formCreating")
                 : isEditing
-                  ? "Save Changes"
-                  : "Create Monitor"}
+                  ? t("formSaveBtn")
+                  : t("formCreateBtn")}
             </button>
           </div>
         </form>

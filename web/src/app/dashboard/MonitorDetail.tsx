@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type MonitorHistory, type Bucket, type Point } from "@/lib/api";
 import { MonitorTypeIcon } from "./NewMonitorForm";
 import RangeTabs, { rangeLabel, type RangeKey } from "@/components/RangeTabs";
+import { useI18n } from "@/lib/i18n/context";
 
 /**
  * Monitor detail: uptime history, response times and past incidents.
@@ -472,6 +473,7 @@ export default function MonitorDetail({
   monitorId: string | null;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [data, setData] = useState<MonitorHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -602,7 +604,7 @@ export default function MonitorDetail({
                   <span className="stat-num">{fmtPct(m.uptime30d)}</span>
                 </div>
                 <div className="detail-stat">
-                  <span className="stat-title">Avg response</span>
+                  <span className="stat-title">{t("detailAvgResponse")}</span>
                   <span className={`stat-num ${latencyClass(data.summary.avgMs)}`}>
                     {fmtMs(data.summary.avgMs)}
                   </span>
@@ -797,7 +799,7 @@ export default function MonitorDetail({
 
               <section className="detail-section">
                 <div className="detail-section-head">
-                  <h3>Uptime</h3>
+                  <h3>{t("detailUptime")}</h3>
                   <RangeTabs value={range} onChange={setRange} disabled={loading} />
                 </div>
                 <UptimeBars
@@ -809,7 +811,7 @@ export default function MonitorDetail({
 
               <section className="detail-section">
                 <div className="detail-section-head">
-                  <h3>Response time</h3>
+                  <h3>{t("detailTabResponseTime")}</h3>
                   <span className="dim">{rangeLabel(range)}</span>
                 </div>
                 <ResponseChart samples={data.points} />
@@ -817,14 +819,14 @@ export default function MonitorDetail({
 
               <section className="detail-section">
                 <div className="detail-section-head">
-                  <h3>Incidents</h3>
+                  <h3>{t("detailTabIncidents")}</h3>
                   {!!data.incidents.length && (
                     <span className="dim">{data.incidents.length} recorded</span>
                   )}
                 </div>
                 {!data.incidents.length ? (
                   <div className="detail-empty">
-                    <p>No incidents recorded.</p>
+                    <p>{t("detailNoIncidents")}</p>
                   </div>
                 ) : (
                   <div className="detail-incidents">

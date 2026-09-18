@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type OrgSettings as Settings } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 
 /**
  * Workspace name and public status page address.
@@ -22,6 +23,7 @@ export default function OrgSettings({
   onRenamed?: (name: string) => void;
   onOpenProfile?: () => void;
 }) {
+  const { t } = useI18n();
   const [data, setData] = useState<Settings | null>(null);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -103,7 +105,7 @@ export default function OrgSettings({
     <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-content" role="dialog" aria-modal="true" aria-label="Workspace settings">
         <div className="modal-header">
-          <h2>Workspace</h2>
+          <h2>{t("settingsTitle")}</h2>
           <button className="btn-sm" onClick={onClose} aria-label="Close">
             ✕
           </button>
@@ -169,7 +171,7 @@ export default function OrgSettings({
 
               <form onSubmit={saveName} className="settings-block">
                 <div className="field">
-                  <label htmlFor="org-name">Workspace name</label>
+                  <label htmlFor="org-name">{t("settingsWorkspaceName")}</label>
                   <input
                     id="org-name"
                     value={name}
@@ -180,13 +182,13 @@ export default function OrgSettings({
                   <p className="dim">Shown to you and anyone you invite. Any language.</p>
                 </div>
                 <button className="primary" disabled={busy !== null || !name.trim() || name.trim() === data.name}>
-                  {busy === "name" ? "Saving…" : "Save name"}
+                  {busy === "name" ? "Saving…" : t("settingsSave")}
                 </button>
               </form>
 
               <form onSubmit={savePage} className="settings-block">
                 <div className="field">
-                  <label htmlFor="org-slug">Status page address</label>
+                  <label htmlFor="org-slug">{t("settingsSlug")}</label>
                   <div className="slug-input">
                     <span className="slug-prefix">/status/</span>
                     <input
@@ -225,7 +227,7 @@ export default function OrgSettings({
                 </div>
 
                 <div className="field">
-                  <label htmlFor="org-title">Page heading</label>
+                  <label htmlFor="org-title">{t("settingsPageTitle")}</label>
                   <input
                     id="org-title"
                     value={title}
@@ -240,7 +242,7 @@ export default function OrgSettings({
                 </div>
 
                 <div className="field">
-                  <label htmlFor="org-desc">Page subtitle</label>
+                  <label htmlFor="org-desc">{t("settingsPageDesc")}</label>
                   <input
                     id="org-desc"
                     value={description}
@@ -251,7 +253,7 @@ export default function OrgSettings({
                 </div>
 
                 <button className="primary" disabled={busy !== null || !slug.trim()}>
-                  {busy === "page" ? "Saving…" : "Save status page"}
+                  {busy === "page" ? "Saving…" : t("settingsSave")}
                 </button>
               </form>
 

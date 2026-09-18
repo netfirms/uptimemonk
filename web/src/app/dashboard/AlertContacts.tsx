@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type AlertChannel, type AlertContact } from "@/lib/api";
 import { events } from "@/lib/analytics";
+import { useI18n } from "@/lib/i18n/context";
 
 /**
  * Who gets paged.
@@ -58,6 +59,7 @@ export default function AlertContacts({
   isOpen: boolean;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [contacts, setContacts] = useState<AlertContact[] | null>(null);
   const [channels, setChannels] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -209,7 +211,7 @@ export default function AlertContacts({
     <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-content" role="dialog" aria-modal="true" aria-label="Alert contacts">
         <div className="modal-header">
-          <h2>Alert contacts</h2>
+          <h2>{t("contactsTitle")}</h2>
           <button className="btn-sm" onClick={onClose} aria-label="Close">
             ✕
           </button>
@@ -239,7 +241,7 @@ export default function AlertContacts({
           <div className="contact-list">
             {contacts === null && <p className="dim">Loading…</p>}
             {contacts?.length === 0 && (
-              <p className="dim">No contacts yet — add one below.</p>
+              <p className="dim">{t("contactsNoContacts")}</p>
             )}
             {contacts?.map((c) => (
               <div key={c.id} className="contact-row">
@@ -265,7 +267,7 @@ export default function AlertContacts({
                 ) : c.verified ? (
                   <span className="status-pill up">
                     <span className="status-dot up" />
-                    confirmed
+                    {t("contactsVerified")}
                   </span>
                 ) : (
                   <button
@@ -273,7 +275,7 @@ export default function AlertContacts({
                     disabled={busyId === c.id}
                     onClick={() => sendVerification(c.id)}
                   >
-                    {busyId === c.id ? "Sending…" : "Resend confirmation"}
+                    {busyId === c.id ? t("contactsSending") : t("contactsResend")}
                   </button>
                 )}
 
@@ -284,7 +286,7 @@ export default function AlertContacts({
                     onClick={() => sendTest(c)}
                     title="Send a real alert now, the same way an outage would"
                   >
-                    {busyId === c.id ? "Sending…" : "Send test"}
+                    {busyId === c.id ? t("contactsSending") : t("contactsTestAlert")}
                   </button>
                 )}
 
@@ -301,17 +303,17 @@ export default function AlertContacts({
                   disabled={busyId === c.id}
                   onClick={() => remove(c)}
                 >
-                  Remove
+                  {t("contactsDelete")}
                 </button>
               </div>
             ))}
           </div>
 
           <form onSubmit={add} className="contact-add">
-            <h3>Add a contact</h3>
+            <h3>{t("contactsAddNew")}</h3>
 
             <div className="field">
-              <label htmlFor="ac-channel">Channel</label>
+              <label htmlFor="ac-channel">{t("contactsChannel")}</label>
               <select
                 id="ac-channel"
                 value={channel}
@@ -333,9 +335,7 @@ export default function AlertContacts({
             )}
 
             <div className="field">
-              <label htmlFor="ac-dest">
-                {channel === "telegram" ? "Chat ID" : channel === "email" ? "Email address" : "Webhook URL"}
-              </label>
+              <label htmlFor="ac-dest">{t("contactsDestination")}</label>
               <input
                 id="ac-dest"
                 value={destination}
@@ -351,7 +351,7 @@ export default function AlertContacts({
             </div>
 
             <div className="field">
-              <label htmlFor="ac-name">Label (optional)</label>
+              <label htmlFor="ac-name">{t("contactsName")}</label>
               <input
                 id="ac-name"
                 value={name}
@@ -361,7 +361,7 @@ export default function AlertContacts({
             </div>
 
             <button className="primary" type="submit" disabled={adding || !destination.trim()}>
-              {adding ? "Adding…" : "Add contact"}
+              {adding ? t("contactsSending") : t("contactsAddBtn")}
             </button>
           </form>
         </div>

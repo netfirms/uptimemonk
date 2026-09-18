@@ -208,6 +208,40 @@ export const LOCALE_SEO: Record<SupportedLocale, LocaleSeoData> = {
       "ရက် ၉၀ မှတ်တမ်းပါ အများသုံး အခြေအနေ စာမျက်နှာ",
     ],
   },
+  zh: {
+    title: "UptimeMonke — 高频基础设施与网站运行监控服务",
+    description:
+      "提供亚分钟级高频网站与API运行监控、SSL证书过期预警、Cron心跳检测、即时多渠道告警以及优雅的公开状态页。永久免费。",
+    keywords: [
+      "网站监控",
+      "API监控",
+      "运行时间监控",
+      "SSL证书监控",
+      "Cron心跳监控",
+      "公开状态页",
+      "Ping监控",
+      "端口监控",
+      "Slack告警",
+      "Discord告警",
+      "故障管理",
+      "UptimeRobot替代",
+      "DevOps监控工具",
+    ],
+    ogLocale: "zh_CN",
+    applicationDescription:
+      "高频网站与API监控服务，支持亚分钟级探测、SSL证书追踪、Cron心跳探测以及优雅公开状态页。",
+    offersDescription: "每天永久免费提供 14,400 次检测额度",
+    featureList: [
+      "HTTP 与关键字可用性监控",
+      "TCP 端口监控",
+      "DNS 记录验证",
+      "SSL 证书到期告警",
+      "ICMP Ping 延迟检测",
+      "Cron 心跳监控",
+      "多渠道即时告警 (Slack, Discord, 邮件, Webhook)",
+      "带90天历史记录条的精美公开状态页",
+    ],
+  },
 };
 
 /**
@@ -216,6 +250,7 @@ export const LOCALE_SEO: Record<SupportedLocale, LocaleSeoData> = {
 export function getAlternateLanguages(): Record<string, string> {
   return {
     en: `${BASE_URL}/`,
+    zh: `${BASE_URL}/zh`,
     ja: `${BASE_URL}/ja`,
     ko: `${BASE_URL}/ko`,
     ms: `${BASE_URL}/ms`,

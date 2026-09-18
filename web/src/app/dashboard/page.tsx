@@ -18,6 +18,9 @@ import MonitorDetail from "./MonitorDetail";
 import Landing from "@/components/Landing";
 import VerifyEmailGate from "@/components/VerifyEmailGate";
 import ProfileModal from "@/components/ProfileModal";
+import LanguagePicker from "@/components/LanguagePicker";
+import { useI18n } from "@/lib/i18n/context";
+import type { Translations } from "@/lib/i18n/translations";
 import { events, identify } from "@/lib/analytics";
 
 type Status = "up" | "down" | "pending" | "paused";
@@ -55,9 +58,27 @@ interface LiveState {
  * matters is whether the last check was recent, and a clock face makes you do
  * the subtraction yourself.
  */
-function sinceLabel(at?: number | null): string {
-  if (!at) return "never checked";
+function sinceLabel(t: (key: keyof Translations) => string, at?: number | null, locale?: string): string {
+  if (!at) return t("dashNeverChecked");
   const secs = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (locale === "zh") {
+    if (secs < 60) return `${secs}秒前`;
+    if (secs < 3600) return `${Math.round(secs / 60)}分钟前`;
+    if (secs < 86400) return `${Math.round(secs / 3600)}小时前`;
+    return `${Math.round(secs / 86400)}天前`;
+  }
+  if (locale === "ja") {
+    if (secs < 60) return `${secs}秒前`;
+    if (secs < 3600) return `${Math.round(secs / 60)}分前`;
+    if (secs < 86400) return `${Math.round(secs / 3600)}時間前`;
+    return `${Math.round(secs / 86400)}日前`;
+  }
+  if (locale === "ko") {
+    if (secs < 60) return `${secs}초 전`;
+    if (secs < 3600) return `${Math.round(secs / 60)}분 전`;
+    if (secs < 86400) return `${Math.round(secs / 3600)}시간 전`;
+    return `${Math.round(secs / 86400)}일 전`;
+  }
   if (secs < 60) return `${secs}s ago`;
   if (secs < 3600) return `${Math.round(secs / 60)}m ago`;
   if (secs < 86400) return `${Math.round(secs / 3600)}h ago`;
@@ -71,13 +92,13 @@ function sinceLabel(at?: number | null): string {
  * same moment the first warning is sent — a list that still looks calm while
  * an email says otherwise is worse than no badge.
  */
-function certBadge(expiresAt: number): { text: string; state: "ok" | "warn" | "down" } {
+function certBadge(t: (key: keyof Translations) => string, expiresAt: number): { text: string; state: "ok" | "warn" | "down" } {
   const days = Math.floor((expiresAt - Date.now()) / 86_400_000);
-  if (days < 0) return { text: "cert expired", state: "down" };
-  if (days === 0) return { text: "cert expires today", state: "down" };
-  if (days === 1) return { text: "cert expires tomorrow", state: "down" };
+  if (days < 0) return { text: t("dashCertExpired"), state: "down" };
+  if (days === 0) return { text: t("dashCertExpiresToday"), state: "down" };
+  if (days === 1) return { text: t("dashCertExpiresTomorrow"), state: "down" };
   return {
-    text: `cert ${days}d`,
+    text: t("dashCertDays").replace("{days}", String(days)),
     state: days <= 7 ? "down" : days <= 30 ? "warn" : "ok",
   };
 }
@@ -90,6 +111,7 @@ function compactChecks(n: number): string {
 }
 
 export default function Dashboard() {
+  const { t, locale } = useI18n();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
@@ -154,12 +176,13 @@ export default function Dashboard() {
       setSupportOpen(true);
     }
     const newTarget = params.get("new");
-    if (newTarget) {
-      setNewInitialTarget(decodeURIComponent(newTarget));
-      setNewInitialType("http");
+    const newType = params.get("type") as MonitorType | null;
+    if (newTarget || newType) {
+      if (newTarget) setNewInitialTarget(decodeURIComponent(newTarget));
+      if (newType) setNewInitialType(newType);
       setIsCreateModalOpen(true);
     }
-    if (params.get("donate") || params.get("new")) {
+    if (params.get("donate") || params.get("new") || params.get("type")) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -386,7 +409,7 @@ export default function Dashboard() {
               <circle cx="17" cy="17" r="3" />
               <circle cx="7" cy="7" r="3" />
             </svg>
-            {workspaceName ?? "Workspace"}
+            {workspaceName ?? t("dashWorkspace")}
           </button>
         </div>
 
@@ -396,7 +419,7 @@ export default function Dashboard() {
             type="button"
             className="user-profile-chip"
             onClick={() => setProfileOpen(true)}
-            title="Account & Profile Settings — Click to change username"
+            title={t("profileTitle")}
             aria-label="Account and profile settings"
           >
             <div className="user-avatar-small">
@@ -412,18 +435,18 @@ export default function Dashboard() {
             </div>
             <div className="who">
               <span className="who-name">
-                {userDisplayName || currentUser.displayName || currentUser.email?.split("@")[0] || "Signed in"}
+                {userDisplayName || currentUser.displayName || currentUser.email?.split("@")[0] || t("dashSignedIn")}
               </span>
               <span className="who-edit-hint">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                 </svg>
-                Edit Username
+                {t("dashEditUsername")}
               </span>
               {!!billing?.credits && (
                 <span className="who-credit" title="Donated capacity remaining">
-                  {compactChecks(billing.credits)} checks left
+                  {compactChecks(billing.credits)} {t("dashChecksLeft")}
                 </span>
               )}
             </div>
@@ -432,13 +455,15 @@ export default function Dashboard() {
             </svg>
           </button>
 
+          <LanguagePicker compact />
+
           <button
             className="coffee-btn coffee-btn-nav"
             onClick={() => setSupportOpen(true)}
             title="Capacity used, and how to add more"
           >
             <span aria-hidden>☕</span>
-            Buy me a coffee
+            {t("dashBuyCoffee")}
           </button>
           <button
             className="btn-sm"
@@ -449,7 +474,7 @@ export default function Dashboard() {
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            Alerts
+            {t("dashAlerts")}
           </button>
           <button className="btn-sm" onClick={() => signOut(auth)} title="Sign out">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -457,7 +482,7 @@ export default function Dashboard() {
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" x2="9" y1="12" y2="12" />
             </svg>
-            Sign out
+            {t("dashSignOut")}
           </button>
         </div>
       </header>
@@ -466,7 +491,7 @@ export default function Dashboard() {
       <section className="stats-bar">
         <div className="stat-box">
           <div className="stat-title">
-            <span>Overall Uptime</span>
+            <span>{t("dashOverallUptime")}</span>
             <span style={{ color: "#3BD671" }}>30 DAYS</span>
           </div>
           <div className="stat-num" style={{ color: "#3BD671" }}>
@@ -477,7 +502,7 @@ export default function Dashboard() {
 
         <div className="stat-box">
           <div className="stat-title">
-            <span>Up Monitors</span>
+            <span>{t("dashUpMonitors")}</span>
             <span className="status-dot up" />
           </div>
           <div className="stat-num" style={{ color: "#3BD671" }}>
@@ -488,13 +513,13 @@ export default function Dashboard() {
 
         <div className="stat-box">
           <div className="stat-title">
-            <span>Down Monitors</span>
+            <span>{t("dashDownMonitors")}</span>
             <span className={`status-dot ${stats.downCount > 0 ? "down" : "pending"}`} />
           </div>
           <div className="stat-num" style={{ color: stats.downCount > 0 ? "#ef4444" : "inherit" }}>
             {stats.downCount}
           </div>
-          <div className="dim">{stats.downCount > 0 ? "Active incidents" : "No downtime detected"}</div>
+          <div className="dim">{stats.downCount > 0 ? `${stats.downCount} ${t("dashIncidentsActive")}` : t("dashAllOperational")}</div>
         </div>
 
         <div className="stat-box">
@@ -540,28 +565,28 @@ export default function Dashboard() {
             className={`tab-btn ${activeTab === "all" ? "active" : ""}`}
             onClick={() => setActiveTab("all")}
           >
-            <span>All</span>
+            <span>{t("dashFilterAll")}</span>
             <span className="badge-count">{monitors.length}</span>
           </button>
           <button
             className={`tab-btn ${activeTab === "up" ? "active" : ""}`}
             onClick={() => setActiveTab("up")}
           >
-            <span>Up</span>
+            <span>{t("dashFilterUp")}</span>
             <span className="badge-count up">{stats.upCount}</span>
           </button>
           <button
             className={`tab-btn ${activeTab === "down" ? "active" : ""}`}
             onClick={() => setActiveTab("down")}
           >
-            <span>Down</span>
+            <span>{t("dashFilterDown")}</span>
             <span className="badge-count down">{stats.downCount}</span>
           </button>
           <button
             className={`tab-btn ${activeTab === "paused" ? "active" : ""}`}
             onClick={() => setActiveTab("paused")}
           >
-            <span>Paused</span>
+            <span>{t("dashFilterPaused")}</span>
             <span className="badge-count">{stats.pausedCount}</span>
           </button>
           {stats.pendingCount > 0 && (
@@ -583,7 +608,7 @@ export default function Dashboard() {
             </svg>
             <input
               id="dashboard-search-input"
-              placeholder="Search monitors…"
+              placeholder={t("dashSearchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -618,7 +643,7 @@ export default function Dashboard() {
                 <circle cx="12" cy="12" r="9" />
                 <path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18" />
               </svg>
-              Status page
+              {t("dashViewStatusPage")}
               {publicCount > 0 && <span className="badge-count">{publicCount}</span>}
             </a>
           )}
@@ -628,7 +653,7 @@ export default function Dashboard() {
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            + Add New Monitor
+            + {t("dashNewMonitor")}
           </button>
         </div>
       </div>
@@ -683,7 +708,7 @@ export default function Dashboard() {
                   {status === "down" && <span className="pulse-ring down" />}
                   <span className={`status-dot ${state?.inMaintenance ? "maintenance" : status}`} />
                 </span>
-                {state?.inMaintenance ? "MAINT" : status}
+                {state?.inMaintenance ? t("dashMaintenance") : (status === "up" ? t("dashStatusUp") : status === "down" ? t("dashStatusDown") : status === "paused" ? t("dashStatusPaused") : t("dashStatusPending"))}
               </span>
 
               {/* Protocol Icon */}
@@ -703,7 +728,7 @@ export default function Dashboard() {
                     </span>
                   )}
                   {state?.certExpiresAt != null && (() => {
-                    const b = certBadge(state.certExpiresAt);
+                    const b = certBadge(t, state.certExpiresAt);
                     return (
                       <span
                         className={`cert-tag ${b.state}`}
@@ -771,12 +796,12 @@ export default function Dashboard() {
                         {copiedTokenId === m.id ? (
                           <>
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Copied!</span>
+                            <span>{t("dashCopied")}</span>
                           </>
                         ) : (
                           <>
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                            <span>Copy Ping URL</span>
+                            <span>{t("dashCopyHeartbeat")}</span>
                           </>
                         )}
                       </button>
@@ -802,7 +827,7 @@ export default function Dashboard() {
                   {latency != null ? `${latency} ms` : "—"}
                 </div>
                 <div className="dim">
-                  {state?.uptime30d != null ? `${state.uptime30d.toFixed(2)}% / 30d` : "measuring…"}
+                  {state?.uptime30d != null ? `${state.uptime30d.toFixed(2)}% / ${t("dashUptime30d")}` : "…"}
                 </div>
                 {/* "Is this thing even running?" is the first question a
                     monitoring list has to answer, and it was not on the card. */}
@@ -814,7 +839,7 @@ export default function Dashboard() {
                       : "No check recorded yet"
                   }
                 >
-                  {sinceLabel(state?.lastCheckedAt)}
+                  {sinceLabel(t, state?.lastCheckedAt, locale)}
                 </div>
               </div>
 
@@ -827,7 +852,7 @@ export default function Dashboard() {
                   className="btn-icon"
                   onClick={() => setEditing(m)}
                   disabled={busyId === m.id}
-                  title="Edit monitor"
+                  title={t("dashEdit")}
                   aria-label={`Edit ${m.name}`}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -840,8 +865,8 @@ export default function Dashboard() {
                   className="btn-icon"
                   onClick={() => togglePause(m)}
                   disabled={busyId === m.id}
-                  title={isPaused ? `Resume ${m.name}` : `Pause ${m.name}`}
-                  aria-label={isPaused ? `Resume ${m.name}` : `Pause ${m.name}`}
+                  title={isPaused ? `${t("dashResume")} ${m.name}` : `${t("dashPause")} ${m.name}`}
+                  aria-label={isPaused ? `${t("dashResume")} ${m.name}` : `${t("dashPause")} ${m.name}`}
                 >
                   {isPaused ? (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -859,7 +884,7 @@ export default function Dashboard() {
                   className="btn-icon danger"
                   onClick={() => handleDelete(m)}
                   disabled={busyId === m.id}
-                  title={`Delete ${m.name}`}
+                  title={`${t("dashDelete")} ${m.name}`}
                   aria-label={`Delete ${m.name}`}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -872,83 +897,177 @@ export default function Dashboard() {
           );
         })}
 
-        {/* Empty State */}
+        {/* Empty State / Onboarding Guide */}
         {!filteredMonitors.length && (
           <div className="empty-state onboarding-empty-state">
-            <div className="empty-icon">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-            </div>
-            <h3 style={{ fontWeight: 700, fontSize: "1.25rem", marginBottom: "8px" }}>
-              {searchQuery ? "No monitors match your search" : "Welcome to your Workspace!"}
-            </h3>
-            <p className="muted" style={{ maxWidth: "480px", margin: "0 auto 20px", lineHeight: "1.6" }}>
-              {searchQuery
-                ? "Try searching for a different name, host, or clear your active filter tab."
-                : "Your Lightsail worker fleet is ready. Monitor HTTP uptime, SSL certificates, or worker cron heartbeats with 1 click."}
-            </p>
             {searchQuery ? (
-              <button onClick={() => { setSearchQuery(""); setActiveTab("all"); }}>
-                Clear Search
-              </button>
+              <>
+                <div className="empty-icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                </div>
+                <h3 style={{ fontWeight: 700, fontSize: "1.25rem", marginBottom: "8px" }}>
+                  {t("dashNoMatchingMonitors")}
+                </h3>
+                <p className="muted" style={{ maxWidth: "480px", margin: "0 auto 20px", lineHeight: "1.6" }}>
+                  {t("dashNoMatchingMonitors")}
+                </p>
+                <button onClick={() => { setSearchQuery(""); setActiveTab("all"); }}>
+                  Clear Search
+                </button>
+              </>
             ) : (
-              <div className="quickstart-presets-grid">
-                <div
-                  className="preset-card"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    setNewInitialType("http");
-                    setNewInitialTarget("");
-                    setIsCreateModalOpen(true);
-                  }}
-                >
-                  <div className="preset-icon http">
-                    <MonitorTypeIcon type="http" size={24} />
+              <>
+                <div className="onboarding-guide-container">
+                  <div className="onboarding-guide-header">
+                    <div>
+                      <h3 style={{ fontWeight: 700, fontSize: "1.2rem", margin: "0 0 4px", color: "var(--text)" }}>
+                        {t("onboardTitle")}
+                      </h3>
+                      <p className="dim" style={{ fontSize: "0.85rem", margin: 0 }}>
+                        {t("onboardSubtitle")}
+                      </p>
+                    </div>
+                    <span className="status-pill up" style={{ fontSize: "0.75rem" }}>
+                      <span className="status-dot up pulse" />
+                      Ready to configure
+                    </span>
                   </div>
-                  <h4>Website (HTTP/S)</h4>
-                  <p>Check status codes 2xx/3xx, response time, and keywords.</p>
-                  <span className="preset-action">Launch Monitor →</span>
+
+                  <div className="onboarding-steps-row">
+                    <div
+                      className="onboarding-step-box"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        setNewInitialType("http");
+                        setNewInitialTarget("");
+                        setIsCreateModalOpen(true);
+                      }}
+                    >
+                      <div className="onboarding-step-num">1</div>
+                      <div>
+                        <strong style={{ fontSize: "0.85rem", display: "block", color: "var(--text)" }}>
+                          {t("onboardStep1Title")}
+                        </strong>
+                        <span className="dim" style={{ fontSize: "0.75rem" }}>
+                          {t("onboardStep1Desc")}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      className="onboarding-step-box"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setContactsOpen(true)}
+                    >
+                      <div className="onboarding-step-num">2</div>
+                      <div>
+                        <strong style={{ fontSize: "0.85rem", display: "block", color: "var(--text)" }}>
+                          {t("onboardStep2Title")}
+                        </strong>
+                        <span className="dim" style={{ fontSize: "0.75rem" }}>
+                          {t("onboardStep2Desc")}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      className="onboarding-step-box"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSettingsOpen(true)}
+                    >
+                      <div className="onboarding-step-num">3</div>
+                      <div>
+                        <strong style={{ fontSize: "0.85rem", display: "block", color: "var(--text)" }}>
+                          {t("onboardStep3Title")}
+                        </strong>
+                        <span className="dim" style={{ fontSize: "0.75rem" }}>
+                          {t("onboardStep3Desc")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div
-                  className="preset-card"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    setNewInitialType("ssl");
-                    setNewInitialTarget("");
-                    setIsCreateModalOpen(true);
-                  }}
-                >
-                  <div className="preset-icon ssl">
-                    <MonitorTypeIcon type="ssl" size={24} />
+                <div className="quickstart-presets-grid">
+                  <div
+                    className="preset-card"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setNewInitialType("http");
+                      setNewInitialTarget("https://api.myapp.ai/v1/chat/completions");
+                      setIsCreateModalOpen(true);
+                    }}
+                  >
+                    <div className="preset-icon ai">
+                      <span style={{ fontSize: "1.2rem" }}>🤖</span>
+                    </div>
+                    <h4>{t("presetAiTitle")}</h4>
+                    <p>{t("presetAiDesc")}</p>
+                    <span className="preset-action">Monitor AI App →</span>
                   </div>
-                  <h4>SSL Certificate</h4>
-                  <p>Automatic alerts before certificates expire (30, 14, 7, 1 days).</p>
-                  <span className="preset-action">Track Certificate →</span>
-                </div>
 
-                <div
-                  className="preset-card"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    setNewInitialType("heartbeat");
-                    setNewInitialTarget("");
-                    setIsCreateModalOpen(true);
-                  }}
-                >
-                  <div className="preset-icon heartbeat">
-                    <MonitorTypeIcon type="heartbeat" size={24} />
+                  <div
+                    className="preset-card"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setNewInitialType("http");
+                      setNewInitialTarget("");
+                      setIsCreateModalOpen(true);
+                    }}
+                  >
+                    <div className="preset-icon http">
+                      <MonitorTypeIcon type="http" size={24} />
+                    </div>
+                    <h4>Website (HTTP/S)</h4>
+                    <p>Check status codes 2xx/3xx, response time, and keywords.</p>
+                    <span className="preset-action">Launch Monitor →</span>
                   </div>
-                  <h4>Cron Heartbeat</h4>
-                  <p>Dead-man's switch for background jobs, backups, or daemons.</p>
-                  <span className="preset-action">Create Heartbeat →</span>
+
+                  <div
+                    className="preset-card"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setNewInitialType("ssl");
+                      setNewInitialTarget("");
+                      setIsCreateModalOpen(true);
+                    }}
+                  >
+                    <div className="preset-icon ssl">
+                      <MonitorTypeIcon type="ssl" size={24} />
+                    </div>
+                    <h4>SSL Certificate</h4>
+                    <p>Automatic alerts before certificates expire (30, 14, 7, 1 days).</p>
+                    <span className="preset-action">Track Certificate →</span>
+                  </div>
+
+                  <div
+                    className="preset-card"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setNewInitialType("heartbeat");
+                      setNewInitialTarget("");
+                      setIsCreateModalOpen(true);
+                    }}
+                  >
+                    <div className="preset-icon heartbeat">
+                      <MonitorTypeIcon type="heartbeat" size={24} />
+                    </div>
+                    <h4>Cron Heartbeat</h4>
+                    <p>Dead-man's switch for background jobs, backups, or daemons.</p>
+                    <span className="preset-action">Create Heartbeat →</span>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
         )}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type Billing } from "@/lib/api";
 import { events } from "@/lib/analytics";
+import { useI18n } from "@/lib/i18n/context";
 
 /**
  * Capacity, and how to add to it.
@@ -40,6 +41,7 @@ export default function Support({
   /** What the workspace's current monitors cost, computed by the caller. */
   usedChecksPerDay: number;
 }) {
+  const { t } = useI18n();
   const [billing, setBilling] = useState<Billing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -88,7 +90,7 @@ export default function Support({
     <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-content" role="dialog" aria-modal="true" aria-label="Capacity">
         <div className="modal-header">
-          <h2>Capacity</h2>
+          <h2>{t("supportTitle")}</h2>
           <button className="btn-sm" onClick={onClose} aria-label="Close">
             ✕
           </button>
@@ -171,7 +173,7 @@ export default function Support({
                     onClick={() => void events.donateStarted(billing.link!.cents / 100)}
                   >
                     <span aria-hidden>☕</span>
-                    Buy me a coffee — ${(billing.link.cents / 100).toFixed(2)}
+                    {t("supportBuyCoffee")} — ${(billing.link.cents / 100).toFixed(2)}
                   </a>
                   <p className="dim" style={{ marginTop: 8 }}>
                     Adds {fmt(billing.link.checks)} checks{" "}
@@ -205,7 +207,7 @@ export default function Support({
                     capacity each month. Unused capacity rolls over.
                   </p>
                   <button className="primary" onClick={donate} disabled={busy}>
-                    {busy ? "Opening Stripe…" : `Support with $${amount}/month`}
+                    {busy ? "Opening Stripe…" : `${t("supportDonateBtn")} ($${amount}/month)`}
                   </button>
                   <p className="dim" style={{ marginTop: 8, fontSize: "0.75rem" }}>
                     Stripe handles the payment. Cancel any time — credit you have

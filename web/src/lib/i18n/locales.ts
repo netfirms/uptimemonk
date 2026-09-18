@@ -1,4 +1,4 @@
-export type SupportedLocale = "en" | "ja" | "ko" | "ms" | "id" | "my";
+export type SupportedLocale = "en" | "ja" | "ko" | "ms" | "id" | "my" | "zh";
 
 export interface LocaleMeta {
   code: SupportedLocale;
@@ -9,6 +9,7 @@ export interface LocaleMeta {
 
 export const SUPPORTED_LOCALES: LocaleMeta[] = [
   { code: "en", name: "English", nativeName: "English", flag: "🇺🇸" },
+  { code: "zh", name: "Chinese", nativeName: "简体中文", flag: "🇨🇳" },
   { code: "ja", name: "Japanese", nativeName: "日本語", flag: "🇯🇵" },
   { code: "ko", name: "Korean", nativeName: "한국어", flag: "🇰🇷" },
   { code: "ms", name: "Malay", nativeName: "Bahasa Melayu", flag: "🇲🇾" },
@@ -27,7 +28,7 @@ export function isSupportedLocale(code: string): code is SupportedLocale {
 }
 
 /**
- * Normalizes a raw language code (e.g. "ja-JP", "ko_KR", "in-ID", "ms-MY", "my-MM")
+ * Normalizes a raw language code (e.g. "zh-CN", "ja-JP", "ko_KR", "in-ID", "ms-MY", "my-MM")
  * to our supported locale code, or undefined if not supported.
  */
 export function matchLocale(rawLang: string): SupportedLocale | undefined {
@@ -37,6 +38,7 @@ export function matchLocale(rawLang: string): SupportedLocale | undefined {
 
   // Indonesian historically used "in" in older Android / Java specifications
   if (primary === "in" || primary === "id") return "id";
+  if (primary === "zh") return "zh";
   if (primary === "ja") return "ja";
   if (primary === "ko") return "ko";
   if (primary === "ms") return "ms";

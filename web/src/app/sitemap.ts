@@ -20,6 +20,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const alternateLanguages = {
     en: `${SITE}/`,
+    zh: `${SITE}/zh`,
     ja: `${SITE}/ja`,
     ko: `${SITE}/ko`,
     ms: `${SITE}/ms`,
@@ -31,6 +32,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const pages = [
     { path: "", priority: 1.0, changeFrequency: "daily" as const },
     { path: "/en", priority: 0.9, changeFrequency: "weekly" as const },
+    { path: "/zh", priority: 0.9, changeFrequency: "weekly" as const },
     { path: "/ja", priority: 0.9, changeFrequency: "weekly" as const },
     { path: "/ko", priority: 0.9, changeFrequency: "weekly" as const },
     { path: "/ms", priority: 0.9, changeFrequency: "weekly" as const },

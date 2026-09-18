@@ -5,6 +5,7 @@ import { updateProfile, type User } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { api, ApiError } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function ProfileModal({
   isOpen,
@@ -19,6 +20,7 @@ export default function ProfileModal({
   onUpdated?: (newDisplayName: string) => void;
   onOpenWorkspaceSettings?: () => void;
 }) {
+  const { t } = useI18n();
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,7 +161,7 @@ export default function ProfileModal({
               <span className="profile-avatar-letter">{initial}</span>
             )}
           </div>
-          <h3 id="profile-modal-title">Account &amp; Profile</h3>
+          <h3 id="profile-modal-title">{t("profileTitle")}</h3>
           <p className="profile-email-badge">
             <span>{currentUser.email}</span>
             {currentUser.emailVerified ? (
@@ -182,7 +184,7 @@ export default function ProfileModal({
             <div className="auth-field">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <label htmlFor="profile-username" className="auth-field-label">
-                  Display Name / Username
+                  {t("profileUsername")}
                 </label>
                 <span className="dim" style={{ fontSize: "0.72rem" }}>
                   {displayName.length}/50
@@ -212,7 +214,7 @@ export default function ProfileModal({
               style={{ width: "100%", marginTop: "12px", padding: "10px 16px" }}
               disabled={busy || !displayName.trim()}
             >
-              {busy ? "Saving…" : "Save Changes"}
+              {busy ? t("profileSaving") : t("profileSave")}
             </button>
           </form>
 

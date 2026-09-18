@@ -40,16 +40,53 @@ export default function Landing({
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"signup" | "signin">("signup");
   const [quickUrl, setQuickUrl] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState<"ai" | "web" | "ssl" | "heartbeat">("ai");
 
   // Interactive Live Edge Probes Tab
-  const [demoTab, setDemoTab] = useState<"http" | "ssl" | "ports" | "heartbeat">("http");
+  const [demoTab, setDemoTab] = useState<"ai" | "http" | "ssl" | "ports" | "heartbeat">("ai");
 
-  // Simulated live latency jitter (18ms - 32ms) to give a breathing, active pulse
+  // Simulated live latency jitter to give a breathing, active pulse
   const [simulatedJitter, setSimulatedJitter] = useState({
+    ai: 360,
     api: 24,
     auth: 46,
     store: 31,
   });
+
+  function getDestination(target: string, preset: "ai" | "web" | "ssl" | "heartbeat") {
+    const p = new URLSearchParams();
+    let finalTarget = target.trim();
+    if (!finalTarget) {
+      finalTarget =
+        preset === "ai"
+          ? "https://api.myapp.ai/v1/chat/completions"
+          : preset === "ssl"
+          ? "myapp.com"
+          : preset === "heartbeat"
+          ? "nightly-ai-worker"
+          : "https://myapp.com";
+    }
+    if (preset !== "ssl" && preset !== "heartbeat") {
+      if (!finalTarget.startsWith("http://") && !finalTarget.startsWith("https://")) {
+        finalTarget = "https://" + finalTarget;
+      }
+    }
+    p.set("new", finalTarget);
+    if (preset === "ai") {
+      p.set("type", "http");
+      p.set("name", "AI Inference API");
+    } else if (preset === "ssl") {
+      p.set("type", "ssl");
+      p.set("name", `${finalTarget} SSL`);
+    } else if (preset === "heartbeat") {
+      p.set("type", "heartbeat");
+      p.set("name", finalTarget);
+    } else {
+      p.set("type", "http");
+      p.set("name", "Production Web App");
+    }
+    return `/dashboard?${p.toString()}`;
+  }
 
   // Alert Channel Tab
   const [alertTab, setAlertTab] = useState<"slack" | "discord" | "email" | "webhook">("slack");
@@ -85,6 +122,7 @@ export default function Landing({
   useEffect(() => {
     const timer = setInterval(() => {
       setSimulatedJitter({
+        ai: 340 + Math.floor(Math.random() * 50),
         api: 20 + Math.floor(Math.random() * 8),
         auth: 42 + Math.floor(Math.random() * 10),
         store: 28 + Math.floor(Math.random() * 7),
@@ -200,23 +238,21 @@ export default function Landing({
             </div>
           )}
         </div>
-      </header>
-
-      {/* 2. HERO SECTION */}
+      </header>      {/* 2. HERO SECTION */}
       <section className="hero-wrap" id="hero">
         <div className="hero-glow-backdrop" aria-hidden="true" />
 
-        <div className="hero-tag">
+        <div className="hero-ai-pill">
           <span className="status-dot up pulse" />
-          <span>{t("heroTag")}</span>
+          <span>{t("heroAiBadge")}</span>
         </div>
 
         <h1 className="hero-title">
-          {t("heroTitle1")}<span className="hero-green">{t("heroTitleHighlight")}</span>{t("heroTitle2")}
+          <span className="hero-gradient-text">{t("heroAiHeadline")}</span>
         </h1>
 
         <p className="hero-desc">
-          {t("heroDesc")}
+          {t("heroAiSubtext")}
         </p>
 
         {/* Interactive Quickstart Form */}
@@ -231,17 +267,9 @@ export default function Landing({
             className="hero-quickstart-form"
             onSubmit={(e) => {
               e.preventDefault();
-              let target = quickUrl.trim();
-              if (!target) {
-                setAuthModalMode("signup");
-                setAuthModalOpen(true);
-                return;
-              }
-              if (!target.startsWith("http://") && !target.startsWith("https://")) {
-                target = "https://" + target;
-              }
+              const dest = getDestination(quickUrl, selectedPreset);
               if (currentUser) {
-                window.location.href = `/dashboard?new=${encodeURIComponent(target)}`;
+                window.location.href = dest;
               } else {
                 setAuthModalMode("signup");
                 setAuthModalOpen(true);
@@ -249,11 +277,21 @@ export default function Landing({
             }}
           >
             <div className="hero-quickstart-bar">
-              <span className="hero-quickstart-icon">🌐</span>
+              <span className="hero-quickstart-icon">
+                {selectedPreset === "ai" ? "🤖" : selectedPreset === "ssl" ? "🔒" : selectedPreset === "heartbeat" ? "⚡" : "🌐"}
+              </span>
               <input
                 type="text"
                 className="hero-quickstart-input"
-                placeholder={t("heroPlaceholder")}
+                placeholder={
+                  selectedPreset === "ai"
+                    ? "https://api.myapp.ai/v1/chat/completions"
+                    : selectedPreset === "ssl"
+                    ? "myapp.com"
+                    : selectedPreset === "heartbeat"
+                    ? "nightly-ai-worker"
+                    : t("heroPlaceholder")
+                }
                 value={quickUrl}
                 onChange={(e) => setQuickUrl(e.target.value)}
                 aria-label={t("heroPlaceholder")}
@@ -261,6 +299,50 @@ export default function Landing({
               <button type="submit" className="hero-quickstart-btn">
                 <span>{t("heroStartBtn")}</span>
                 <span className="arrow-icon">→</span>
+              </button>
+            </div>
+
+            {/* Quickstart Workload Presets */}
+            <div className="hero-presets-strip">
+              <button
+                type="button"
+                className={`hero-preset-btn ${selectedPreset === "ai" ? "active" : ""}`}
+                onClick={() => {
+                  setSelectedPreset("ai");
+                  setQuickUrl("https://api.myapp.ai/v1/chat/completions");
+                }}
+              >
+                <span>{t("presetAiApi")}</span>
+              </button>
+              <button
+                type="button"
+                className={`hero-preset-btn ${selectedPreset === "web" ? "active" : ""}`}
+                onClick={() => {
+                  setSelectedPreset("web");
+                  setQuickUrl("https://myapp.com");
+                }}
+              >
+                <span>{t("presetWebApp")}</span>
+              </button>
+              <button
+                type="button"
+                className={`hero-preset-btn ${selectedPreset === "ssl" ? "active" : ""}`}
+                onClick={() => {
+                  setSelectedPreset("ssl");
+                  setQuickUrl("myapp.com");
+                }}
+              >
+                <span>{t("presetSsl")}</span>
+              </button>
+              <button
+                type="button"
+                className={`hero-preset-btn ${selectedPreset === "heartbeat" ? "active" : ""}`}
+                onClick={() => {
+                  setSelectedPreset("heartbeat");
+                  setQuickUrl("nightly-ai-worker");
+                }}
+              >
+                <span>{t("presetHeartbeat")}</span>
               </button>
             </div>
           </form>
@@ -271,10 +353,7 @@ export default function Landing({
               type="button"
               className="google-btn-light"
               onClick={() => {
-                const target = quickUrl.trim()
-                  ? (quickUrl.trim().startsWith("http") ? quickUrl.trim() : "https://" + quickUrl.trim())
-                  : "";
-                handleGoogleSignIn(target ? `/dashboard?new=${encodeURIComponent(target)}` : "/dashboard");
+                handleGoogleSignIn(getDestination(quickUrl, selectedPreset));
               }}
               disabled={isSigningIn}
             >
@@ -313,7 +392,7 @@ export default function Landing({
           <div className="feature-pill">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
-              <path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4 10 15 15 0 0 1 4-10z" />
+              <path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z" />
             </svg>
             <span>{t("pillHttp")}</span>
           </div>
@@ -346,6 +425,31 @@ export default function Landing({
         </div>
       </section>
 
+      {/* 2.5. ONBOARDING JOURNEY SECTION */}
+      <section className="onboarding-journey-section">
+        <div className="section-head" style={{ marginBottom: "8px" }}>
+          <span className="section-tag">{t("onboardingJourneyTag")}</span>
+          <h2>{t("onboardingJourneyTitle")}</h2>
+        </div>
+        <div className="journey-cards-grid">
+          <div className="journey-card">
+            <div className="journey-badge">1</div>
+            <h3>{t("onboardingStep1")}</h3>
+            <p>{t("onboardingStep1Desc")}</p>
+          </div>
+          <div className="journey-card">
+            <div className="journey-badge">2</div>
+            <h3>{t("onboardingStep2")}</h3>
+            <p>{t("onboardingStep2Desc")}</p>
+          </div>
+          <div className="journey-card">
+            <div className="journey-badge">3</div>
+            <h3>{t("onboardingStep3")}</h3>
+            <p>{t("onboardingStep3Desc")}</p>
+          </div>
+        </div>
+      </section>
+
       {/* 3. INTERACTIVE "LIVE EDGE PROBES" SANDBOX */}
       <section className="demo-section" id="demo">
         <div className="section-head">
@@ -357,6 +461,14 @@ export default function Landing({
         <div className="preview-box preview-box-interactive">
           {/* Tab bar inside preview */}
           <div className="preview-nav-tabs">
+            <button
+              type="button"
+              className={`preview-tab-btn ${demoTab === "ai" ? "active" : ""}`}
+              onClick={() => setDemoTab("ai")}
+            >
+              <span>🤖</span>
+              <span>{t("tabAi")}</span>
+            </button>
             <button
               type="button"
               className={`preview-tab-btn ${demoTab === "http" ? "active" : ""}`}
@@ -416,6 +528,55 @@ export default function Landing({
 
           {/* Dynamic Tab Content */}
           <div className="preview-rows">
+            {demoTab === "ai" && (
+              <>
+                <div className="preview-row">
+                  <div className="preview-info-col">
+                    <div className="row" style={{ gap: "8px" }}>
+                      <span className="status-dot up pulse" />
+                      <strong className="preview-target">https://api.myapp.ai/v1/chat/completions</strong>
+                    </div>
+                    <div className="uptime-spark-row" title={t("demoUptime30d")}>
+                      {Array.from({ length: 30 }).map((_, i) => (
+                        <span key={i} className="spark-bar up" />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="preview-meta-col">
+                    <span className="badge-code-200">200 OK</span>
+                    <span className="latency-val latency-fast">{simulatedJitter.ai} ms</span>
+                  </div>
+                </div>
+
+                <div className="preview-row">
+                  <div className="preview-info-col">
+                    <div className="row" style={{ gap: "8px" }}>
+                      <span className="status-dot up pulse" />
+                      <strong className="preview-target">https://gateway.internal.ai/v1/models</strong>
+                    </div>
+                    <span className="dim" style={{ fontSize: "0.75rem" }}>OpenAI &amp; Claude LLM Proxy Gateway</span>
+                  </div>
+                  <div className="preview-meta-col">
+                    <span className="badge-code-200">200 OK</span>
+                    <span className="latency-val latency-fast">42 ms</span>
+                  </div>
+                </div>
+
+                <div className="preview-row">
+                  <div className="preview-info-col">
+                    <div className="row" style={{ gap: "8px" }}>
+                      <span className="status-dot up pulse" />
+                      <strong className="preview-target">vector-db-qdrant.prod:6333</strong>
+                    </div>
+                    <span className="dim" style={{ fontSize: "0.75rem" }}>Vector Database Latency &amp; Embeddings Health</span>
+                  </div>
+                  <div className="preview-meta-col">
+                    <span className="badge-code-200">{t("demoPortOpen")}</span>
+                    <span className="latency-val latency-fast">18 ms</span>
+                  </div>
+                </div>
+              </>
+            )}
             {demoTab === "http" && (
               <>
                 <div className="preview-row">
@@ -985,7 +1146,7 @@ export default function Landing({
               <button
                 type="button"
                 className="google-btn-light"
-                onClick={() => handleGoogleSignIn()}
+                onClick={() => handleGoogleSignIn(getDestination(quickUrl, selectedPreset))}
                 disabled={isSigningIn}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24">
@@ -1056,12 +1217,7 @@ export default function Landing({
           if (onSignedIn) {
             onSignedIn(u);
           } else {
-            const target = quickUrl.trim()
-              ? quickUrl.trim().startsWith("http")
-                ? quickUrl.trim()
-                : "https://" + quickUrl.trim()
-              : "";
-            window.location.href = target ? `/dashboard?new=${encodeURIComponent(target)}` : "/dashboard";
+            window.location.href = getDestination(quickUrl, selectedPreset);
           }
         }}
       />
