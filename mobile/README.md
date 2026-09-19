@@ -75,6 +75,37 @@ flutter run
 Push notifications require a real device and the platform notification
 configuration; permission is requested at runtime.
 
+## Testing
+
+Tests live in `test/` and use `flutter_test` (see `pubspec.yaml`). Run them with:
+
+```sh
+flutter test
+flutter analyze
+```
+
+`flutter analyze` uses the lint set configured in `analysis_options.yaml`
+(`package:flutter_lints/flutter.yaml`), which excludes `build/**`, `android/**`
+and `ios/**`.
+
+Current tests:
+
+- `test/email_verification_test.dart` — unit tests for `needsEmailConfirmation`
+  in `lib/core/email_verification.dart`. Covers the gate itself (a password
+  sign-in with an unconfirmed address is blocked) and the deliberate
+  exceptions: `google.com`, `github.com` and `apple.com` are let straight
+  through because Firebase reports `emailVerified: false` for them, and an
+  Apple private-relay address (`@privaterelay.appleid.com`) is never asked to
+  confirm because only Apple can confirm it.
+- `test/widget_test.dart` — domain-model unit tests: `MonitorConfig.fromFirestore`
+  and `LiveState.fromMap` from `lib/data/models/`.
+
+Native tests: `ios/RunnerTests/RunnerTests.swift` is an XCTest stub run via the
+Xcode test action; there is no equivalent Android instrumentation test.
+
+Fastlane also exposes a `test` action on each platform (see
+`android/fastlane/README.md` and `ios/fastlane/README.md`).
+
 ## Auth flow
 
 `main.dart` routes by `AuthViewModel` state: a loading screen while `initial`, a
