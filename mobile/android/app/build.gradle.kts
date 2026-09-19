@@ -38,14 +38,18 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+    // compilerOptions replaces the removed kotlinOptions DSL (Kotlin 2.2 makes
+    // kotlinOptions a hard error).
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        }
     }
 
     defaultConfig {
         applicationId = "com.mfx.uptimemonke"
         multiDexEnabled = true
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutterVersionCode.toInt()
         versionName = flutterVersionName

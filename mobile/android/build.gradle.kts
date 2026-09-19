@@ -18,8 +18,11 @@ subprojects {
 
 subprojects {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-        kotlinOptions {
-            freeCompilerArgs = freeCompilerArgs + listOf("-Xskip-metadata-version-check")
+        // compilerOptions replaces the removed kotlinOptions DSL (Kotlin 2.2
+        // makes kotlinOptions a hard error). add() appends rather than
+        // replacing, so any args a plugin set are preserved.
+        compilerOptions {
+            freeCompilerArgs.add("-Xskip-metadata-version-check")
         }
     }
 }
