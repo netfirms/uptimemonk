@@ -5,6 +5,7 @@ import '../../data/models/monitor.dart';
 import '../../data/models/live_state.dart';
 import '../../viewmodels/monitor_detail_viewmodel.dart';
 import '../monitor_form/monitor_form_screen.dart';
+import 'widgets/status_bars_chart.dart';
 import 'widgets/response_chart.dart';
 import 'widgets/incident_list.dart';
 
@@ -100,7 +101,8 @@ class MonitorDetailScreen extends StatelessWidget {
                   // Status Header Box
                   _buildHeaderCard(context),
 
-                  // Chart
+                  // Charts — the range selector lives on the status chart and
+                  // drives both, so one tap relabels and refetches everything.
                   if (vm.isLoading && vm.history == null)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 40),
@@ -108,12 +110,20 @@ class MonitorDetailScreen extends StatelessWidget {
                         child: CircularProgressIndicator(color: AppTheme.primaryEmerald),
                       ),
                     )
-                  else if (vm.history != null)
+                  else if (vm.history != null) ...[
+                    // Monitoring result first: up/down history over the range.
+                    StatusBarsChart(
+                      history: vm.history!,
+                      activeRange: vm.range,
+                      onRangeSelected: (r) => vm.setRange(r),
+                    ),
+                    // Then response time, the same buckets' latency.
                     ResponseChart(
                       history: vm.history!,
                       activeRange: vm.range,
                       onRangeSelected: (r) => vm.setRange(r),
                     ),
+                  ],
 
                   // Incidents
                   if (vm.history != null)
