@@ -1,11 +1,30 @@
 import type { FastifyInstance } from "fastify";
 import { auth, col } from "../sync/firebase.js";
 import { requireAdmin, requireAuth } from "./auth.js";
-import { listMonitors, getOrgCredit, creditLedger } from "../db/repo.js";
+import { listMonitors, getOrgCredit, creditLedger, deleteOrg } from "../db/repo.js";
 import { budgetFor, standingOf } from "../lib/credits.js";
 import { readinessSummary } from "../lib/readiness.js";
 import { readFileSync } from "node:fs";
 import { log } from "../lib/log.js";
+
+/**
+ * Whether an account is shielded from deletion.
+ *
+ * An operator cannot delete an operator, themselves included. `requireAdmin`
+ * fails closed on an empty allowlist, so emptying it by deleting the last
+ * administrator would lock everyone out of this console permanently — with no
+ * way back in through the console itself.
+ *
+ * Matching lowercases both sides because addresses are case-insensitive and
+ * the allowlist is written by hand.
+ */
+export function isProtectedAccount(
+  email: string | null | undefined,
+  admins: string[]
+): boolean {
+  if (!email) return false;
+  return admins.map((a) => a.toLowerCase()).includes(email.toLowerCase());
+}
 
 /** Same shape the config endpoint uses: enough to recognise, not to reuse. */
 function maskForDisplay(val: unknown): string {
@@ -15,6 +34,7 @@ function maskForDisplay(val: unknown): string {
   return str.slice(0, 4) + "•".repeat(Math.min(str.length - 8, 20)) + str.slice(-4);
 }
 import {
+  ADMIN_EMAILS,
   SECRET_CONFIG_KEYS,
   getEffectiveConfig,
   API_VERSION,
@@ -85,6 +105,110 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       }),
     };
   });
+
+  /**
+   * Erase an account and the workspace it owns.
+   *
+   * Irreversible, and it removes monitoring other people may be relying on,
+   * so the rules are deliberately narrow:
+   *
+   * - An operator cannot delete an operator, themselves included. Otherwise
+   *   one misclick empties the allowlist and nobody can reach this console
+   *   again — `requireAdmin` fails closed on an empty list by design.
+   * - A workspace with other members attached is refused rather than
+   *   silently taking them down with it. Bootstrap only ever creates owners
+   *   today, so this should never fire; it is here because "should never"
+   *   stops being true the moment invites ship.
+   *
+   * Order matters and is chosen to fail safe. The data goes first and the
+   * account last: if this dies halfway, the account survives owning nothing,
+   * and signing in simply bootstraps a fresh workspace. The reverse order
+   * leaves data no one owns, which is exactly the orphaned-workspace state
+   * this console had to clean up by hand once already.
+   */
+  app.delete<{ Params: { uid: string } }>(
+    "/v1/admin/users/:uid",
+    guard,
+    async (req, reply) => {
+      const { uid } = req.params;
+
+      let account;
+      try {
+        account = await auth().getUser(uid);
+      } catch {
+        return reply.code(404).send({ error: "No such account" });
+      }
+
+      if (isProtectedAccount(account.email, ADMIN_EMAILS)) {
+        return reply.code(403).send({
+          error: "Administrators cannot be deleted from the console.",
+          code: "admin-protected",
+        });
+      }
+
+      const orgSnap = await col.orgs().where("ownerUid", "==", uid).get();
+      const orgId = orgSnap.empty ? null : orgSnap.docs[0].id;
+
+      if (orgId) {
+        const members = await col.users().where("orgId", "==", orgId).get();
+        const others = members.docs.filter((d) => d.id !== uid);
+        if (others.length) {
+          return reply.code(409).send({
+            error: `That workspace has ${others.length} other member(s). Move or remove them first.`,
+            code: "org-has-members",
+          });
+        }
+      }
+
+      // Firestore first. Batched per collection rather than one giant batch,
+      // because a batch caps at 500 writes and a busy workspace exceeds it.
+      let firestoreDocs = 0;
+      if (orgId) {
+        for (const query of [
+          col.monitors().where("orgId", "==", orgId),
+          col.incidents().where("orgId", "==", orgId),
+          col.alertContacts().where("orgId", "==", orgId),
+          col.statusPages().where("orgId", "==", orgId),
+          col.statusSlugs().where("orgId", "==", orgId),
+        ]) {
+          const snap = await query.get();
+          for (let i = 0; i < snap.docs.length; i += 400) {
+            const batch = col.orgs().firestore.batch();
+            snap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+            await batch.commit();
+          }
+          firestoreDocs += snap.size;
+        }
+
+        await col.orgStatus().doc(orgId).delete();
+        await col.orgs().doc(orgId).delete();
+        firestoreDocs += 2;
+      }
+
+      await col.users().doc(uid).delete();
+      firestoreDocs += 1;
+
+      // Then the worker's own tables, which nothing upstream describes.
+      const removed = orgId ? deleteOrg(orgId) : { monitors: 0, contacts: 0, ledger: 0 };
+
+      // The account last, so a failure above leaves something recoverable.
+      await auth().deleteUser(uid);
+
+      log.warn(
+        {
+          deletedUid: uid,
+          deletedEmail: account.email ?? null,
+          orgId,
+          firestoreDocs,
+          ...removed,
+          by: req.user?.email,
+        },
+        "admin deleted account"
+      );
+
+      return { deleted: true, uid, orgId, firestoreDocs, ...removed };
+    }
+  );
 
   /**
    * The fleet.

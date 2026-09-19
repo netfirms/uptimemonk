@@ -33,8 +33,21 @@ Runner/GeneratedPluginRegistrant.*
 !default.pbxuser
 !default.perspectivev3
 
-# Fastlane credentials & reports
+# Fastlane & Apple credentials, certificates, profiles & reports
+*.p8
+*.p12
+*.cer
+*.cert
+*.crt
+*.der
+*.key
+*.pem
+*.mobileprovision
+*.provisionprofile
+*.certSigningRequest
+*.csr
 fastlane/*.p8
 fastlane/api_key_info.json
 **/report.xml
+
 

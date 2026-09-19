@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "174268178454-ro2gblfq7dkba9hitrsdifghrud2in0p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mfx.uptimemonke",
+            "certificate_hash": "1bea19cdb9ff585d72cae1983d959d0c45eefb29"
+          }
+        },
+        {
+          "client_id": "174268178454-rsulnj1adtso62tou06c1cscqufq2pf0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mfx.uptimemonke",
+            "certificate_hash": "85e5b59884c35de532b7f515e39c1fb693fb85fd"
+          }
+        },
+        {
           "client_id": "174268178454-cdldtbaa3enknq32qiie9qn4hrns9ibe.apps.googleusercontent.com",
           "client_type": 3
         }

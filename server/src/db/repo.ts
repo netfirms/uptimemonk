@@ -189,6 +189,47 @@ export function deleteMonitor(id: string): void {
 }
 
 /**
+ * Erase a workspace and everything the worker holds for it.
+ *
+ * Deleting the Firestore documents alone is not enough. The config listener
+ * removes monitors that disappear upstream, which takes their buckets,
+ * rollups and incidents with them — but nothing upstream describes the
+ * org-scoped rows, so `alert_contacts`, `credit_ledger` and the `orgs` row
+ * itself would stay on disk forever. That is how orphaned workspaces happen.
+ *
+ * One transaction, because a half-deleted workspace is worse than either
+ * outcome: the ledger is append-only and an org row without its ledger reads
+ * as a workspace that never paid.
+ *
+ * Returns what it removed, so the caller can log a real number rather than
+ * claiming success.
+ */
+export function deleteOrg(orgId: string): { monitors: number; contacts: number; ledger: number } {
+  const db = getDb();
+  let monitors = 0;
+  let contacts = 0;
+  let ledger = 0;
+
+  db.transaction(() => {
+    // Outbox rows reference incidents, so they go first — same order as
+    // deleteMonitor, for the same reason.
+    db.prepare(
+      `DELETE FROM alert_outbox WHERE incident_id IN
+         (SELECT id FROM incidents WHERE org_id = ?)`
+    ).run(orgId);
+    db.prepare("DELETE FROM incidents WHERE org_id = ?").run(orgId);
+    db.prepare("DELETE FROM hour_buckets WHERE org_id = ?").run(orgId);
+    db.prepare("DELETE FROM day_rollups WHERE org_id = ?").run(orgId);
+    monitors = db.prepare("DELETE FROM monitors WHERE org_id = ?").run(orgId).changes;
+    contacts = db.prepare("DELETE FROM alert_contacts WHERE org_id = ?").run(orgId).changes;
+    ledger = db.prepare("DELETE FROM credit_ledger WHERE org_id = ?").run(orgId).changes;
+    db.prepare("DELETE FROM orgs WHERE id = ?").run(orgId);
+  })();
+
+  return { monitors, contacts, ledger };
+}
+
+/**
  * One-off repair for monitors deleted before the cascade existed. Runs at
  * worker start: cheap when there is nothing to do, and it is the only way the
  * rows already stranded on disk ever go away.

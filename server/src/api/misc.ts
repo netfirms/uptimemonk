@@ -6,9 +6,9 @@ import { getMonitorByHeartbeatToken, getMonitor, getOrgPlan, setDueAt } from "..
 import { limitsFor } from "../lib/plans.js";
 import { flush, recordResult } from "../monitors/recordResult.js";
 import { handleVerifyRequest, signatureMatches } from "../probe/verify.js";
-import { requireAuth } from "./auth.js";
+import { requireAuth, needsEmailConfirmation } from "./auth.js";
 import { log } from "../lib/log.js";
-import { verifyRecaptcha } from "../lib/recaptcha.js";
+import { verifyRecaptcha, botGateApplies } from "../lib/recaptcha.js";
 import { SECRET_CONFIG_KEYS } from "../config.js";
 import { requireAdmin } from "./auth.js";
 import { readinessSummary } from "../lib/readiness.js";
@@ -202,7 +202,7 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
      * Ordering matters: this comes before the early return, so someone who
      * somehow bootstrapped while unverified still cannot proceed.
      */
-    if (decoded.email && decoded.email_verified !== true) {
+    if (needsEmailConfirmation(decoded)) {
       return reply.code(403).send({
         error: "Confirm your email address to continue.",
         code: "email-not-verified",
@@ -214,7 +214,7 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
     }
 
     /**
-     * The one place a bot can be stopped.
+     * The one place a bot can be stopped — for browsers.
      *
      * Sign-up happens in the browser against Google directly, so this server
      * never sees it and cannot gate it. Creating a *workspace* does come
@@ -224,21 +224,43 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
      *
      * Checked after the early return above, so an existing customer whose
      * token already carries an orgId never needs a token for it.
+     *
+     * THE MOBILE EXEMPTION IS A DELIBERATE HOLE, NOT AN OVERSIGHT.
+     *
+     * reCAPTCHA v3 is a browser technology; the Flutter app cannot mint a
+     * token, so before this exemption every mobile sign-up failed here with a
+     * 429. `X-Client` is an ordinary request header and anyone can send it
+     * from curl, so this does not merely exempt the app — it exempts anyone
+     * who reads this file, or who watches the app's traffic once. Treat the
+     * bot gate as advisory rather than as a control.
+     *
+     * The real fix is Firebase App Check (Play Integrity on Android,
+     * DeviceCheck/App Attest on iOS), which attests the app binary and device
+     * and is verifiable server-side the way a reCAPTCHA token is. It needs
+     * console setup per platform, which is why it is not here yet. When it
+     * lands, verify the App Check token for mobile and delete this exemption
+     * rather than keeping both.
      */
-    const verdict = await verifyRecaptcha(
-      req.body?.recaptchaToken,
-      "signup",
-      req.ip
-    );
-    if (!verdict.ok) {
-      log.warn(
-        { uid: decoded.uid, score: verdict.score, reason: verdict.reason },
-        "bootstrap refused by recaptcha"
+    if (botGateApplies(req.headers["x-client"])) {
+      const verdict = await verifyRecaptcha(
+        req.body?.recaptchaToken,
+        "signup",
+        req.ip
       );
-      return reply.code(429).send({
-        error: "We could not verify this request. Reload the page and try again.",
-        code: "recaptcha-failed",
-      });
+      if (!verdict.ok) {
+        log.warn(
+          { uid: decoded.uid, score: verdict.score, reason: verdict.reason },
+          "bootstrap refused by recaptcha"
+        );
+        return reply.code(429).send({
+          error: "We could not verify this request. Reload the page and try again.",
+          code: "recaptcha-failed",
+        });
+      }
+    } else {
+      // Logged so the exemption is visible in production rather than silent:
+      // a spike here is someone scripting it, not customers buying phones.
+      log.info({ uid: decoded.uid, ip: req.ip }, "bootstrap: bot gate skipped for mobile client");
     }
 
     // A claim can lag a moment behind the document; check Firestore too so a

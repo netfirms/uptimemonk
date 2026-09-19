@@ -6,6 +6,7 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { api, ApiError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
+import { needsEmailConfirmation } from "@/lib/authProviders";
 
 export default function ProfileModal({
   isOpen,
@@ -164,7 +165,8 @@ export default function ProfileModal({
           <h3 id="profile-modal-title">{t("profileTitle")}</h3>
           <p className="profile-email-badge">
             <span>{currentUser.email}</span>
-            {currentUser.emailVerified ? (
+            {/* A federated sign-in has nothing pending — see `needsEmailConfirmation`. */}
+            {!needsEmailConfirmation(currentUser) ? (
               <span className="badge-verified" title="Email address is verified">
                 ✓ Verified
               </span>

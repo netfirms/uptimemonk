@@ -5,7 +5,7 @@ import '../data/models/monitor.dart';
 import '../data/models/live_state.dart';
 import '../data/services/api_client.dart';
 
-enum FilterStatus { all, up, down, paused }
+enum FilterStatus { all, up, down, paused, pending }
 
 class MonitorWithLiveState {
   final MonitorConfig config;
@@ -30,15 +30,39 @@ class DashboardViewModel extends ChangeNotifier {
   bool _isLoading = true;
   String? _errorMessage;
 
+  String? _workspaceName;
+  int? _creditsRemaining;
+
   List<MonitorConfig> get monitors => _monitors;
   Map<String, LiveState> get liveStates => _liveStates;
   FilterStatus get filter => _filter;
   String get searchQuery => _searchQuery;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  String? get workspaceName => _workspaceName;
+  int? get creditsRemaining => _creditsRemaining;
 
   DashboardViewModel({required this.orgId}) {
     _startSubscriptions();
+    _fetchWorkspaceMetadata();
+  }
+
+  Future<void> _fetchWorkspaceMetadata() async {
+    try {
+      final orgData = await _apiClient.fetchOrg();
+      if (orgData['name'] != null) {
+        _workspaceName = orgData['name'] as String;
+      }
+    } catch (_) {}
+
+    try {
+      final billingData = await _apiClient.fetchBilling();
+      if (billingData['credits'] != null) {
+        _creditsRemaining = (billingData['credits'] as num).toInt();
+      }
+    } catch (_) {}
+
+    notifyListeners();
   }
 
   void _startSubscriptions() {
@@ -90,10 +114,13 @@ class DashboardViewModel extends ChangeNotifier {
         .where((m) {
           // Search query check
           if (_searchQuery.isNotEmpty) {
-            final query = _searchQuery.toLowerCase();
+            final query = _searchQuery.toLowerCase().trim();
+            final isHeartbeat = m.type == 'heartbeat';
+            final matchesCron = isHeartbeat && ('cron'.contains(query) || 'heartbeat'.contains(query));
             final matchesName = m.name.toLowerCase().contains(query);
             final matchesTarget = m.target.toLowerCase().contains(query);
-            if (!matchesName && !matchesTarget) return false;
+            final matchesType = m.type.toLowerCase().contains(query);
+            if (!matchesName && !matchesTarget && !matchesType && !matchesCron) return false;
           }
 
           // Status filter check
@@ -111,6 +138,8 @@ class DashboardViewModel extends ChangeNotifier {
               return live.status == 'down';
             case FilterStatus.paused:
               return !m.enabled || live.status == 'paused';
+            case FilterStatus.pending:
+              return live.status == 'pending';
           }
         })
         .map((m) => MonitorWithLiveState(
@@ -120,7 +149,7 @@ class DashboardViewModel extends ChangeNotifier {
         .toList();
   }
 
-  // --- Summary Metrics ---
+  // --- Summary Metrics (Matching Web Exactly) ---
   int get totalCount => _monitors.length;
 
   int get upCount => _monitors.where((m) {
@@ -136,6 +165,42 @@ class DashboardViewModel extends ChangeNotifier {
       }).length;
 
   int get pausedCount => _monitors.where((m) => !m.enabled).length;
+
+  int get pendingCount => _monitors.where((m) {
+        if (!m.enabled) return false;
+        final s = _liveStates[m.id]?.status;
+        return s == null || s == 'pending';
+      }).length;
+
+  int get publicCount => _monitors.where((m) => m.publicOnStatusPage == true).length;
+
+  int? get avgLatency {
+    int total = 0;
+    int count = 0;
+    for (final m in _monitors) {
+      if (!m.enabled) continue;
+      final lat = _liveStates[m.id]?.responseTimeMs;
+      if (lat != null && lat > 0) {
+        total += lat;
+        count++;
+      }
+    }
+    return count > 0 ? (total / count).round() : null;
+  }
+
+  double get avgUptime30d {
+    if (_monitors.isEmpty) return 100.0;
+    double total = 0.0;
+    int count = 0;
+    for (final m in _monitors) {
+      final u = _liveStates[m.id]?.uptime30d;
+      if (u != null) {
+        total += u;
+        count++;
+      }
+    }
+    return count > 0 ? total / count : 100.0;
+  }
 
   double get avgUptime24h {
     final active = _monitors.where((m) => m.enabled).toList();

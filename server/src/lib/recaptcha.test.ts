@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 process.env.RECAPTCHA_SECRET = "test-secret";
 process.env.RECAPTCHA_MIN_SCORE = "0.5";
 
-const { verifyRecaptcha, recaptchaEnabled } = await import("./recaptcha.js");
+const { verifyRecaptcha, recaptchaEnabled, botGateApplies } = await import("./recaptcha.js");
 
 const realFetch = globalThis.fetch;
 let reply: unknown = {};
@@ -75,5 +75,33 @@ describe("reCAPTCHA verification", () => {
   test("a missing score is treated as zero, not as a pass", async () => {
     reply = { success: true, action: "signup" };
     assert.equal((await verifyRecaptcha("tok", "signup")).ok, false);
+  });
+});
+
+/**
+ * The mobile exemption.
+ *
+ * Deliberate, and deliberately weak — see `botGateApplies`. These tests pin
+ * the behaviour so the hole cannot widen quietly, and so that whoever wires
+ * up App Check can see exactly what they are replacing.
+ */
+describe("who the bot gate applies to", () => {
+  test("a browser is gated", () => {
+    assert.equal(botGateApplies(undefined), true);
+  });
+
+  test("the mobile app is exempt, because it cannot mint a token", () => {
+    assert.equal(botGateApplies("mobile"), false);
+  });
+
+  test("any other client value is gated", () => {
+    assert.equal(botGateApplies("web"), true);
+    assert.equal(botGateApplies("Mobile"), true);
+    assert.equal(botGateApplies(""), true);
+  });
+
+  test("a repeated header does not earn the exemption", () => {
+    // No honest client sends x-client twice; Fastify surfaces it as an array.
+    assert.equal(botGateApplies(["mobile", "mobile"]), true);
   });
 });

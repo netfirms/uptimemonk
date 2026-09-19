@@ -92,8 +92,16 @@ echo "Mode: $DEPLOY_TARGET"
 if [[ "$SKIP_BUMP" == "false" && -z "${UPTIMEMONK_ALREADY_BUMPED:-}" ]]; then
   echo "==> Bumping version before unified deployment..."
   node "$SCRIPT_DIR/../scripts/bump-version.mjs"
-  export UPTIMEMONK_ALREADY_BUMPED=1
 fi
+
+# Claim the decision either way.
+#
+# Both sub-scripts bump on their own unless this is set. Exporting it only in
+# the branch above meant `--skip-bump` skipped the parent's bump and then let
+# each child bump instead — one deploy, two bumps, which is the opposite of
+# what the flag asks for. Whether we bumped or were told not to, the question
+# is settled here.
+export UPTIMEMONK_ALREADY_BUMPED=1
 
 # 1. Firebase deployment
 if [[ "$DEPLOY_TARGET" == "all" || "$DEPLOY_TARGET" == "firebase" ]]; then
@@ -106,7 +114,9 @@ if [[ "$DEPLOY_TARGET" == "all" || "$DEPLOY_TARGET" == "firebase" ]]; then
   if [[ -n "$FIREBASE_PROJECT" ]]; then
     FB_ARGS+=(--project "$FIREBASE_PROJECT")
   fi
-  bash "$SCRIPT_DIR/deploy-firebase.sh" "${FB_ARGS[@]}"
+  # Empty arrays are unbound under `set -u` in bash 3.2, which ships on
+  # macOS — so the no-options path died here before running anything.
+  bash "$SCRIPT_DIR/deploy-firebase.sh" ${FB_ARGS[@]+"${FB_ARGS[@]}"}
 fi
 
 # 2. AWS Lightsail deployment
@@ -121,9 +131,9 @@ if [[ "$DEPLOY_TARGET" == "all" || "$DEPLOY_TARGET" == "lightsail" ]]; then
     LS_ARGS+=(--no-restart-worker)
   fi
   if [[ ${#HOSTS[@]} -gt 0 ]]; then
-    LS_ARGS+=("${HOSTS[@]}")
+    LS_ARGS+=(${HOSTS[@]+"${HOSTS[@]}"})
   fi
-  bash "$SCRIPT_DIR/deploy-lightsail.sh" "${LS_ARGS[@]}"
+  bash "$SCRIPT_DIR/deploy-lightsail.sh" ${LS_ARGS[@]+"${LS_ARGS[@]}"}
 fi
 
 echo ""

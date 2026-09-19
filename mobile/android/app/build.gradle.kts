@@ -33,6 +33,7 @@ android {
     ndkVersion = "28.0.13004108"
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -44,7 +45,7 @@ android {
     defaultConfig {
         applicationId = "com.mfx.uptimemonke"
         multiDexEnabled = true
-        minSdk = 21
+        minSdk = 23
         targetSdk = 36
         versionCode = flutterVersionCode.toInt()
         versionName = flutterVersionName
@@ -83,3 +84,7 @@ flutter {
     source = "../.."
 }
 
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation("androidx.browser:browser:1.8.0")
+}

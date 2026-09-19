@@ -234,6 +234,14 @@ export default function AdminPage() {
 
   // Inspector modal state
   const [inspectedUser, setInspectedUser] = useState<UserAccount | null>(null);
+  // Account deletion. `deleteConfirm` holds what the operator has typed: the
+  // button stays disabled until it matches the address exactly, because the
+  // action is irreversible and a misclick in a table of similar rows is the
+  // realistic failure, not a considered mistake.
+  const [deleteTarget, setDeleteTarget] = useState<UserAccount | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [inspectedMonitor, setInspectedMonitor] = useState<MonitorItem | null>(null);
   const [inspectedDonation, setInspectedDonation] = useState<DonationRecord | null>(null);
   const [copiedAdminToken, setCopiedAdminToken] = useState(false);
@@ -915,6 +923,34 @@ export default function AdminPage() {
     }
   };
 
+  /** Erase an account and its workspace. Irreversible; see the admin route. */
+  const handleDeleteUser = async () => {
+    if (!deleteTarget || !currentUser) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const token = await currentUser.getIdToken();
+      const res = await fetch(
+        `https://api.uptimemonke.com/v1/admin/users/${encodeURIComponent(deleteTarget.uid)}`,
+        { method: "DELETE", headers: { authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Delete failed (${res.status})`);
+      }
+      // Drop it from the table rather than refetching: the list is the whole
+      // fleet and a reload here would blank the operator's filters.
+      setUsers((prev) => prev.filter((u) => u.uid !== deleteTarget.uid));
+      setInspectedUser((prev) => (prev?.uid === deleteTarget.uid ? null : prev));
+      setDeleteTarget(null);
+      setDeleteConfirm("");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Filtered Users
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
@@ -1509,13 +1545,32 @@ export default function AdminPage() {
                       </span>
                     </td>
                     <td>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: "4px 10px", fontSize: "0.75rem" }}
-                        onClick={() => setInspectedUser(u)}
-                      >
-                        Inspect
-                      </button>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: "4px 10px", fontSize: "0.75rem" }}
+                          onClick={() => setInspectedUser(u)}
+                        >
+                          Inspect
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          style={{
+                            padding: "4px 10px",
+                            fontSize: "0.75rem",
+                            color: "var(--red)",
+                            borderColor: "rgba(239, 68, 68, 0.35)",
+                          }}
+                          title="Delete this account and its workspace"
+                          onClick={() => {
+                            setDeleteTarget(u);
+                            setDeleteConfirm("");
+                            setDeleteError(null);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -2837,6 +2892,102 @@ export default function AdminPage() {
             <div className="inspector-field">
               <label>Registered Date / Last Active</label>
               <div className="val">{inspectedUser.createdAt} (Last seen: {inspectedUser.lastActive})</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account — irreversible, so the address must be typed out. */}
+      {deleteTarget && (
+        <div className="modal-backdrop" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="inspector-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="inspector-header">
+              <h3 style={{ color: "var(--red)" }}>Delete account</h3>
+              <button
+                className="btn btn-secondary"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div
+              style={{
+                background: "rgba(239, 68, 68, 0.08)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                borderRadius: "6px",
+                padding: "12px 14px",
+                marginBottom: "14px",
+                fontSize: "0.85rem",
+                lineHeight: 1.55,
+              }}
+            >
+              This cannot be undone. It permanently removes the sign-in account,
+              the workspace <strong>{deleteTarget.orgName || deleteTarget.orgId || "—"}</strong>,
+              its <strong>{deleteTarget.monitorsCount}</strong> monitor(s), all
+              history and incidents, the alert contacts, any public status page
+              and its claimed address, and the credit ledger
+              {deleteTarget.creditsRemaining > 0 && (
+                <> — including <strong>{deleteTarget.creditsRemaining.toLocaleString()}</strong> unspent checks</>
+              )}
+              . Monitoring stops immediately and nobody is notified.
+            </div>
+
+            <div className="inspector-field">
+              <label>Account</label>
+              <div className="val font-mono">{deleteTarget.email ?? deleteTarget.uid}</div>
+            </div>
+
+            <div className="inspector-field">
+              <label>Type the address to confirm</label>
+              <input
+                className="config-input"
+                autoFocus
+                spellCheck={false}
+                autoComplete="off"
+                value={deleteConfirm}
+                disabled={deleting}
+                placeholder={deleteTarget.email ?? deleteTarget.uid}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                style={{ width: "100%", fontFamily: "var(--font-mono, monospace)" }}
+              />
+            </div>
+
+            {deleteError && (
+              <div
+                style={{
+                  color: "var(--red)",
+                  fontSize: "0.82rem",
+                  marginTop: "10px",
+                  lineHeight: 1.5,
+                }}
+              >
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "18px" }}>
+              <button
+                className="btn btn-secondary"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                disabled={deleting || deleteConfirm !== (deleteTarget.email ?? deleteTarget.uid)}
+                onClick={handleDeleteUser}
+                style={{
+                  background: "var(--red)",
+                  color: "#fff",
+                  opacity:
+                    deleting || deleteConfirm !== (deleteTarget.email ?? deleteTarget.uid) ? 0.5 : 1,
+                }}
+              >
+                {deleting ? "Deleting…" : "Delete permanently"}
+              </button>
             </div>
           </div>
         </div>

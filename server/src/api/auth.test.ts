@@ -97,6 +97,99 @@ describe("API Auth Middleware", () => {
     assert.equal(res.statusCode, 403);
   });
 
+  test("a GitHub sign-in is not held behind a confirmation it can never do", async () => {
+    // Firebase only sets email_verified for Google. A GitHub user arrives with
+    // it false and has no password account to confirm, so a bare
+    // `email_verified !== true` check would lock them out forever.
+    setCustomAuth({
+      verifyIdToken: async () =>
+        ({
+          uid: "u1",
+          orgId: "org-1",
+          role: "owner",
+          email: "dev@test.com",
+          email_verified: false,
+          firebase: { sign_in_provider: "github.com" },
+        } as any),
+    } as unknown as Auth);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/test",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    assert.equal(res.statusCode, 200);
+  });
+
+  test("an Apple sign-in is let through, private relay address and all", async () => {
+    // Hide My Email gives a @privaterelay.appleid.com address. Only Apple can
+    // confirm it, so gating on a confirmation link would be a dead end.
+    setCustomAuth({
+      verifyIdToken: async () =>
+        ({
+          uid: "u1",
+          orgId: "org-1",
+          role: "owner",
+          email: "abc123@privaterelay.appleid.com",
+          email_verified: false,
+          firebase: { sign_in_provider: "apple.com" },
+        } as any),
+    } as unknown as Auth);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/test",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    assert.equal(res.statusCode, 200);
+  });
+
+  test("any federated sign-in is let through, not just the ones we ship today", async () => {
+    // The rule is "password sign-ups confirm their address", so a provider
+    // nobody enumerated is still a provider, and its users are not asked to
+    // confirm an address they never typed.
+    setCustomAuth({
+      verifyIdToken: async () =>
+        ({
+          uid: "u1",
+          orgId: "org-1",
+          role: "owner",
+          email: "someone@test.com",
+          email_verified: false,
+          firebase: { sign_in_provider: "facebook.com" },
+        } as any),
+    } as unknown as Auth);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/test",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    assert.equal(res.statusCode, 200);
+  });
+
+  test("a password sign-up is still gated", async () => {
+    // The rule the gate exists for: anyone can type any address into a form.
+    setCustomAuth({
+      verifyIdToken: async () =>
+        ({
+          uid: "u1",
+          orgId: "org-1",
+          role: "owner",
+          email: "typed@test.com",
+          email_verified: false,
+          firebase: { sign_in_provider: "password" },
+        } as any),
+    } as unknown as Auth);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/test",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    assert.equal(res.statusCode, 403);
+  });
+
   test("a token with no email at all is let through", async () => {
     // No enabled provider makes one today; the exemption is so that turning
     // on phone or anonymous auth later locks nobody out by surprise.

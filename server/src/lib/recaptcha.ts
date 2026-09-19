@@ -20,6 +20,26 @@ import { log } from "./log.js";
  * So the token is minted in the browser at sign-up and spent here.
  */
 
+/**
+ * Whether the bot gate applies to this request.
+ *
+ * reCAPTCHA v3 is a browser technology — the Flutter app cannot mint a token,
+ * so every mobile sign-up was refused until this exemption existed. It is
+ * named and tested rather than inlined so that it is greppable and so nobody
+ * removes it believing it to be an accident.
+ *
+ * It is worth being blunt about what it is worth: `X-Client` is an ordinary
+ * request header, so anything that can send a request can claim to be the
+ * app. The gate is advisory for anyone who looks. Firebase App Check is the
+ * control that actually holds, and replaces this.
+ *
+ * A repeated header arrives as an array, which no honest client sends, so it
+ * does not earn the exemption.
+ */
+export function botGateApplies(clientHeader: string | string[] | undefined): boolean {
+  return clientHeader !== "mobile";
+}
+
 export interface RecaptchaVerdict {
   ok: boolean;
   score?: number;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../viewmodels/auth_viewmodel.dart';
+import 'widgets/social_auth_buttons.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -28,12 +29,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Account'),
+        title: const Text('Create Workspace'),
       ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Form(
               key: _formKey,
               child: Column(
@@ -43,7 +44,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Text(
                     'Get Started with UptimeMonke',
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 24,
                       fontWeight: FontWeight.w800,
                       color: AppTheme.textPrimary,
                       letterSpacing: -0.5,
@@ -54,7 +55,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     'Free forever: 14,400 checks/day across all monitor types',
                     style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
+
+                  // 1-Click Social Authentication (Google & GitHub)
+                  SocialAuthButtons(
+                    onSuccess: () {
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
 
                   // Email
                   TextFormField(
@@ -69,7 +79,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
                   // Password
                   TextFormField(
@@ -88,18 +98,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                   // Error Message
                   if (authVm.errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        authVm.errorMessage!,
-                        style: const TextStyle(color: AppTheme.statusDown, fontSize: 13),
-                        textAlign: TextAlign.center,
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.statusDownBg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.statusDownBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, size: 18, color: AppTheme.statusDown),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              authVm.errorMessage!,
+                              style: const TextStyle(color: AppTheme.statusDown, fontSize: 13),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
                   // Submit Button
                   ElevatedButton(
-                    onPressed: authVm.status == AuthStatus.loading
+                    onPressed: authVm.isAnyLoading
                         ? null
                         : () async {
                             if (_formKey.currentState!.validate()) {
@@ -118,7 +141,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                           )
-                        : const Text('Create Workspace'),
+                        : const Text('Create Workspace with Email'),
                   ),
                 ],
               ),

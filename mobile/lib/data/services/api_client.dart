@@ -29,6 +29,11 @@ class ApiClient {
     return {
       'content-type': 'application/json',
       'authorization': 'Bearer $token',
+      // Tells /v1/bootstrap this is the app, which cannot mint a reCAPTCHA
+      // token — that is a browser technology. See the bot-gate comment in
+      // server/src/api/misc.ts: the exemption is deliberate and weak, and is
+      // meant to be replaced by Firebase App Check.
+      'x-client': 'mobile',
     };
   }
 
@@ -144,8 +149,9 @@ class ApiClient {
 
   Future<void> unregisterDevice(String token) async {
     final headers = await _authHeaders();
+    final encoded = Uri.encodeComponent(token);
     final res = await http.delete(
-      Uri.parse('$baseUrl/v1/devices/$token'),
+      Uri.parse('$baseUrl/v1/devices/$encoded'),
       headers: headers,
     ).timeout(AppConstants.requestTimeout);
 
@@ -170,8 +176,133 @@ class ApiClient {
     final res = await http.post(
       Uri.parse('$baseUrl/v1/contacts/$id/test'),
       headers: headers,
+      body: jsonEncode({}),
     ).timeout(AppConstants.requestTimeout);
 
     _handleResponse(res);
   }
+
+  /// Add an alert destination.
+  ///
+  /// The server decides `verified` — it always starts false, and a client that
+  /// could set it could page a stranger. Email and Telegram need a
+  /// confirmation step before anything is delivered to them.
+  Future<AlertContact> createContact({
+    required String channel,
+    required String name,
+    required String destination,
+  }) async {
+    final headers = await _authHeaders();
+    final res = await http.post(
+      Uri.parse('$baseUrl/v1/contacts'),
+      headers: headers,
+      body: jsonEncode({
+        'channel': channel,
+        'name': name,
+        'destination': destination,
+      }),
+    ).timeout(AppConstants.requestTimeout);
+
+    return AlertContact.fromJson(_handleResponse(res) as Map<String, dynamic>);
+  }
+
+  /// Rename, or turn a destination on and off.
+  ///
+  /// Channel and destination are immutable server-side: changing either would
+  /// carry the old destination's verified status to a new one.
+  Future<void> updateContact(String id, {String? name, bool? enabled}) async {
+    final headers = await _authHeaders();
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (enabled != null) body['enabled'] = enabled;
+
+    final res = await http.patch(
+      Uri.parse('$baseUrl/v1/contacts/$id'),
+      headers: headers,
+      body: jsonEncode(body),
+    ).timeout(AppConstants.requestTimeout);
+
+    _handleResponse(res);
+  }
+
+  Future<void> deleteContact(String id) async {
+    final headers = await _authHeaders();
+    final res = await http.delete(
+      Uri.parse('$baseUrl/v1/contacts/$id'),
+      headers: headers,
+    ).timeout(AppConstants.requestTimeout);
+
+    _handleResponse(res);
+  }
+
+  /// Send (or resend) the confirmation for a destination that needs one.
+  Future<void> verifyContact(String id) async {
+    final headers = await _authHeaders();
+    final res = await http.post(
+      Uri.parse('$baseUrl/v1/contacts/$id/verify'),
+      headers: headers,
+      body: jsonEncode({}),
+    ).timeout(AppConstants.requestTimeout);
+
+    _handleResponse(res);
+  }
+
+  // --- Current User Limits & Plan ---
+  Future<Map<String, dynamic>> fetchMe() async {
+    final headers = await _authHeaders();
+    final res = await http.get(
+      Uri.parse('$baseUrl/v1/me'),
+      headers: headers,
+    ).timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(res) as Map<String, dynamic>;
+  }
+
+  /// Change the display name on the account.
+  Future<String> updateDisplayName(String displayName) async {
+    final headers = await _authHeaders();
+    final res = await http.patch(
+      Uri.parse('$baseUrl/v1/me'),
+      headers: headers,
+      body: jsonEncode({'displayName': displayName}),
+    ).timeout(AppConstants.requestTimeout);
+
+    final data = _handleResponse(res) as Map<String, dynamic>;
+    return data['displayName'] as String? ?? displayName;
+  }
+
+  // --- Org & Billing ---
+  Future<Map<String, dynamic>> fetchOrg() async {
+    final headers = await _authHeaders();
+    final res = await http.get(
+      Uri.parse('$baseUrl/v1/org'),
+      headers: headers,
+    ).timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(res) as Map<String, dynamic>;
+  }
+
+  /// Rename the workspace. Owner-only server-side.
+  Future<String> updateOrgName(String name) async {
+    final headers = await _authHeaders();
+    final res = await http.patch(
+      Uri.parse('$baseUrl/v1/org'),
+      headers: headers,
+      body: jsonEncode({'name': name}),
+    ).timeout(AppConstants.requestTimeout);
+
+    final data = _handleResponse(res) as Map<String, dynamic>;
+    return data['name'] as String? ?? name;
+  }
+
+  Future<Map<String, dynamic>> fetchBilling() async {
+    final headers = await _authHeaders();
+    final res = await http.get(
+      Uri.parse('$baseUrl/v1/billing'),
+      headers: headers,
+    ).timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(res) as Map<String, dynamic>;
+  }
 }
+

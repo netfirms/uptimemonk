@@ -84,3 +84,41 @@ describe("saving system config", () => {
     assert.ok(ignored.includes("isAdmin"));
   });
 });
+
+/**
+ * Deleting an account.
+ *
+ * Irreversible and it stops other people's monitoring, so the guard around it
+ * matters more than the delete itself.
+ */
+const { isProtectedAccount } = await import("./admin.js");
+
+describe("who cannot be deleted", () => {
+  const ADMINS = ["ops@uptimemonke.com", "second@uptimemonke.com"];
+
+  test("an operator is shielded, including the one clicking", () => {
+    // Deleting the last administrator empties the allowlist, and requireAdmin
+    // fails closed on an empty list — there would be no way back in.
+    assert.equal(isProtectedAccount("ops@uptimemonke.com", ADMINS), true);
+    assert.equal(isProtectedAccount("second@uptimemonke.com", ADMINS), true);
+  });
+
+  test("matching ignores case, because addresses do", () => {
+    assert.equal(isProtectedAccount("Ops@UptimeMonke.com", ADMINS), true);
+    assert.equal(isProtectedAccount("ops@uptimemonke.com", ["OPS@UPTIMEMONKE.COM"]), true);
+  });
+
+  test("an ordinary customer is not shielded", () => {
+    assert.equal(isProtectedAccount("customer@example.com", ADMINS), false);
+  });
+
+  test("an account with no address is not shielded by that alone", () => {
+    // It is still deletable; the allowlist simply cannot match it.
+    assert.equal(isProtectedAccount(null, ADMINS), false);
+    assert.equal(isProtectedAccount(undefined, ADMINS), false);
+  });
+
+  test("an empty allowlist shields nobody", () => {
+    assert.equal(isProtectedAccount("ops@uptimemonke.com", []), false);
+  });
+});

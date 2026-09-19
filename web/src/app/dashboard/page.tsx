@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { needsEmailConfirmation } from "@/lib/authProviders";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { api, ApiError, checksPerDay, type Billing } from "@/lib/api";
@@ -113,6 +114,8 @@ function compactChecks(n: number): string {
 export default function Dashboard() {
   const { t, locale } = useI18n();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  /** From the ID token; `undefined` until it resolves. See `needsEmailConfirmation`. */
+  const [signInProvider, setSignInProvider] = useState<string | null | undefined>(undefined);
   const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [monitors, setMonitors] = useState<MonitorConfig[]>([]);
@@ -199,9 +202,13 @@ export default function Dashboard() {
       onAuthStateChanged(auth, async (u) => {
         setCurrentUser(u);
         setUserDisplayName(u?.displayName ?? null);
-        if (!u) return setOrgId(null);
+        if (!u) {
+          setSignInProvider(undefined);
+          return setOrgId(null);
+        }
 
         let token = await u.getIdTokenResult();
+        setSignInProvider(token.signInProvider);
         let id = (token.claims.orgId as string) ?? null;
 
         if (!id) {
@@ -380,9 +387,11 @@ export default function Dashboard() {
    *
    * The API refuses these tokens outright, so without this the dashboard
    * would render and then fail every request with nothing explaining why.
-   * Google sign-ins never land here — Google verifies the address itself.
+   * A federated sign-in never lands here — the provider asserts the address,
+   * and there is no confirmation link such a user could click. See
+   * `needsEmailConfirmation`, which mirrors the server's own rule.
    */
-  if (currentUser.email && !currentUser.emailVerified) {
+  if (needsEmailConfirmation(currentUser, signInProvider)) {
     return <VerifyEmailGate user={currentUser} />;
   }
 

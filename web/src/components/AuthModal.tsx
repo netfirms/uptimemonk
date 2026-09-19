@@ -10,6 +10,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   GoogleAuthProvider,
+  GithubAuthProvider,
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -72,6 +73,7 @@ export default function AuthModal({
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [githubBusy, setGithubBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -152,6 +154,50 @@ export default function AuthModal({
       }
     } finally {
       setGoogleBusy(false);
+    }
+  }
+
+  /**
+   * GitHub sign-in.
+   *
+   * Same popup-then-redirect shape as Google: a popup is the better
+   * experience, but browsers block it often enough that falling back rather
+   * than showing an error is what makes it reliable.
+   *
+   * Note the account it returns may carry `emailVerified: false` — Firebase
+   * only sets that flag for Google. The confirmation gate keys on the sign-in
+   * provider rather than the flag for exactly this reason; see
+   * `needsEmailConfirmation`.
+   */
+  async function handleGithubSignIn() {
+    setError(null);
+    setGithubBusy(true);
+    try {
+      const provider = new GithubAuthProvider();
+      provider.addScope("read:user");
+      provider.addScope("user:email");
+      const res = await signInWithPopup(auth, provider);
+      void events.signIn("github");
+      handleDone(res.user);
+    } catch (err: unknown) {
+      console.error("GitHub sign-in error:", err);
+      const code = (err as { code?: string })?.code;
+      if (code === "auth/popup-blocked" || code === "auth/unauthorized-domain") {
+        try {
+          const provider = new GithubAuthProvider();
+          provider.addScope("read:user");
+          provider.addScope("user:email");
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr) {
+          setError(readableAuthError((redirectErr as { code?: string })?.code, "GitHub sign-in popup was blocked."));
+        }
+      } else {
+        const msg = readableAuthError(code, (err as Error)?.message);
+        if (msg) setError(msg);
+      }
+    } finally {
+      setGithubBusy(false);
     }
   }
 
@@ -305,7 +351,7 @@ export default function AuthModal({
                 type="button"
                 className="btn-google-social"
                 onClick={handleGoogleSignIn}
-                disabled={googleBusy || busy}
+                disabled={googleBusy || githubBusy || busy}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
                   <path
@@ -326,6 +372,22 @@ export default function AuthModal({
                   />
                 </svg>
                 <span>{googleBusy ? t("heroConnecting") : t("continueWithGoogle")}</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn-github-social"
+                onClick={handleGithubSignIn}
+                disabled={githubBusy || googleBusy || busy}
+                style={{ marginTop: "10px" }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" style={{ flexShrink: 0 }} aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+                  />
+                </svg>
+                <span>{githubBusy ? t("heroConnecting") : t("continueWithGithub")}</span>
               </button>
 
               <div className="auth-divider">
@@ -454,7 +516,7 @@ export default function AuthModal({
             <button
               type="submit"
               className="btn-auth-submit"
-              disabled={busy || googleBusy}
+              disabled={busy || googleBusy || githubBusy}
             >
               {busy ? (
                 <span>{t("authProcessing")}</span>

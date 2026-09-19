@@ -622,12 +622,20 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** Unregister a device push token on logout or app removal */
-  app.delete<{ Params: { token: string } }>(
-    "/v1/devices/:token",
+  app.delete<{ Params: { token?: string }; Querystring: { token?: string }; Body?: { token?: string } }>(
+    "/v1/devices/:token?",
     { preHandler: requireAuth() },
     async (req, reply) => {
       const { orgId } = req.user!;
-      const token = req.params.token;
+      const raw = req.params?.token || req.query?.token || (req.body as any)?.token || "";
+      let token = "";
+      try {
+        token = decodeURIComponent(raw);
+      } catch {
+        token = raw;
+      }
+
+      if (!token) return reply.code(400).send({ error: "Missing device token" });
 
       const snap = await col
         .alertContacts()

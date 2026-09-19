@@ -6,7 +6,9 @@ class StatsHeader extends StatelessWidget {
   final int up;
   final int down;
   final int paused;
-  final double avgUptime;
+  final int pending;
+  final double avgUptime30d;
+  final int? avgLatency;
 
   const StatsHeader({
     super.key,
@@ -14,103 +16,123 @@ class StatsHeader extends StatelessWidget {
     required this.up,
     required this.down,
     required this.paused,
-    required this.avgUptime,
+    this.pending = 0,
+    required this.avgUptime30d,
+    this.avgLatency,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.bgSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderDark),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         children: [
+          // Row 1: Overall Uptime & Up Monitors
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '24-HOUR AVAILABILITY',
-                    style: TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+              Expanded(
+                child: _buildStatBox(
+                  title: 'OVERALL UPTIME',
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '30 DAYS',
+                      style: TextStyle(
+                        color: AppTheme.primaryGreen,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        '${avgUptime.toStringAsFixed(2)}%',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          color: avgUptime >= 99.0
-                              ? AppTheme.statusUp
-                              : avgUptime >= 95.0
-                                  ? AppTheme.statusPending
-                                  : AppTheme.statusDown,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: (down == 0 ? AppTheme.statusUp : AppTheme.statusDown)
-                              .withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          down == 0 ? 'Operational' : '$down Degraded',
-                          style: TextStyle(
-                            color: down == 0 ? AppTheme.statusUp : AppTheme.statusDown,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.bgDark,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.borderDark),
+                  value: '${avgUptime30d.toStringAsFixed(2)}%',
+                  valueColor: AppTheme.primaryGreen,
+                  subtext: 'System-wide operational ratio',
+                  accentColor: AppTheme.primaryGreen,
                 ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'TOTAL',
-                      style: TextStyle(color: AppTheme.textMuted, fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildStatBox(
+                  title: 'UP MONITORS',
+                  trailing: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primaryGreen,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryGreen,
+                          blurRadius: 5,
+                          spreadRadius: 0.5,
+                        ),
+                      ],
                     ),
-                    Text(
-                      '$total',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
-                    ),
-                  ],
+                  ),
+                  value: '$up',
+                  valueColor: AppTheme.primaryGreen,
+                  subtext: 'Reporting healthy response',
+                  accentColor: AppTheme.primaryGreen,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
+          // Row 2: Down Monitors & Avg Response
           Row(
             children: [
-              _buildCountPill('Up', up, AppTheme.statusUp),
-              const SizedBox(width: 8),
-              _buildCountPill('Down', down, AppTheme.statusDown),
-              const SizedBox(width: 8),
-              _buildCountPill('Paused', paused, AppTheme.statusPaused),
+              Expanded(
+                child: _buildStatBox(
+                  title: 'DOWN MONITORS',
+                  trailing: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: down > 0 ? AppTheme.statusDown : AppTheme.textMuted,
+                      shape: BoxShape.circle,
+                      boxShadow: down > 0
+                          ? [
+                              const BoxShadow(
+                                color: AppTheme.statusDown,
+                                blurRadius: 5,
+                                spreadRadius: 0.5,
+                              ),
+                            ]
+                          : null,
+                    ),
+                  ),
+                  value: '$down',
+                  valueColor: down > 0 ? AppTheme.statusDown : AppTheme.textPrimary,
+                  subtext: down > 0 ? '$down incident${down == 1 ? '' : 's'} active' : 'All operational',
+                  accentColor: down > 0 ? AppTheme.statusDown : Colors.transparent,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildStatBox(
+                  title: 'AVG RESPONSE',
+                  trailing: const Icon(
+                    Icons.access_time_rounded,
+                    size: 13,
+                    color: AppTheme.textMuted,
+                  ),
+                  value: avgLatency != null ? '$avgLatency ms' : '—',
+                  valueColor: avgLatency == null
+                      ? AppTheme.textMuted
+                      : avgLatency! < 250
+                          ? AppTheme.latencyFast
+                          : avgLatency! < 600
+                              ? AppTheme.latencyMed
+                              : AppTheme.latencySlow,
+                  subtext: 'Fast global edge probes',
+                  accentColor: AppTheme.accentCyan,
+                ),
+              ),
             ],
           ),
         ],
@@ -118,34 +140,65 @@ class StatsHeader extends StatelessWidget {
     );
   }
 
-  Widget _buildCountPill(String label, int count, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: AppTheme.bgDark,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.borderDark),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  Widget _buildStatBox({
+    required String title,
+    required Widget trailing,
+    required String value,
+    required Color valueColor,
+    required String subtext,
+    required Color accentColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppTheme.bgSurfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.borderDark, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header title & indicator
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              trailing,
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Big value number
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'monospace',
+              color: valueColor,
+              letterSpacing: -0.5,
             ),
-            const SizedBox(width: 6),
-            Text(
-              '$label: ',
-              style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 3),
+          // Subtext
+          Text(
+            subtext,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppTheme.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
             ),
-            Text(
-              '$count',
-              style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -9,6 +9,11 @@ class AppTheme {
   static const Color bgSurfaceElevated = Color(0xFF1B273A);
   static const Color borderDark = Color(0xFF1E2D42);
   static const Color borderLight = Color(0xFF2E3E56);
+  static const Color borderSubtle = Color(0xFF1E2D42);
+
+  // Status Backgrounds & Borders
+  static Color statusDownBg = const Color(0xFFEF4444).withValues(alpha: 0.12);
+  static Color statusDownBorder = const Color(0xFFEF4444).withValues(alpha: 0.3);
 
   // Status Colors
   static const Color statusUp = Color(0xFF10B981); // Emerald
@@ -17,12 +22,24 @@ class AppTheme {
   static const Color statusPaused = Color(0xFF64748B); // Slate
   static const Color statusMaintenance = Color(0xFF8B5CF6); // Violet
 
-  // Accents & Gradients
-  static const Color primaryEmerald = Color(0xFF10B981);
+  // Web UptimeRobot Brand Colors
+  static const Color primaryGreen = Color(0xFF3BD671); // #3BD671 signature UptimeMonke green
+  static const Color primaryEmerald = Color(0xFF3BD671);
   static const Color accentCyan = Color(0xFF06B6D4);
   static const Color textPrimary = Color(0xFFF8FAFC);
   static const Color textSecondary = Color(0xFF94A3B8);
   static const Color textMuted = Color(0xFF64748B);
+  static const Color textDim = Color(0xFF475569);
+
+  // Latency rating thresholds
+  static const Color latencyFast = Color(0xFF3BD671); // < 250ms
+  static const Color latencyMed = Color(0xFFF59E0B);  // < 600ms
+  static const Color latencySlow = Color(0xFFEF4444); // >= 600ms
+
+  // Additional surfaces matching web CSS
+  static const Color bgSurfaceCard = Color(0xFF121A24);
+  static const Color bgSurfaceInput = Color(0xFF0F1823);
+  static const Color bgSurfaceHover = Color(0xFF1E2B3C);
 
   static ThemeData get darkTheme {
     return ThemeData(

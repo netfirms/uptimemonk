@@ -21,6 +21,7 @@ export interface Translations {
   heroPlaceholder: string;
   heroStartBtn: string;
   continueWithGoogle: string;
+  continueWithGithub: string;
   signUpWithEmail: string;
   heroConnecting: string;
   featureIntervals: string;
@@ -348,6 +349,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroPlaceholder: "Enter your website or API (e.g. example.com)",
     heroStartBtn: "Start Monitoring",
     continueWithGoogle: "Continue with Google",
+    continueWithGithub: "Continue with GitHub",
     signUpWithEmail: "Sign up with Email",
     heroConnecting: "Connecting…",
     featureIntervals: "⚡ 60s Check Intervals",
@@ -686,6 +688,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroPlaceholder: "输入您的网站或 API 地址 (例如 example.com)",
     heroStartBtn: "开始监控",
     continueWithGoogle: "使用 Google 继续",
+    continueWithGithub: "使用 GitHub 继续",
     signUpWithEmail: "使用邮箱注册",
     heroConnecting: "连接中…",
     featureIntervals: "⚡ 60秒检测间隔",
@@ -1021,6 +1024,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroPlaceholder: "WebサイトまたはAPIのURL (例: example.com)",
     heroStartBtn: "監視を開始",
     continueWithGoogle: "Googleで続ける",
+    continueWithGithub: "GitHubで続ける",
     signUpWithEmail: "メールアドレスで登録",
     heroConnecting: "接続中…",
     featureIntervals: "⚡ 60秒チェック間隔",
@@ -1339,6 +1343,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroPlaceholder: "웹사이트 또는 API 주소 입력 (예: example.com)",
     heroStartBtn: "모니터링 시작",
     continueWithGoogle: "Google 계정으로 계속하기",
+    continueWithGithub: "GitHub 계정으로 계속하기",
     signUpWithEmail: "이메일로 회원가입",
     heroConnecting: "연결 중…",
     featureIntervals: "⚡ 60초 점검 주기",
@@ -1658,6 +1663,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroPlaceholder: "Masukkan laman web atau API anda (cth. example.com)",
     heroStartBtn: "Mula Memantau",
     continueWithGoogle: "Teruskan dengan Google",
+    continueWithGithub: "Teruskan dengan GitHub",
     signUpWithEmail: "Daftar dengan Emel",
     heroConnecting: "Menyambung…",
     featureIntervals: "⚡ Selang Semakan 60s",
@@ -1977,6 +1983,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroPlaceholder: "Masukkan URL situs web atau API Anda (cth. example.com)",
     heroStartBtn: "Mulai Memantau",
     continueWithGoogle: "Lanjutkan dengan Google",
+    continueWithGithub: "Lanjutkan dengan GitHub",
     signUpWithEmail: "Daftar dengan Email",
     heroConnecting: "Menghubungkan…",
     featureIntervals: "⚡ Interval Pengecekan 60d",
@@ -2296,6 +2303,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroPlaceholder: "ဝဘ်ဆိုက် (သို့) API လိပ်စာထည့်ပါ (ဥပမာ- example.com)",
     heroStartBtn: "စောင့်ကြည့်စစ်ဆေးရန်",
     continueWithGoogle: "Google ဖြင့် ဆက်လက်လုပ်ဆောင်ရန်",
+    continueWithGithub: "GitHub ဖြင့် ဆက်လက်လုပ်ဆောင်ရန်",
     signUpWithEmail: "အီးမေးလ်ဖြင့် အကောင့်ဖွင့်ရန်",
     heroConnecting: "ချိတ်ဆက်နေသည်…",
     featureIntervals: "⚡ ၆၀ စက္ကန့် စစ်ဆေးမှုနှုန်း",

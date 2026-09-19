@@ -21,6 +21,47 @@ declare module "fastify" {
   }
 }
 
+/**
+ * Email confirmation applies to password sign-ups, and nothing else.
+ *
+ * The gate exists for one attack: anyone can type any address into a
+ * registration form, so a password account has to prove it owns the address
+ * before it can do anything. A federated sign-in has already proven it — the
+ * account is keyed on the provider's uid and the address arrives from the
+ * provider, not from the user.
+ *
+ * It has to be decided on the provider rather than on `email_verified`,
+ * because Firebase only sets that flag for Google. GitHub, Apple, Facebook and
+ * Microsoft sign-ins all arrive with it false (firebase-js-sdk#340,
+ * firebase-functions#1592), so gating on the flag alone locks those users out
+ * of an account they can never unlock: there is no confirmation link to click,
+ * because there is no password account to confirm. Apple has a second reason —
+ * Hide My Email gives a `@privaterelay.appleid.com` address that only Apple
+ * can confirm.
+ *
+ * A missing `sign_in_provider` is still treated as needing confirmation.
+ * Absent must not read as permission on a security check, and every token
+ * Firebase issues carries the claim, so this only bites something malformed.
+ *
+ * Note the tradeoff: enabling a new provider now lets its users straight in
+ * without anyone deciding that. That is deliberate — the rule is "password
+ * sign-ins confirm their address" — but it does mean a provider that lets a
+ * user self-assert an unowned address would inherit that trust.
+ */
+const PASSWORD_PROVIDER = "password";
+
+/** True when the token's address still needs a confirmation click. */
+export function needsEmailConfirmation(decoded: {
+  email?: string;
+  email_verified?: boolean;
+  firebase?: { sign_in_provider?: string };
+}): boolean {
+  if (!decoded.email) return false;
+  if (decoded.email_verified === true) return false;
+  const provider = decoded.firebase?.sign_in_provider;
+  return provider === undefined || provider === PASSWORD_PROVIDER;
+}
+
 export interface AuthOptions {
   /** Re-check that the session has not been revoked. Costs a network call, so
    *  reserve it for billing and member management. */
@@ -45,13 +86,12 @@ export function requireAuth(options: AuthOptions = {}) {
        * lives in the browser is a suggestion — the token is all the API ever
        * sees, and anyone can call it directly.
        *
-       * Google sets `email_verified` itself, so those sign-ins pass
-       * untouched; a password sign-up does not until the link is clicked. The
+       * See `needsEmailConfirmation` for which sign-ins this applies to. The
        * check is skipped when the token carries no email at all, which no
        * enabled provider produces today — it is there so turning on phone or
        * anonymous auth later locks nobody out by surprise.
        */
-      if (decoded.email && decoded.email_verified !== true) {
+      if (needsEmailConfirmation(decoded)) {
         return reply.code(403).send({
           error: "Confirm your email address to continue.",
           code: "email-not-verified",

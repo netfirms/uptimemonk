@@ -858,6 +858,42 @@ button.btn-outline-red {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
 
+/* Same geometry as the Google button beside it, GitHub's own colour. Two
+   identical white buttons read as one control repeated; the contrast is what
+   makes them scan as a choice between providers. */
+.github-btn-dark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 26px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  border-radius: 8px;
+  background: #1f2430;
+  color: #f8fafc;
+  /* No border: the Google button beside it has none, and 1px here makes this
+     one 2px taller and a pixel out of line. The dark fill is the distinction;
+     the edge is drawn with an inset shadow, which costs no layout. */
+  border: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+
+.github-btn-dark:hover:not(:disabled) {
+  background: #2a3140;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.github-btn-dark:disabled,
+.google-btn-light:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .hero-subtext {
   font-size: 0.82rem;
   color: var(--text-dim);
@@ -3610,7 +3646,8 @@ button.workspace-pill:hover {
 }
 
 /* Social Google Button */
-.btn-google-social {
+.btn-google-social,
+.btn-github-social {
   width: 100%;
   height: 44px;
   display: flex;
@@ -3630,13 +3667,15 @@ button.workspace-pill:hover {
   outline: none;
 }
 
-.btn-google-social:hover {
+.btn-google-social:hover,
+.btn-github-social:hover {
   background: rgba(255, 255, 255, 0.09);
   border-color: rgba(255, 255, 255, 0.22);
   transform: translateY(-1px);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
+.btn-github-social:focus-visible,
 .btn-google-social:focus-visible,
 .auth-modal-tab:focus-visible,
 .btn-auth-submit:focus-visible {
@@ -3644,7 +3683,8 @@ button.workspace-pill:hover {
   outline-offset: 2px;
 }
 
-.btn-google-social:disabled {
+.btn-google-social:disabled,
+.btn-github-social:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;

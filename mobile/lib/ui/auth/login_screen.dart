@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'register_screen.dart';
+import 'widgets/social_auth_buttons.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
             child: Form(
               key: _formKey,
               child: Column(
@@ -41,28 +42,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Logo & Brand
                   Center(
                     child: Container(
-                      width: 56,
-                      height: 56,
+                      width: 64,
+                      height: 64,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppTheme.primaryEmerald, AppTheme.accentCyan],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
+                        color: AppTheme.bgSurfaceCard,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppTheme.borderSubtle, width: 1.5),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.primaryEmerald.withValues(alpha: 0.3),
-                            blurRadius: 16,
+                            color: AppTheme.primaryEmerald.withValues(alpha: 0.15),
+                            blurRadius: 20,
                             spreadRadius: 2,
                           ),
                         ],
                       ),
-                      child: const Center(
-                        child: Text(
-                          '🐵',
-                          style: TextStyle(fontSize: 30),
-                        ),
+                      padding: const EdgeInsets.all(10),
+                      child: Image.asset(
+                        'assets/mascot-128.png',
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
@@ -71,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     'UptimeMonke',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 26,
                       fontWeight: FontWeight.w800,
                       color: AppTheme.textPrimary,
                       letterSpacing: -0.5,
@@ -83,9 +80,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
-                  // Email
+                  // 1-Click Social Authentication (Google & GitHub)
+                  const SocialAuthButtons(),
+
+                  // Email Input
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -98,9 +98,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                  // Password
+                  // Password Input
                   TextFormField(
                     controller: _passwordController,
                     obscureText: true,
@@ -117,18 +117,31 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // Error Message
                   if (authVm.errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        authVm.errorMessage!,
-                        style: const TextStyle(color: AppTheme.statusDown, fontSize: 13),
-                        textAlign: TextAlign.center,
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.statusDownBg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.statusDownBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, size: 18, color: AppTheme.statusDown),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              authVm.errorMessage!,
+                              style: const TextStyle(color: AppTheme.statusDown, fontSize: 13),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
                   // Sign In Button
                   ElevatedButton(
-                    onPressed: authVm.status == AuthStatus.loading
+                    onPressed: authVm.isAnyLoading
                         ? null
                         : () {
                             if (_formKey.currentState!.validate()) {
@@ -144,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                           )
-                        : const Text('Sign In'),
+                        : const Text('Sign In with Email'),
                   ),
                   const SizedBox(height: 16),
 

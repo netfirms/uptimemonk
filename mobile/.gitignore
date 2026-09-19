@@ -46,9 +46,25 @@ app.*.map.json
 
 # Credentials and signing secrets
 credentials/
+**/credentials/
 *.p8
+*.p12
 *.jks
 *.keystore
+*.key
+*.keypair
+*.pem
+*.cer
+*.crt
+*.der
+*.mobileprovision
+*.provisionprofile
+*.certSigningRequest
+*.csr
 keystore.properties
+key.properties
 local*.properties
+fastlane/*.p8
+fastlane/api_key_info.json
 report.xml
+

@@ -6,6 +6,7 @@ import {
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
+  GithubAuthProvider,
   onAuthStateChanged,
   type User,
 } from "firebase/auth";
@@ -37,6 +38,7 @@ export default function Landing({
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isGithubSigningIn, setIsGithubSigningIn] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"signup" | "signin">("signup");
   const [quickUrl, setQuickUrl] = useState("");
@@ -173,6 +175,52 @@ export default function Landing({
       }
     } finally {
       setIsSigningIn(false);
+    }
+  }
+
+  /**
+   * GitHub sign-in.
+   *
+   * Mirrors the Google path, including the popup-then-redirect fallback:
+   * a popup is the better experience, but browsers block it often enough
+   * that falling back rather than erroring is what makes it reliable.
+   */
+  async function handleGithubSignIn(next: string = "/dashboard") {
+    setAuthError(null);
+    setIsGithubSigningIn(true);
+    try {
+      const provider = new GithubAuthProvider();
+      provider.addScope("read:user");
+      provider.addScope("user:email");
+      const res = await signInWithPopup(auth, provider);
+      void events.signIn("github");
+      if (onSignedIn) {
+        onSignedIn(res.user);
+      } else {
+        window.location.href = next;
+      }
+    } catch (err: unknown) {
+      console.error("GitHub sign-in error:", err);
+      const code = (err as { code?: string })?.code;
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        // Closed deliberately — not an error worth showing.
+      } else if (code === "auth/popup-blocked" || code === "auth/unauthorized-domain") {
+        try {
+          const provider = new GithubAuthProvider();
+          provider.addScope("read:user");
+          provider.addScope("user:email");
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr) {
+          setAuthError(
+            (redirectErr as Error)?.message || "Sign-in popup was blocked. Please allow popups or try again."
+          );
+        }
+      } else {
+        setAuthError((err as Error)?.message || "Could not sign in with GitHub.");
+      }
+    } finally {
+      setIsGithubSigningIn(false);
     }
   }
 
@@ -355,7 +403,7 @@ export default function Landing({
               onClick={() => {
                 handleGoogleSignIn(getDestination(quickUrl, selectedPreset));
               }}
-              disabled={isSigningIn}
+              disabled={isSigningIn || isGithubSigningIn}
             >
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
@@ -364,6 +412,20 @@ export default function Landing({
                 <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
               </svg>
               <span>{isSigningIn ? t("heroConnecting") : t("continueWithGoogle")}</span>
+            </button>
+
+            <button
+              type="button"
+              className="github-btn-dark"
+              onClick={() => {
+                handleGithubSignIn(getDestination(quickUrl, selectedPreset));
+              }}
+              disabled={isSigningIn || isGithubSigningIn}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+              </svg>
+              <span>{isGithubSigningIn ? t("heroConnecting") : t("continueWithGithub")}</span>
             </button>
 
             <button
@@ -1038,7 +1100,7 @@ export default function Landing({
               className="coffee-btn"
               style={{ marginTop: 14 }}
               onClick={handleDonate}
-              disabled={isSigningIn}
+              disabled={isSigningIn || isGithubSigningIn}
             >
               <span aria-hidden>☕</span>
               {isSigningIn ? t("heroConnecting") : t("buyCoffeeBtn")}
@@ -1147,7 +1209,7 @@ export default function Landing({
                 type="button"
                 className="google-btn-light"
                 onClick={() => handleGoogleSignIn(getDestination(quickUrl, selectedPreset))}
-                disabled={isSigningIn}
+                disabled={isSigningIn || isGithubSigningIn}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24">
                   <path
@@ -1168,6 +1230,18 @@ export default function Landing({
                   />
                 </svg>
                 <span>{isSigningIn ? t("heroConnecting") : t("continueWithGoogle")}</span>
+              </button>
+
+              <button
+                type="button"
+                className="github-btn-dark"
+                onClick={() => handleGithubSignIn(getDestination(quickUrl, selectedPreset))}
+                disabled={isSigningIn || isGithubSigningIn}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                </svg>
+                <span>{isGithubSigningIn ? t("heroConnecting") : t("continueWithGithub")}</span>
               </button>
 
               <button
