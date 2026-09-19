@@ -5,6 +5,62 @@ project the dashboard uses, lists the organisation's monitors, creates and edits
 them through the worker API, and receives downtime/recovery alerts as push
 notifications.
 
+## Architecture
+
+```
++-------------------------------------------------------------+
+|  Platform shell                                             |
+|  android/app/src/main/AndroidManifest.xml                   |
+|    - Firebase Auth deep link (genericidp / firebase.auth)   |
+|    - FCM channel "uptime_alerts" (flutterEmbedding=2)       |
+|  ios/Runner/AppDelegate.swift  (FlutterImplicitEngineDelegate)
+|    - GeneratedPluginRegistrant registers plugins            |
++-------------------------------------------------------------+
+              |  (runs)
+              v
++-------------------------------------------------------------+
+|  lib/main.dart  -  entrypoint                               |
+|    Firebase.initializeApp()                                 |
+|    PushNotificationService.initialize()                     |
+|    MultiProvider(AuthViewModel)  ->  routes by auth state   |
++-------------------------------------------------------------+
+      |                 |                  |
+      v                 v                  v
++-----------+   +---------------+   +----------------+
+| ui/auth   |   | ui/dashboard  |   | ui/settings    |
+| login     |   | monitor list  |   | alert contacts |
+| verify    |   | history       |   | display name   |
+| email     |   | status link   |   | workspace name |
++-----------+   +---------------+   +----------------+
+      |                 |                  |
+      +--------+--------+------------------+
+               v
++-------------------------------------------------------------+
+|  viewmodels/    AuthViewModel, DashboardViewModel           |
+|    (provider) - hold UI state, call services                |
++-------------------------------------------------------------+
+               v
++-------------------------------------------------------------+
+|  data/services/                                             |
+|    API client      -> http  -> AppConstants.apiUrl           |
+|    push_service.dart -> firebase_messaging +                 |
+|                        flutter_local_notifications           |
++-------------------------------------------------------------+
+               |
+     +---------+----------+
+     v                    v
++-------------+   +----------------------------+
+| Worker API  |   | Firebase                    |
+| api.uptime  |   |  Auth (sign-in, email gate)  |
+| monke.com   |   |  Firestore (read-only mirror)|
+| (all writes)|   |  FCM (downtime/recovery)     |
++-------------+   +----------------------------+
+```
+
+Monitor state is read from the Firebase mirror but every mutation goes to the
+worker API; the app never writes `monitors` in Firestore directly. See
+`firestore.rules`.
+
 ## Stack
 
 From `pubspec.yaml`:
