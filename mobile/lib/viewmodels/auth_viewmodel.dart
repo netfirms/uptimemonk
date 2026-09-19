@@ -431,6 +431,35 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  /// Email a password-reset link. Returns null on success, else why not.
+  ///
+  /// Deliberately reports the same success whether or not the address has an
+  /// account: Firebase does not tell us either, and confirming an address is
+  /// registered would turn this into an account-enumeration oracle.
+  Future<String?> sendPasswordReset(String email) async {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty || !trimmed.contains('@')) {
+      return 'Enter your email above first, then tap Forgot password.';
+    }
+
+    try {
+      await _auth.sendPasswordResetEmail(email: trimmed);
+      return null;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Password reset failed: ${e.code} / ${e.message}');
+      if (e.code == 'too-many-requests') {
+        return 'Too many requests. Wait a few minutes before trying again.';
+      }
+      if (e.code == 'invalid-email') {
+        return 'That email address looks invalid.';
+      }
+      return 'Could not send the reset email. Try again shortly.';
+    } catch (e) {
+      debugPrint('Password reset failed: $e');
+      return 'Could not send the reset email. Try again shortly.';
+    }
+  }
+
   Future<void> signOut() async {
     try {
       await PushNotificationService.instance.unregister();

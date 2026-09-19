@@ -195,12 +195,17 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Row: Status Pill, Protocol Icon, Name, Action Icons
+                // Top Row: Status Pill, Protocol Icon, and Action Icons.
+                // The monitor name deliberately sits on its own line below
+                // (see the next Row) rather than competing for width here —
+                // sharing this row squeezed a normal 20-character name down to
+                // a few pixels and ellipsized it.
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // 1. Status Pill (Web style with pulsing glow ring)
-                    Container(
+                    Flexible(
+                      child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                       decoration: BoxDecoration(
                         color: statusBg,
@@ -253,16 +258,22 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
                             ),
                           ),
                           const SizedBox(width: 5),
-                          Text(
-                            status.toUpperCase(),
-                            style: TextStyle(
-                              color: statusColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
+                          Flexible(
+                            child: Text(
+                              status.toUpperCase(),
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
                             ),
                           ),
                         ],
+                      ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -284,56 +295,32 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-
-                    // 3. Monitor Name
-                    Expanded(
-                      child: Text(
-                        widget.config.name,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                          letterSpacing: -0.2,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+                    // 3. Spacer pushes the action buttons to the far right.
+                    const Spacer(),
 
                     // 4. Action Buttons (Edit, Pause/Resume, Delete)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 16),
+                        _actionIcon(
+                          icon: Icons.edit_outlined,
                           color: AppTheme.textMuted,
-                          padding: const EdgeInsets.all(6),
-                          constraints: const BoxConstraints(),
-                          splashRadius: 16,
                           tooltip: 'Edit Monitor',
                           onPressed: widget.onEdit,
                         ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          icon: Icon(
-                            isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                            size: 17,
-                          ),
-                          color: isPaused ? AppTheme.primaryGreen : AppTheme.textMuted,
-                          padding: const EdgeInsets.all(6),
-                          constraints: const BoxConstraints(),
-                          splashRadius: 16,
+                        _actionIcon(
+                          icon: isPaused
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause_rounded,
+                          color: isPaused
+                              ? AppTheme.primaryGreen
+                              : AppTheme.textMuted,
                           tooltip: isPaused ? 'Resume' : 'Pause',
                           onPressed: widget.onTogglePause,
                         ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                        _actionIcon(
+                          icon: Icons.delete_outline_rounded,
                           color: AppTheme.statusDown.withValues(alpha: 0.75),
-                          padding: const EdgeInsets.all(6),
-                          constraints: const BoxConstraints(),
-                          splashRadius: 16,
                           tooltip: 'Delete Monitor',
                           onPressed: widget.onDelete,
                         ),
@@ -343,6 +330,23 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
                 ),
 
                 const SizedBox(height: 10),
+
+                // Monitor Name — full card width, so ordinary names are never
+                // truncated. Two lines is enough for anything long; beyond
+                // that it ellipsizes rather than pushing the card taller.
+                Text(
+                  widget.config.name,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+
+                const SizedBox(height: 8),
 
                 // Middle Row: Tags (Protocol, Interval, Public, Cert Expiry, Muted)
                 Wrap(
@@ -455,55 +459,81 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
                 const Divider(height: 1, color: AppTheme.borderDark),
                 const SizedBox(height: 8),
 
-                // Bottom Metrics Row: Latency, 30d Uptime, Last Checked
+                                // Bottom Metrics Row: Latency, 30d Uptime, Last Checked.
+                // Every cell is Expanded so each gets an equal share and none
+                // can overflow; the text inside ellipsizes rather than crop.
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Latency
-                    Row(
-                      children: [
-                        Text(
-                          latency != null ? '$latency ms' : '—',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            fontFamily: 'monospace',
-                            color: latencyColor,
-                          ),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: latency != null ? '$latency ms' : '—',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'monospace',
+                                color: latencyColor,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: ' response',
+                              style: TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'response',
-                          style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                        ),
-                      ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                      ),
                     ),
 
                     // 30d Uptime
-                    Text(
-                      widget.live.uptime30d != null
-                          ? '${widget.live.uptime30d!.toStringAsFixed(1)}% / 30d'
-                          : '…',
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Text(
+                        widget.live.uptime30d != null
+                            ? '${widget.live.uptime30d!.toStringAsFixed(1)}% / 30d'
+                            : '…',
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
 
                     // Last Checked relative time
-                    Row(
-                      children: [
-                        const Icon(Icons.history_rounded, size: 12, color: AppTheme.textMuted),
-                        const SizedBox(width: 4),
-                        Text(
-                          _sinceLabel(widget.live.lastCheckedAt),
-                          style: const TextStyle(
-                            color: AppTheme.textMuted,
-                            fontSize: 11,
+                    Expanded(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          const Icon(Icons.history_rounded,
+                              size: 12, color: AppTheme.textMuted),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              _sinceLabel(widget.live.lastCheckedAt),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                              style: const TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 11,
+                              ),
+                            ),
                           ),
-                        ),
                       ],
+                      ),
                     ),
                   ],
                 ),
@@ -512,6 +542,27 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
           ),
         ),
       ),
+    );
+  }
+
+  /// A compact icon action. Kept as one helper so the three buttons share an
+  /// identical, small footprint — three default IconButtons with their own
+  /// padding and gaps were what pushed the header row past a 320px screen.
+  Widget _actionIcon({
+    required IconData icon,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      icon: Icon(icon, size: 16),
+      color: color,
+      padding: const EdgeInsets.all(4),
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      splashRadius: 16,
+      visualDensity: VisualDensity.compact,
+      tooltip: tooltip,
+      onPressed: onPressed,
     );
   }
 
