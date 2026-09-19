@@ -293,7 +293,14 @@ class DashboardScreen extends StatelessWidget {
               ? const Center(
                   child: CircularProgressIndicator(color: AppTheme.primaryGreen),
                 )
-              : CustomScrollView(
+              : RefreshIndicator(
+                  onRefresh: vm.refreshAll,
+                  color: AppTheme.primaryGreen,
+                  backgroundColor: AppTheme.bgSurfaceElevated,
+                  child: CustomScrollView(
+                  // Always scrollable so pull-to-refresh still works when the
+                  // list is short enough not to scroll on its own.
+                  physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
                     // Global Error Callout
                     if (vm.errorMessage != null)
@@ -375,6 +382,7 @@ class DashboardScreen extends StatelessWidget {
                             return MonitorCard(
                               config: item.config,
                               live: item.live,
+                              history: vm.historyFor(item.config.id),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -412,6 +420,7 @@ class DashboardScreen extends StatelessWidget {
                     const SliverToBoxAdapter(child: SizedBox(height: 36)),
                   ],
                 ),
+              ),
         );
       },
     );

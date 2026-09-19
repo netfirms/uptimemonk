@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../data/models/monitor.dart';
 import '../data/models/live_state.dart';
+import '../data/models/history.dart';
 import '../data/services/api_client.dart';
 
 enum FilterStatus { all, up, down, paused, pending }
@@ -25,6 +26,12 @@ class DashboardViewModel extends ChangeNotifier {
   List<MonitorConfig> _monitors = [];
   Map<String, LiveState> _liveStates = {};
 
+  /// Recent history per monitor id, powering the card sparklines. Fetched from
+  /// the worker API (not Firestore), so this does not affect the write bill.
+  /// Absent entries simply render no chart.
+  final Map<String, MonitorHistory> _history = {};
+  final Set<String> _historyInFlight = {};
+
   FilterStatus _filter = FilterStatus.all;
   String _searchQuery = '';
   bool _isLoading = true;
@@ -35,6 +42,7 @@ class DashboardViewModel extends ChangeNotifier {
 
   List<MonitorConfig> get monitors => _monitors;
   Map<String, LiveState> get liveStates => _liveStates;
+  MonitorHistory? historyFor(String monitorId) => _history[monitorId];
   FilterStatus get filter => _filter;
   String get searchQuery => _searchQuery;
   bool get isLoading => _isLoading;
@@ -79,6 +87,10 @@ class DashboardViewModel extends ChangeNotifier {
       _monitors.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       _isLoading = false;
       notifyListeners();
+
+      // Fetch sparkline history for any monitor we do not already have it for.
+      // Fire-and-forget: the list must not wait on N network calls.
+      _historyUnawaited(_fetchMissingHistory());
     }, onError: (err) {
       _errorMessage = 'Lost connection to monitors';
       _isLoading = false;
@@ -215,6 +227,58 @@ class DashboardViewModel extends ChangeNotifier {
       }
     }
     return counted > 0 ? total / counted : 100.0;
+  }
+
+  // --- History (card sparklines) ---
+
+  /// Kick off a future without making the caller await it, while still
+  /// swallowing errors so one failed chart never surfaces as a screen error.
+  void _historyUnawaited(Future<void> future) {
+    unawaited(future.catchError((_) {}));
+  }
+
+  /// Fetch history only for monitors we do not already hold, and at most
+  /// [maxParallel] at a time. A dashboard with many monitors would otherwise
+  /// open one socket per monitor simultaneously — enough to look like a burst
+  /// from a single client, and enough to matter on a phone's battery.
+  Future<void> _fetchMissingHistory({int maxParallel = 4}) async {
+    final pending = _monitors
+        .where((m) => !_history.containsKey(m.id) && !_historyInFlight.contains(m.id))
+        .toList();
+    if (pending.isEmpty) return;
+
+    for (var i = 0; i < pending.length; i += maxParallel) {
+      final batch = pending.skip(i).take(maxParallel);
+      await Future.wait(batch.map(_fetchOneHistory));
+    }
+  }
+
+  Future<void> _fetchOneHistory(MonitorConfig monitor) async {
+    if (_historyInFlight.contains(monitor.id)) return;
+    _historyInFlight.add(monitor.id);
+    try {
+      final history = await _apiClient.fetchHistory(monitor.id, range: '24h');
+      if (history.buckets.isEmpty) return;
+      _history[monitor.id] = history;
+      notifyListeners();
+    } catch (_) {
+      // A monitor with no history yet, or a transient failure, is not an error
+      // worth showing — the card just omits its sparkline.
+    } finally {
+      _historyInFlight.remove(monitor.id);
+    }
+  }
+
+  /// Pull-to-refresh: re-fetch every monitor's history (force, so it replaces
+  /// cached data) and refresh the workspace metadata. Config and live state
+  /// already stream in from Firestore, so only history needs an explicit pull.
+  Future<void> refreshAll() async {
+    _history.clear();
+    await Future.wait([
+      _fetchMissingHistory(),
+      _fetchWorkspaceMetadata(),
+    ]);
+    notifyListeners();
   }
 
   // --- Actions ---

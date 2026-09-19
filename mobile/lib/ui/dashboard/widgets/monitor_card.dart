@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import '../../../core/theme.dart';
 import '../../../data/models/monitor.dart';
 import '../../../data/models/live_state.dart';
+import '../../../data/models/history.dart';
 import '../../../main.dart';
+import 'hourly_bars.dart';
 
 class MonitorCard extends StatefulWidget {
   final MonitorConfig config;
@@ -13,6 +15,11 @@ class MonitorCard extends StatefulWidget {
   final VoidCallback onTogglePause;
   final VoidCallback onDelete;
 
+  /// Recent hourly history for this monitor, or null while it is still being
+  /// fetched. When absent the card simply omits the sparkline rather than
+  /// showing a misleading empty chart.
+  final MonitorHistory? history;
+
   const MonitorCard({
     super.key,
     required this.config,
@@ -21,6 +28,7 @@ class MonitorCard extends StatefulWidget {
     required this.onEdit,
     required this.onTogglePause,
     required this.onDelete,
+    this.history,
   });
 
   @override
@@ -345,6 +353,32 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+
+                // Last 12 hours at a glance. Hidden while paused: a paused
+                // monitor has no fresh bars, and an empty sparkline would read
+                // as an outage rather than a deliberate stop.
+                if (!isPaused && widget.history != null) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Text(
+                        'Last 12h',
+                        style: TextStyle(
+                          color: AppTheme.textDim,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: HourlyBars(
+                          buckets: widget.history!.buckets,
+                          hours: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
 
                 const SizedBox(height: 8),
 
