@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../viewmodels/auth_viewmodel.dart';
+import '../widgets/app_version_label.dart';
 import 'register_screen.dart';
 import 'widgets/social_auth_buttons.dart';
 
@@ -299,6 +300,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                           ),
+
+                          // App version at the foot of the page. Useful when a
+                          // user is reporting an issue from a screenshot.
+                          const SizedBox(height: 20),
+                          const AppVersionLabel(),
                         ],
                       ),
                     ),

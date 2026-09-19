@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../data/models/alert_contact.dart';
 import '../../data/services/api_client.dart';
 import '../../viewmodels/auth_viewmodel.dart';
+import '../widgets/app_version_label.dart';
 
 /// What a channel is called, what it needs, and how to draw it.
 ///
@@ -373,6 +374,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (context.mounted) Navigator.pop(context);
               },
             ),
+
+            // Version at the foot of the settings list, where people look when
+            // filing a bug report.
+            const SizedBox(height: 20),
+            const AppVersionLabel(),
+            const SizedBox(height: 8),
           ],
         ),
       ),
