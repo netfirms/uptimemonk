@@ -239,7 +239,17 @@ class PushNotificationService {
     }
   }
 
-  /// Ensure FCM token is retrieved and registered with the backend API
+  /// Ensure FCM token is retrieved and registered with the backend API.
+  ///
+  /// On iOS, `getToken()` can return null if it is called before APNs has
+  /// handed the device a token — which is exactly what happens at a cold
+  /// start, when this runs early in `initialize()`. The token is not lost for
+  /// good, but nothing else here re-tries: `onTokenRefresh` only fires when
+  /// the token *changes*, so a user already signed in at launch could go
+  /// unregistered indefinitely and never receive an alert.
+  ///
+  /// So wait for the APNs token first, and if the FCM token is still null,
+  /// retry a few times with a short backoff before giving up.
   Future<void> syncDeviceToken() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -249,16 +259,36 @@ class PushNotificationService {
 
     try {
       if (_currentToken == null) {
-        _currentToken = await FirebaseMessaging.instance.getToken();
-        debugPrint('Retrieved FCM token: ${_currentToken != null ? "${_currentToken!.substring(0, 10)}..." : "null"}');
+        if (Platform.isIOS) {
+          // Waits until APNs has issued a token (or returns null on failure).
+          await FirebaseMessaging.instance.getAPNSToken();
+        }
+        _currentToken = await _fetchFcmTokenWithRetry();
+        debugPrint(
+          'Retrieved FCM token: ${_currentToken != null ? "${_currentToken!.substring(0, 10)}..." : "null"}',
+        );
       }
 
       if (_currentToken != null) {
         await _registerToken(_currentToken!);
+      } else {
+        debugPrint('No FCM token available yet; will retry on next sync.');
       }
     } catch (e) {
       debugPrint('Failed to sync FCM device token: $e');
     }
+  }
+
+  /// `getToken()` a few times, spaced out, for the iOS cold-start race.
+  Future<String?> _fetchFcmTokenWithRetry() async {
+    const attempts = 5;
+    const delay = Duration(seconds: 2);
+    for (var i = 0; i < attempts; i++) {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && token.isNotEmpty) return token;
+      if (i < attempts - 1) await Future<void>.delayed(delay);
+    }
+    return null;
   }
 
   Future<void> _registerToken(String token) async {
