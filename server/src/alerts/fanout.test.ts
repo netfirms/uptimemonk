@@ -127,6 +127,37 @@ describe("alert fan-out", () => {
     );
   });
 
+  test("two contact rows for one destination page only once", () => {
+    // The device-registration race created two fcm rows with the same token.
+    // Both are enabled and verified, so both used to queue an alert and the
+    // device got two pushes for one outage. The destination is the identity
+    // that matters for "was this person told"; it is the dedupe key.
+    contact({ id: "device-a", channel: "fcm", destination: "same-token" });
+    contact({ id: "device-b", channel: "fcm", destination: "same-token" });
+    assert.deepEqual(paged(monitor()), ["device-a"]);
+  });
+
+  test("an explicit list naming both duplicates still pages both", () => {
+    // An explicit list is a deliberate instruction, honoured exactly — the
+    // dedupe only governs the "page everyone" default. If someone really did
+    // name the same destination twice, that is their call, not a bug to paper
+    // over silently.
+    contact({ id: "device-a", channel: "fcm", destination: "same-token" });
+    contact({ id: "device-b", channel: "fcm", destination: "same-token" });
+    assert.deepEqual(
+      paged(monitor({ alertContactIds: ["device-a", "device-b"] })),
+      ["device-a", "device-b"]
+    );
+  });
+
+  test("dedupe is per destination, not per channel", () => {
+    // Different channels reaching the same address are still two destinations
+    // to the person who configured them, and both are intended to fire.
+    contact({ id: "mail", channel: "email", destination: "ops@example.com" });
+    contact({ id: "hook", channel: "webhook", destination: "https://example.com/h" });
+    assert.deepEqual(paged(monitor()), ["hook", "mail"]);
+  });
+
   test("recovery is queued the same way as the outage", () => {
     contact({ id: "a" });
     const m = monitor();

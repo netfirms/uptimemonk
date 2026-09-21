@@ -28,6 +28,16 @@ class PushNotificationService {
   bool _isInitialized = false;
   StreamSubscription<User?>? _authSubscription;
 
+  /// The registration currently in flight, if any.
+  ///
+  /// `syncDeviceToken()` is called from two places at startup — the
+  /// `authStateChanges` listener and directly after it in `initialize()` — and
+  /// on a warm start both run. Without this guard they raced: both saw a null
+  /// token, both fetched the same one, and both POSTed it, so the server
+  /// created two rows for one device and every alert arrived twice. Concurrent
+  /// callers now await the same future instead of starting a second round trip.
+  Future<void>? _syncInFlight;
+
   PushNotificationService._internal({ApiClient? apiClient})
       : _apiClient = apiClient ?? ApiClient();
 
@@ -250,7 +260,17 @@ class PushNotificationService {
   ///
   /// So wait for the APNs token first, and if the FCM token is still null,
   /// retry a few times with a short backoff before giving up.
-  Future<void> syncDeviceToken() async {
+  Future<void> syncDeviceToken() {
+    // Collapse concurrent callers onto one round trip. This is the client half
+    // of the duplicate-push fix; the server's deterministic document id is the
+    // other half, so a duplicate is prevented even if this guard is bypassed
+    // by an older build still in the wild.
+    return _syncInFlight ??= _syncDeviceTokenInner().whenComplete(() {
+      _syncInFlight = null;
+    });
+  }
+
+  Future<void> _syncDeviceTokenInner() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       debugPrint('Skipping device token sync: User is not authenticated yet.');

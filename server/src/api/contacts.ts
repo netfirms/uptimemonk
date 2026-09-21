@@ -73,6 +73,82 @@ const RESEND_COOLDOWN_MS = 60_000;
 
 const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
 
+/**
+ * The document id for one device's push registration.
+ *
+ * Deterministic on purpose. The old handler queried for an existing token and
+ * then inserted if it found none, which is not atomic: the client calls
+ * syncDeviceToken() twice on startup (once from the authStateChanges listener,
+ * once directly), so two requests raced, both found nothing, and both created
+ * a row for the same token. The timestamps proved it — duplicates landed 3ms
+ * apart.
+ *
+ * With the id derived from the identity of the row, a second write is an
+ * upsert onto the same document rather than a second document. `set()` is
+ * idempotent, so concurrent writers converge instead of multiplying.
+ *
+ * The token is hashed rather than used raw: document ids may not contain "/",
+ * FCM tokens are long and opaque, and this keeps a device token out of the
+ * document path where it would show up in any Firestore console URL.
+ */
+export function deviceDocId(orgId: string, token: string): string {
+  return `fcm_${createHash("sha256").update(`${orgId}:${token}`).digest("hex").slice(0, 40)}`;
+}
+
+/**
+ * Collapse push registrations down to one row per token.
+ *
+ * Used to clean up the rows the race already produced, and to retire rows for
+ * tokens a device has rotated away from. Newest wins — it is the one the
+ * device most recently said it wanted alerts on.
+ *
+ * Pure so it can be tested without Firestore.
+ */
+export function pickDuplicateFcmRows(
+  rows: { id: string; token: string; createdAt: number | null }[]
+): string[] {
+  const newest = new Map<string, { id: string; at: number }>();
+  for (const r of rows) {
+    const at = r.createdAt ?? 0;
+    const prev = newest.get(r.token);
+    if (!prev || at > prev.at) newest.set(r.token, { id: r.id, at });
+  }
+  const keep = new Set([...newest.values()].map((v) => v.id));
+  return rows.filter((r) => !keep.has(r.id)).map((r) => r.id);
+}
+
+/**
+ * Earlier registrations of the *same device* — same uid, same platform — that
+ * a fresh registration supersedes.
+ *
+ * A token rotates on reinstall or an FCM refresh and the app reports the new
+ * one, but nothing removed the old row: the device accumulated identically
+ * named entries in Settings, each still able to page it.
+ *
+ * Scoped to platform on purpose. One account signed in on both an iPhone and
+ * an Android has a legitimate token per platform, and matching on uid alone
+ * would delete the other device's registration the moment either one launched
+ * — silencing a device the user still expects to be paged. Rotation replaces a
+ * token for a platform, never across platforms.
+ *
+ * Pure so the cross-platform case can be tested without Firestore.
+ */
+export function pickSupersededFcmRows(
+  rows: { id: string; token: string; uid: string | null; platform: string | null; channel: string }[],
+  current: { id: string; token: string; uid: string; platform: string }
+): string[] {
+  return rows
+    .filter(
+      (r) =>
+        r.channel === "fcm" &&
+        r.uid === current.uid &&
+        r.platform === current.platform &&
+        r.id !== current.id &&
+        r.token !== current.token
+    )
+    .map((r) => r.id);
+}
+
 function message(destination: string, channel: string, link: string): string {
   return [
     `Confirm this ${channel} contact for UptimeMonke.`,
@@ -557,6 +633,16 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
    *
    * Authenticated by the user's Firebase token. Auto-verifies the device since
    * the token is registered directly from the authenticated client app.
+   *
+   * Idempotent by document id, not by query-then-insert. The old version read
+   * for an existing token and inserted if none was found, which two concurrent
+   * calls from the same device both passed — the check and the write were not
+   * one operation. Writing to a deterministic id means the second request
+   * overwrites the first instead of duplicating it.
+   *
+   * A duplicate row is not merely untidy: `queueAlerts` fans out over every
+   * deliverable contact and `deliverableContactIds` does not dedupe by
+   * destination, so two rows for one token send two pushes per incident.
    */
   app.post<{ Body: { token?: string; platform?: "ios" | "android"; name?: string } }>(
     "/v1/devices",
@@ -573,48 +659,90 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "Invalid device token" });
       }
 
-      // Check if this token is already registered in this org
-      const existingDoc = await col
+      const ref = col.alertContacts().doc(deviceDocId(orgId, token));
+
+      // Does a row already exist *anywhere in this org* for this token? If so
+      // the seat is already used and the cap must not count it twice.
+      const rowsForToken = await col
         .alertContacts()
         .where("orgId", "==", orgId)
         .where("channel", "==", "fcm")
         .where("destination", "==", token)
-        .limit(1)
         .get();
 
-      if (!existingDoc.empty) {
-        const doc = existingDoc.docs[0];
-        await doc.ref.update({
+      // Rows created by the old race, plus rows carrying the id the previous
+      // naming scheme would have produced. Both are superseded by `ref`.
+      const stale = rowsForToken.docs
+        .filter((d) => d.id !== ref.id)
+        .map((d) => d.id);
+      const superseded = pickDuplicateFcmRows(
+        rowsForToken.docs.map((d) => ({
+          id: d.id,
+          token: String(d.data().destination ?? ""),
+          createdAt: d.data().createdAt?.toMillis?.() ?? null,
+        }))
+      );
+
+      // Retire this *device's* previous token — same uid, same platform. A
+      // token rotates on reinstall or an FCM refresh and the app reports the
+      // new one, but nothing removed the old row, so a single device piled up
+      // identically-named entries in Settings, each still able to page it.
+      // Scoped to platform: an account on both an iPhone and an Android has a
+      // legitimate token per platform, and matching on uid alone would silence
+      // the other device the moment either launched.
+      const sameDevice = pickSupersededFcmRows(
+        (
+          await col.alertContacts().where("orgId", "==", orgId).where("uid", "==", uid).get()
+        ).docs.map((d) => ({
+          id: d.id,
+          token: String(d.data().destination ?? ""),
+          uid: d.data().uid ?? null,
+          platform: d.data().platform ?? null,
+          channel: String(d.data().channel ?? ""),
+        })),
+        { id: ref.id, token, uid, platform }
+      );
+
+      const staleIds = new Set([...stale, ...superseded, ...sameDevice]);
+      if (staleIds.size) {
+        const batch = col.alertContacts().firestore.batch();
+        for (const id of staleIds) batch.delete(col.alertContacts().doc(id));
+        await batch.commit();
+        log.info(
+          { orgId, removed: staleIds.size, platform },
+          "retired superseded push registrations"
+        );
+      }
+
+      // Seat accounting after the cleanup, so a re-registration is free and
+      // the cap is measured against distinct devices.
+      if (rowsForToken.empty) {
+        const existingCount = await col.alertContacts().where("orgId", "==", orgId).get();
+        if (existingCount.size >= MAX_CONTACTS) {
+          return reply
+            .code(409)
+            .send({ error: `An organisation can have at most ${MAX_CONTACTS} alert contacts` });
+        }
+      }
+
+      await ref.set(
+        {
+          orgId,
+          uid,
+          channel: "fcm",
           name,
+          destination: token,
+          fcmToken: token,
           platform,
           enabled: true,
           verified: true,
           updatedAt: Timestamp.now(),
-        });
-        return reply.code(200).send({ id: doc.id, registered: true });
-      }
-
-      const existingCount = await col.alertContacts().where("orgId", "==", orgId).get();
-      if (existingCount.size >= MAX_CONTACTS) {
-        return reply
-          .code(409)
-          .send({ error: `An organisation can have at most ${MAX_CONTACTS} alert contacts` });
-      }
-
-      const ref = col.alertContacts().doc();
-      await ref.set({
-        orgId,
-        uid,
-        channel: "fcm",
-        name,
-        destination: token,
-        fcmToken: token,
-        platform,
-        enabled: true,
-        verified: true,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      });
+          // `createdAt` is only ever stamped once, so a re-registration keeps
+          // the original date and duplicate cleanup stays deterministic.
+          createdAt: rowsForToken.empty ? Timestamp.now() : rowsForToken.docs[0].data().createdAt,
+        },
+        { merge: true }
+      );
 
       log.info({ contactId: ref.id, platform, orgId }, "mobile device registered for push alerts");
       return reply.code(201).send({ id: ref.id, registered: true });

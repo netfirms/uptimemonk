@@ -659,13 +659,26 @@ export function listContacts(orgId: string): AlertContact[] {
   return rows.map(rowToContact);
 }
 
-/** Everyone in the org who could actually receive an alert right now. */
+/**
+ * Everyone in the org who could actually receive an alert right now — what an
+ * incident pages when the monitor names no contacts of its own.
+ *
+ * Deduplicated by destination. Two rows for one destination — which the
+ * device-registration race produced, and which any future bug or a manual
+ * Firestore edit could recreate — would otherwise each get their own outbox
+ * row and each send their own push. Notifying someone twice for one outage is
+ * a real defect, not cosmetic, so the guarantee is enforced here as well as at
+ * the write path. Belt and braces: the write path stops new duplicates, this
+ * stops an existing one from double-paging.
+ */
 export function deliverableContactIds(orgId: string): string[] {
   return (
     getDb()
       .prepare(
-        `SELECT id FROM alert_contacts
-         WHERE org_id = ? AND enabled = 1 AND verified = 1`
+        `SELECT MIN(id) AS id FROM alert_contacts
+         WHERE org_id = ? AND enabled = 1 AND verified = 1
+         GROUP BY destination
+         ORDER BY id`
       )
       .all(orgId) as any[]
   ).map((r) => r.id);
