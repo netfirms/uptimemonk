@@ -73,5 +73,22 @@ void main() {
       await tester.pumpWidget(host(const SizedBox()));
       expect(find.byType(ProbePulse), findsNothing);
     });
+
+    testWidgets('only ever one caption is on screen', (tester) async {
+      // A cross-fade paints the outgoing and incoming label at once, which
+      // on a device looked like two strings printed over each other.
+      await tester.pumpWidget(host(const ProbePulse(
+        messages: ['Waking the monkey…', 'Reaching the edge probes…'],
+      )));
+
+      for (var step = 0; step < 24; step++) {
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(
+          tester.widgetList(find.byType(Text)).length,
+          lessThanOrEqualTo(1),
+          reason: 'two labels drawn together at step $step',
+        );
+      }
+    });
   });
 }

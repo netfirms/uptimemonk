@@ -52,8 +52,13 @@ class _ProbePulseState extends State<ProbePulse> with SingleTickerProviderStateM
   /// outlive the widget — firing against a disposed state and, in tests,
   /// leaving a pending timer the binding rightly complains about.
   Timer? _messageTimer;
+  Timer? _swapTimer;
   int _messageIndex = 0;
   bool _showMessage = false;
+  /// True while the label is faded out for a swap, so nothing is drawn twice.
+  bool _swapping = false;
+
+  static const _fade = Duration(milliseconds: 260);
 
   @override
   void initState() {
@@ -73,15 +78,28 @@ class _ProbePulseState extends State<ProbePulse> with SingleTickerProviderStateM
     if (!_showMessage || widget.messages.length < 2) return;
     // One message per full cycle, so the text changes with the rings rather
     // than on its own timer drifting against them.
+    if (_swapping) return;
     final cycle = (_controller.lastElapsedDuration ?? Duration.zero).inMilliseconds ~/
         _period.inMilliseconds;
     final next = cycle % widget.messages.length;
-    if (next != _messageIndex) setState(() => _messageIndex = next);
+    if (next == _messageIndex) return;
+
+    // Fade out, change the text while nothing is visible, fade back in.
+    setState(() => _swapping = true);
+    _swapTimer?.cancel();
+    _swapTimer = Timer(_fade, () {
+      if (!mounted) return;
+      setState(() {
+        _messageIndex = next;
+        _swapping = false;
+      });
+    });
   }
 
   @override
   void dispose() {
     _messageTimer?.cancel();
+    _swapTimer?.cancel();
     _controller.removeListener(_advanceMessage);
     _controller.dispose();
     super.dispose();
@@ -116,19 +134,24 @@ class _ProbePulseState extends State<ProbePulse> with SingleTickerProviderStateM
         ),
         if (widget.messages.isNotEmpty) ...[
           const SizedBox(height: 22),
+          // Fade through, not cross-fade.
+          //
+          // An AnimatedSwitcher paints the outgoing and incoming children at
+          // the same time. With centred text of different widths that reads
+          // as two strings printed over each other — which is what it looked
+          // like on a device, even though the tests were happy. Fading the
+          // one label out and back in means only ever one string is on
+          // screen.
           AnimatedOpacity(
-            opacity: _showMessage ? 1 : 0,
-            duration: const Duration(milliseconds: 400),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 350),
-              child: Text(
-                widget.messages[_messageIndex],
-                key: ValueKey(_messageIndex),
-                style: const TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
+            opacity: (_showMessage && !_swapping) ? 1 : 0,
+            duration: _fade,
+            curve: Curves.easeInOut,
+            child: Text(
+              widget.messages[_messageIndex],
+              style: const TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
