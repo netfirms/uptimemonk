@@ -5,6 +5,8 @@ import '../../data/models/monitor.dart';
 import '../../data/models/live_state.dart';
 import '../../viewmodels/monitor_detail_viewmodel.dart';
 import '../monitor_form/monitor_form_screen.dart';
+import '../widgets/probe_pulse.dart';
+import '../widgets/stagger_in.dart';
 import 'widgets/status_bars_chart.dart';
 import 'widgets/response_chart.dart';
 import 'widgets/incident_list.dart';
@@ -107,27 +109,53 @@ class MonitorDetailScreen extends StatelessWidget {
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 40),
                       child: Center(
-                        child: CircularProgressIndicator(color: AppTheme.primaryEmerald),
+                        // The same loader as the rest of the app. A bare spinner
+                        // said nothing about what was being waited on; the pulse
+                        // says probe history is being fetched, which is what is
+                        // actually happening.
+                        child: ProbePulse(
+                          size: 104,
+                          messages: [
+                            'Fetching probe history\u2026',
+                            'Replaying the last checks\u2026',
+                          ],
+                        ),
                       ),
                     )
                   else if (vm.history != null) ...[
-                    // Monitoring result first: up/down history over the range.
-                    StatusBarsChart(
-                      history: vm.history!,
-                      activeRange: vm.range,
-                      onRangeSelected: (r) => vm.setRange(r),
+                    // The panels arrive in reading order rather than all at
+                    // once, so the eye lands on the uptime bars first. Keyed by
+                    // range so switching 24h/7d/30d replays the entrance and
+                    // makes it obvious the data underneath changed.
+                    StaggerIn(
+                      index: 0,
+                      key: ValueKey('status-${vm.range}'),
+                      // Monitoring result first: up/down history over the range.
+                      child: StatusBarsChart(
+                        history: vm.history!,
+                        activeRange: vm.range,
+                        onRangeSelected: (r) => vm.setRange(r),
+                      ),
                     ),
-                    // Then response time, the same buckets' latency.
-                    ResponseChart(
-                      history: vm.history!,
-                      activeRange: vm.range,
-                      onRangeSelected: (r) => vm.setRange(r),
+                    StaggerIn(
+                      index: 1,
+                      key: ValueKey('response-${vm.range}'),
+                      // Then response time, the same buckets' latency.
+                      child: ResponseChart(
+                        history: vm.history!,
+                        activeRange: vm.range,
+                        onRangeSelected: (r) => vm.setRange(r),
+                      ),
                     ),
                   ],
 
                   // Incidents
                   if (vm.history != null)
-                    IncidentList(incidents: vm.history!.incidents),
+                    StaggerIn(
+                      index: 2,
+                      key: ValueKey('incidents-${vm.range}'),
+                      child: IncidentList(incidents: vm.history!.incidents),
+                    ),
 
                   const SizedBox(height: 30),
                 ],

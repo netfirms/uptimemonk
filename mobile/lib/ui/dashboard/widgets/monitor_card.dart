@@ -43,10 +43,15 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
+    // Started in `build` rather than here: whether it should run at all
+    // depends on the monitor's status and on the platform's reduce-motion
+    // setting, neither of which is knowable in initState. Repeating
+    // unconditionally meant a paused monitor kept a frame callback alive and
+    // the OS reduce-motion switch was ignored outright.
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
-    )..repeat();
+    );
 
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.6).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
@@ -144,6 +149,17 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
     final status = isPaused ? 'paused' : widget.live.status.toLowerCase();
     final isUp = status == 'up';
     final isDown = status == 'down';
+
+    // Only a live monitor breathes. A paused one has nothing to report, and
+    // the OS reduce-motion switch exists precisely to stop a loop like this.
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final shouldPulse = (isUp || isDown) && !reduceMotion;
+    if (shouldPulse && !_pulseController.isAnimating) {
+      _pulseController.repeat();
+    } else if (!shouldPulse && _pulseController.isAnimating) {
+      _pulseController.stop();
+      _pulseController.value = 0;
+    }
 
     Color statusColor;
     Color statusBg;

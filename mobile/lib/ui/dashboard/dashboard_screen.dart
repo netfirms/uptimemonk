@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/probe_pulse.dart';
+import '../widgets/stagger_in.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
@@ -385,37 +386,45 @@ class DashboardScreen extends StatelessWidget {
                         delegate: SliverChildBuilderDelegate(
                           (ctx, idx) {
                             final item = monitors[idx];
-                            return MonitorCard(
-                              config: item.config,
-                              live: item.live,
-                              history: vm.historyFor(item.config.id),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => MonitorDetailScreen(
-                                      monitor: item.config,
-                                      live: item.live,
+                            return StaggerIn(
+                              index: idx,
+                              // Keyed by monitor id so a filter change or a
+                              // rename reuses the same State instead of
+                              // replaying the entrance on a row that was
+                              // already on screen.
+                              key: ValueKey(item.config.id),
+                              child: MonitorCard(
+                                config: item.config,
+                                live: item.live,
+                                history: vm.historyFor(item.config.id),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => MonitorDetailScreen(
+                                        monitor: item.config,
+                                        live: item.live,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                              onEdit: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => MonitorFormScreen(
-                                      existingMonitor: item.config,
+                                  );
+                                },
+                                onEdit: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => MonitorFormScreen(
+                                        existingMonitor: item.config,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                              onTogglePause: () => vm.togglePause(item.config),
-                              onDelete: () => _confirmDelete(
-                                context,
-                                item.config.id,
-                                item.config.name,
-                                vm,
+                                  );
+                                },
+                                onTogglePause: () => vm.togglePause(item.config),
+                                onDelete: () => _confirmDelete(
+                                  context,
+                                  item.config.id,
+                                  item.config.name,
+                                  vm,
+                                ),
                               ),
                             );
                           },
