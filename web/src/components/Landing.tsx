@@ -291,6 +291,9 @@ export default function Landing({
       </header>      {/* 2. HERO SECTION */}
       <section className="hero-wrap" id="hero">
         <div className="hero-glow-backdrop" aria-hidden="true" />
+        {/* The Grid. Decorative only — aria-hidden, and pointer-events: none
+            in CSS so it cannot intercept a click on anything above it. */}
+        <div className="grid-floor" aria-hidden="true" />
 
         <div className="hero-ai-pill">
           <span className="status-dot up pulse" />
@@ -534,7 +537,7 @@ export default function Landing({
           <p className="dim">{t("demoDesc")}</p>
         </Reveal>
 
-        <div className="preview-box preview-box-interactive glass">
+        <div className="preview-box preview-box-interactive glass hud-frame">
           {/* Tab bar inside preview */}
           <div className="preview-nav-tabs">
             <button
@@ -1144,6 +1147,8 @@ export default function Landing({
 
       {/* 6. TRANSPARENT CAPACITY PRICING */}
       <section className="donate-strip" id="pricing">
+        {/* Orange grid: this is the one section that belongs to the other side. */}
+        <div className="grid-floor grid-floor-accent" aria-hidden="true" />
         <Reveal className="section-head">
           <span className="section-tag">{t("pricingTag")}</span>
           <h2>{t("pricingTitle")}</h2>
@@ -1261,7 +1266,7 @@ export default function Landing({
       </section>
 
       {/* 8. FRICTIONLESS BOTTOM CONVERSION BANNER */}
-      <section className="cta-banner glass-strong">
+      <section className="cta-banner glass-strong hud-frame">
         <div className="cta-banner-content">
           <div className="cta-tag">{t("ctaTag")}</div>
           <h2>{t("ctaTitle")}</h2>

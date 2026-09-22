@@ -76,13 +76,33 @@
 
      The hairline is cyan rather than white now: a white edge on this base
      reads as grey plastic, where a tinted one reads as lit. */
-  --glass-bg: rgba(111, 195, 223, 0.045);
-  --glass-bg-strong: rgba(111, 195, 223, 0.075);
-  --glass-border: rgba(111, 195, 223, 0.16);
-  --glass-border-lit: rgba(111, 195, 223, 0.34);
-  --glass-blur: 18px;
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --glass-shadow-lg: 0 18px 54px rgba(0, 0, 0, 0.6);
+  --glass-bg: rgba(111, 195, 223, 0.055);
+  --glass-bg-strong: rgba(111, 195, 223, 0.085);
+  --glass-border: rgba(111, 195, 223, 0.18);
+  --glass-border-lit: rgba(160, 226, 246, 0.5);
+  /* iOS blurs harder than the web usually does, and pairs it with a large
+     saturation boost — that is what makes the colour behind a panel bleed
+     through as colour rather than as grey. Blur alone reads as frosted
+     plastic. */
+  --glass-blur: 30px;
+  --glass-saturate: 180%;
+  /* Depth is two shadows, not one: a tight contact shadow that anchors the
+     panel to what is under it, and a wide soft one that gives it height. A
+     single blurred shadow reads as a drop shadow rather than as a floating
+     pane. */
+  --glass-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 10px 36px rgba(0, 0, 0, 0.46);
+  --glass-shadow-lg:
+    0 1px 2px rgba(0, 0, 0, 0.55),
+    0 24px 64px rgba(0, 0, 0, 0.58);
+  /* The lit top edge and the dark bottom edge, drawn inside the panel. On
+     iOS this pair is what separates a pane from a flat translucent rectangle
+     — light catches the top lip, the bottom falls away. */
+  --glass-inset:
+    inset 0 1px 0 rgba(200, 240, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  --glass-radius: 18px;
 
   /* --- Motion ------------------------------------------------------------ */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -99,16 +119,44 @@
 .glass,
 .glass-strong {
   position: relative;
-  background: var(--glass-bg);
+  /* A gradient rather than a flat fill: real glass is lit from one side, and
+     an even translucency is the tell that a panel is a rectangle with opacity
+     rather than a pane with a surface. */
+  background:
+    linear-gradient(
+      160deg,
+      rgba(111, 195, 223, 0.085) 0%,
+      rgba(111, 195, 223, 0.03) 42%,
+      rgba(7, 11, 16, 0.22) 100%
+    ),
+    var(--glass-bg);
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
-  box-shadow: var(--glass-shadow);
+  border-radius: var(--glass-radius);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow), var(--glass-inset);
 }
 
 .glass-strong {
-  background: var(--glass-bg-strong);
-  box-shadow: var(--glass-shadow-lg);
+  background:
+    linear-gradient(
+      160deg,
+      rgba(111, 195, 223, 0.12) 0%,
+      rgba(111, 195, 223, 0.045) 42%,
+      rgba(7, 11, 16, 0.26) 100%
+    ),
+    var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow-lg), var(--glass-inset);
+}
+
+/* Fallback for engines without backdrop-filter (Firefox with the flag off).
+   Without this the panels are nearly transparent and the text sits directly
+   on the page background. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-strong {
+    background: rgba(13, 20, 28, 0.92);
+  }
 }
 
 .glass::before,
@@ -126,6 +174,189 @@
     transparent
   );
   pointer-events: none;
+}
+
+/* =======================================================================
+   THE GRID — futuristic backdrop graphics
+   =======================================================================
+   Three separate layers, each doing one job, because stacking them into one
+   element made every one of them impossible to tune:
+
+     .grid-floor   the receding perspective plane, the single most legible
+                   Tron cue there is
+     .hud-frame    corner brackets, the "this panel is an instrument" signal
+     .scanlines    a whole-page overlay at very low alpha
+
+   All three are decorative and inert: aria-hidden in the markup, and
+   pointer-events: none here so they can never eat a click.
+   ======================================================================= */
+
+.grid-floor {
+  position: absolute;
+  /* Full-bleed. Its parents are narrow reading columns (760px for the hero),
+     and a floor plane clipped to a text column reads as a decorative panel
+     rather than as ground the page is standing on. */
+  inset: auto auto 0 50%;
+  width: 100vw;
+  margin-left: -50vw;
+  height: 44vh;
+  max-height: 400px;
+  overflow: hidden;
+  pointer-events: none;
+  /* -1, matching .hero-glow-backdrop. A positioned element at z-index 0 paints
+     above non-positioned in-flow siblings, which would lay the grid over the
+     hero copy rather than behind it. */
+  z-index: -1;
+  /* `perspective` as a property on the parent, with an explicit origin at the
+     horizon — not `perspective()` inside the child's transform. The function
+     form takes its origin from the child's own centre, and on a plane this
+     wide that puts most of the geometry behind the viewer, where it is
+     clipped away entirely and nothing renders. */
+  perspective: 220px;
+  perspective-origin: 50% 0%;
+  -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.6) 40%, transparent 96%);
+  mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.6) 40%, transparent 96%);
+}
+
+.grid-floor::before {
+  content: "";
+  position: absolute;
+  /* Anchored at the horizon and running far past the bottom and sides: after
+     the rotation the near edge is enormously wider than the container. */
+  top: 0;
+  left: -60%;
+  right: -60%;
+  bottom: -160%;
+  background-image:
+    linear-gradient(to right, rgba(111, 195, 223, 0.32) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(111, 195, 223, 0.32) 1px, transparent 1px);
+  background-size: 56px 56px;
+  /* Rotated about the top edge so the plane lies down away from the viewer. */
+  transform: rotateX(64deg);
+  transform-origin: 50% 0%;
+  /* Own compositor layer. Without it the drift below repaints this whole
+     plane — full-bleed, 3D-transformed and masked — on the main thread. */
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* The horizon: where the plane meets the dark. A single lit line sells the
+   depth more than the grid does. */
+.grid-floor::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(111, 195, 223, 0.5) 22%,
+    rgba(160, 226, 246, 0.72) 50%,
+    rgba(111, 195, 223, 0.5) 78%,
+    transparent
+  );
+  box-shadow: 0 0 22px rgba(111, 195, 223, 0.5);
+}
+
+/* Orange variant, for the one section that belongs to the other side. */
+.grid-floor-accent::before {
+  background-image:
+    linear-gradient(to right, rgba(255, 157, 46, 0.18) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 157, 46, 0.18) 1px, transparent 1px);
+}
+
+.grid-floor-accent::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 157, 46, 0.5) 22%,
+    rgba(255, 196, 122, 0.7) 50%,
+    rgba(255, 157, 46, 0.5) 78%,
+    transparent
+  );
+  box-shadow: 0 0 22px rgba(255, 157, 46, 0.45);
+}
+
+/* The plane drifts toward the viewer. One background-size step per cycle, so
+   the loop is seamless rather than snapping back. */
+@media (prefers-reduced-motion: no-preference) {
+  .grid-floor::before {
+    animation: grid-drift 7s linear infinite;
+  }
+}
+
+/* Drifts by translating along the plane rather than by moving the background.
+   `background-position` was the first attempt, and it repaints this whole
+   element — full-bleed, 3D-transformed and masked — on every frame. Toggling
+   it off in a like-for-like sample cut p95 frame time by roughly 15x, which
+   is the shape of the problem even though the absolute numbers came off a
+   throttled dev page. A transform is composited instead, and the translate
+   happens inside the rotated space, so the plane slides along itself — which
+   is the motion wanted anyway.
+
+   One full cell (56px) per cycle, so the loop is seamless. */
+@keyframes grid-drift {
+  from { transform: rotateX(64deg) translate3d(0, 0, 0); }
+  to   { transform: rotateX(64deg) translate3d(0, 56px, 0); }
+}
+
+/* --- HUD corner brackets ------------------------------------------------
+   Eight gradients drawing four L-shaped corners. Uses ::after because .glass
+   already spends ::before on its lit top hairline. */
+.hud-frame {
+  position: relative;
+}
+
+.hud-frame::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  --hud: rgba(111, 195, 223, 0.65);
+  --hud-len: 15px;
+  --hud-w: 2px;
+  background:
+    linear-gradient(var(--hud), var(--hud)) top left / var(--hud-len) var(--hud-w) no-repeat,
+    linear-gradient(var(--hud), var(--hud)) top left / var(--hud-w) var(--hud-len) no-repeat,
+    linear-gradient(var(--hud), var(--hud)) top right / var(--hud-len) var(--hud-w) no-repeat,
+    linear-gradient(var(--hud), var(--hud)) top right / var(--hud-w) var(--hud-len) no-repeat,
+    linear-gradient(var(--hud), var(--hud)) bottom left / var(--hud-len) var(--hud-w) no-repeat,
+    linear-gradient(var(--hud), var(--hud)) bottom left / var(--hud-w) var(--hud-len) no-repeat,
+    linear-gradient(var(--hud), var(--hud)) bottom right / var(--hud-len) var(--hud-w) no-repeat,
+    linear-gradient(var(--hud), var(--hud)) bottom right / var(--hud-w) var(--hud-len) no-repeat;
+}
+
+.hud-frame-accent::after {
+  --hud: rgba(255, 157, 46, 0.6);
+}
+
+/* --- Scanlines ----------------------------------------------------------
+   Whole-viewport overlay, fixed so it does not scroll with content. The alpha
+   is deliberately near-invisible: legible as texture, never as stripes over
+   body copy. Suppressed under reduce-motion together with everything else
+   that makes the page feel like a display rather than a document. */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(111, 195, 223, 0.03) 0px,
+    rgba(111, 195, 223, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  /* Deliberately no mix-blend-mode. Blending a fixed, full-viewport layer
+     forces the entire page into one composited blend group on every frame —
+     expensive on its own, and worse here because it has to re-composite over
+     every backdrop-filter panel underneath it. At this alpha a plain overlay
+     is indistinguishable from the blended one. */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanlines { display: none; }
 }
 
 /* =======================================================================
@@ -2414,6 +2645,9 @@ button.btn-outline-red {
 /* --- Landing: how it is paid for --- */
 
 .donate-strip {
+  /* Positioning context for its .grid-floor, which is absolutely positioned
+     and would otherwise resolve against an ancestor further up. */
+  position: relative;
   max-width: 980px;
   margin: 56px auto 0;
   padding: 0 16px;

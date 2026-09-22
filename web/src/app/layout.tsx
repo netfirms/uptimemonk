@@ -110,6 +110,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <I18nProvider>
           {children}
         </I18nProvider>
+        {/* Display texture over the whole page. Last in the body and
+            pointer-events: none, so it sits above the content visually
+            without ever taking a click. Hidden under reduce-motion. */}
+        <div className="scanlines" aria-hidden="true" />
         <Analytics />
       </body>
     </html>
