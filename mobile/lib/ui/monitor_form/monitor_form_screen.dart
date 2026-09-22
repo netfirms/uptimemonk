@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/analytics.dart';
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../data/models/alert_contact.dart';
@@ -357,9 +360,11 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
     try {
       if (widget.existingMonitor != null) {
         await _apiClient.updateMonitor(widget.existingMonitor!.id, payload);
+        unawaited(AnalyticsEvents.monitorEdited(_type));
         if (mounted) Navigator.pop(context, true);
       } else {
         final res = await _apiClient.createMonitor(payload);
+        unawaited(AnalyticsEvents.monitorCreated(_type, _intervalSeconds));
         if (mounted) {
           final heartbeatToken = res['heartbeatToken'] as String?;
           if (_type == 'heartbeat' && heartbeatToken != null && heartbeatToken.isNotEmpty) {
@@ -369,6 +374,10 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
         }
       }
     } catch (e) {
+      unawaited(AnalyticsEvents.actionFailed(
+        widget.existingMonitor != null ? 'edit_monitor' : 'create_monitor',
+        e is ApiException ? e.statusCode : null,
+      ));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

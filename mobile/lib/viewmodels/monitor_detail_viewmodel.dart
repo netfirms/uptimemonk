@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import '../core/analytics.dart';
 import '../data/models/history.dart';
 import '../data/models/monitor.dart';
 import '../data/services/api_client.dart';
@@ -18,6 +21,11 @@ class MonitorDetailViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   MonitorDetailViewModel({required this.monitor}) {
+    // Once per opening, not once per fetch: `fetchHistory` also runs on every
+    // range switch and pull-to-refresh, and counting those would turn "people
+    // opened history" into "people changed the time range", which is a
+    // different question with a much larger number.
+    unawaited(AnalyticsEvents.historyViewed(monitor.type));
     fetchHistory();
   }
 

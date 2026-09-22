@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../core/analytics.dart';
 import '../core/email_verification.dart';
 import '../data/services/api_client.dart';
 import '../data/services/push_service.dart';
@@ -17,6 +18,10 @@ class AuthViewModel extends ChangeNotifier {
   String? _orgId;
   /// From the ID token; null until it resolves. See [_needsVerification].
   String? _signInProvider;
+
+  /// See [analyticsMethodFor] — the normalisation lives there so it can be
+  /// tested without Firebase.
+  String get _analyticsMethod => analyticsMethodFor(_signInProvider);
   /// True when a bootstrap or claim lookup failed, as opposed to never run.
   bool _workspaceLookupFailed = false;
   AuthStatus _status = AuthStatus.initial;
@@ -106,11 +111,22 @@ class AuthViewModel extends ChangeNotifier {
       final claimOrgId = idTokenResult.claims?['orgId'] as String?;
       if (claimOrgId != null && claimOrgId.isNotEmpty) {
         _orgId = claimOrgId;
+        // A claim already exists, so this is a returning user. Reported here
+        // rather than in each of the six sign-in methods: every one of them
+        // funnels through this call, so one site cannot drift out of step
+        // with another, and a new provider is measured the day it is added.
+        unawaited(AnalyticsEvents.signIn(_analyticsMethod));
+        unawaited(Analytics.identify(claimOrgId));
         return;
       }
 
       // 2. Call bootstrap to ensure workspace exists and custom claim is issued
       _orgId = await _apiClient.bootstrap();
+      // No claim before this call means bootstrap just created the workspace —
+      // the one moment that is genuinely a sign-up rather than a login. The
+      // web client draws the same line at the same place.
+      unawaited(AnalyticsEvents.signUpBootstrapped(_analyticsMethod));
+      unawaited(Analytics.identify(_orgId!));
       await user.getIdToken(true); // Force token refresh to get claim
 
       // 3. Sync FCM push notification token with backend
@@ -119,6 +135,14 @@ class AuthViewModel extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error resolving orgId: $e');
       _errorMessage = _readableApiError(e);
+      // The workspace lookup failing is the single worst thing that can happen
+      // to a new account — it is the 403/429 class of bug that stranded users
+      // before. Worth counting rather than only logging to a console nobody
+      // reads in production.
+      unawaited(AnalyticsEvents.actionFailed(
+        'resolve_workspace',
+        e is ApiException ? e.statusCode : null,
+      ));
       // Recorded rather than left implicit: `_orgId == null` alone cannot
       // tell a failure apart from a lookup that has not run, and the router
       // needs that difference to show a retry instead of a login form.
@@ -515,6 +539,10 @@ class AuthViewModel extends ChangeNotifier {
       await GoogleSignIn.instance.signOut();
     } catch (_) {}
     await _auth.signOut();
+    // Otherwise the next account signed in on this device inherits the
+    // previous one's org_id until its own lookup completes, attributing that
+    // window of events to the wrong workspace.
+    unawaited(Analytics.resetIdentity());
     _user = null;
     _orgId = null;
     _signInProvider = null;

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../../core/analytics.dart';
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 import 'api_client.dart';
@@ -70,6 +71,14 @@ class PushNotificationService {
         sound: true,
         provisional: false,
       );
+
+      // Worth counting: alerting is the whole product, so a device that
+      // declines notifications is a user who will silently get less value
+      // than they signed up for. `provisional` counts as granted — the
+      // notifications do arrive, just quietly.
+      final granted = settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+      unawaited(AnalyticsEvents.pushPermission(granted));
 
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
         debugPrint('Push notification permission denied by user.');

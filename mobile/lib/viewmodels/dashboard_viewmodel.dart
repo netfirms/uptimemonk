@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../core/analytics.dart';
 import '../data/models/monitor.dart';
 import '../data/models/live_state.dart';
 import '../data/models/history.dart';
@@ -285,17 +286,36 @@ class DashboardViewModel extends ChangeNotifier {
   Future<void> togglePause(MonitorConfig monitor) async {
     try {
       await _apiClient.togglePause(monitor.id);
+      // `enabled` is the state before the call, so the new paused state is its
+      // inverse — the same expression the web client uses.
+      unawaited(AnalyticsEvents.monitorPaused(monitor.enabled));
     } catch (e) {
       _errorMessage = e.toString();
+      unawaited(AnalyticsEvents.actionFailed(
+        'toggle_pause',
+        e is ApiException ? e.statusCode : null,
+      ));
       notifyListeners();
     }
   }
 
   Future<void> deleteMonitor(String id) async {
+    // Read the type before the delete: afterwards the Firestore subscription
+    // drops the document and there is nothing left to look it up from.
+    final type = _monitors
+        .where((m) => m.id == id)
+        .map((m) => m.type)
+        .followedBy(const ['unknown'])
+        .first;
     try {
       await _apiClient.deleteMonitor(id);
+      unawaited(AnalyticsEvents.monitorDeleted(type));
     } catch (e) {
       _errorMessage = e.toString();
+      unawaited(AnalyticsEvents.actionFailed(
+        'delete_monitor',
+        e is ApiException ? e.statusCode : null,
+      ));
       notifyListeners();
     }
   }

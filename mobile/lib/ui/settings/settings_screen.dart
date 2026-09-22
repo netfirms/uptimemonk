@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/analytics.dart';
 import '../../core/theme.dart';
 import '../../data/models/alert_contact.dart';
 import '../../data/services/api_client.dart';
@@ -209,14 +212,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // --------------------------------------------------------------- contacts
 
-  Future<void> _runOnContact(String id, Future<void> Function() action, String done) async {
+  /// [report] is handed the outcome, so a caller that wants to measure an
+  /// action does not have to duplicate the try/catch to learn whether it
+  /// worked. Optional because most of these actions are not worth an event.
+  Future<void> _runOnContact(
+    String id,
+    Future<void> Function() action,
+    String done, {
+    void Function(bool ok)? report,
+  }) async {
     setState(() => _busyContacts.add(id));
     try {
       await action();
       await _load();
       _toast(done);
+      report?.call(true);
     } catch (e) {
       _toast(_readable(e), ok: false);
+      report?.call(false);
     } finally {
       if (mounted) setState(() => _busyContacts.remove(id));
     }
@@ -556,7 +569,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onSelected: (value) {
                   switch (value) {
                     case 'test':
-                      _runOnContact(c.id, () => _apiClient.testContact(c.id), 'Test alert sent');
+                      _runOnContact(
+                        c.id,
+                        () => _apiClient.testContact(c.id),
+                        'Test alert sent',
+                        report: (ok) =>
+                            unawaited(AnalyticsEvents.contactTested(c.channel, ok)),
+                      );
                     case 'verify':
                       _runOnContact(
                           c.id, () => _apiClient.verifyContact(c.id), 'Confirmation sent');
@@ -633,10 +652,17 @@ class _AddContactSheetState extends State<_AddContactSheet> {
         name: _nameController.text.trim(),
         destination: _destinationController.text.trim(),
       );
+      // Channel only. The destination is a real phone number or address and
+      // has no business leaving the device.
+      unawaited(AnalyticsEvents.contactAdded(_channel.id));
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       final text = e.toString();
       final match = RegExp(r'\((\d{3})\):\s*(.+)$', dotAll: true).firstMatch(text);
+      unawaited(AnalyticsEvents.actionFailed(
+        'contact_add',
+        match != null ? int.tryParse(match.group(1)!) : null,
+      ));
       if (mounted) {
         setState(() {
           _error = match != null ? match.group(2)!.trim() : text;
