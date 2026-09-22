@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { col } from "../sync/firebase.js";
 import { listMonitors } from "../db/repo.js";
-import { parseRange, type RangeKey } from "../lib/ranges.js";
+import { parseRange, DEFAULT_RANGE, type RangeKey } from "../lib/ranges.js";
 import { seriesFor } from "../monitors/series.js";
 import { RANGES } from "../lib/ranges.js";
 import { log } from "../lib/log.js";
@@ -117,7 +117,10 @@ export function buildPublicStatus(
   orgId: string,
   title: string,
   description?: string,
-  range: RangeKey = "90d"
+  // DEFAULT_RANGE rather than a literal: `parseRange` already falls back to
+  // it, and a second hardcoded default here is how the two drift apart —
+  // which is exactly what had happened.
+  range: RangeKey = DEFAULT_RANGE
 ): PublicStatus | null {
   const monitors = listMonitors(orgId).filter((m) => m.publicOnStatusPage === true);
   if (monitors.length === 0) return null;

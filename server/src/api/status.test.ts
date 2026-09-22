@@ -45,7 +45,26 @@ function seed(over: Partial<Monitor> & { id: string }): void {
 }
 
 describe("public status projection", () => {
-  test("only monitors explicitly opted in are published", () => {
+  test("defaults to the 24h window, not the longest one", () => {
+  seed({ id: "a", name: "Public API", publicOnStatusPage: true });
+
+  // A status page answers "is it working right now". Over 90 days an active
+  // outage averages down to a rounding error, so the page reads green while
+  // the service is down — which is the opposite of what a visitor came for.
+  const page = buildPublicStatus(ORG, "Acme");
+  assert.equal(page?.range, "24h");
+  assert.equal(page?.granularity, "hour");
+});
+
+test("an explicit range still wins over the default", () => {
+  seed({ id: "a", name: "Public API", publicOnStatusPage: true });
+
+  const page = buildPublicStatus(ORG, "Acme", undefined, "90d");
+  assert.equal(page?.range, "90d");
+  assert.equal(page?.granularity, "day");
+});
+
+test("only monitors explicitly opted in are published", () => {
     seed({ id: "a", name: "Public API", publicOnStatusPage: true });
     seed({ id: "b", name: "Internal billing", publicOnStatusPage: false });
     seed({ id: "c", name: "Legacy monitor" }); // predates the flag
@@ -92,7 +111,10 @@ describe("public status projection", () => {
         avgMs: 100, uptimeRatio: 1, downtimeSeconds: 0,
       });
     }
-    const buckets = buildPublicStatus(ORG, "Acme")!.monitors[0].buckets;
+    // Explicitly a day-granularity range: this seeds day rollups, and only the
+  // long windows read that table. It used to rely on the default being 90d,
+  // which made it silently a test of the default as much as of the ordering.
+  const buckets = buildPublicStatus(ORG, "Acme", undefined, "90d")!.monitors[0].buckets;
     assert.deepEqual(
       buckets.map((b) => new Date(b.t).toISOString().slice(0, 10)),
       ["2026-09-01", "2026-09-02", "2026-09-03"]

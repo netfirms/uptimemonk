@@ -17,6 +17,18 @@ export const RANGES = [
 
 export type RangeKey = (typeof RANGES)[number]["key"];
 
+/**
+ * Mirrors `DEFAULT_RANGE` in `server/src/lib/ranges.ts`, which is what the API
+ * falls back to when a request carries no `range`.
+ *
+ * 24h because a status page answers "is it working right now". A visitor
+ * arrives during an outage, and a 90-day window averages that outage down to
+ * a rounding error — the page looks green while the service is down. The
+ * longer windows are still one tap away for anyone asking a different
+ * question.
+ */
+export const DEFAULT_RANGE: RangeKey = "24h";
+
 export const rangeLabel = (key: RangeKey) =>
   RANGES.find((r) => r.key === key)?.full ?? key;
 

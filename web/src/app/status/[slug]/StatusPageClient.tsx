@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/api";
-import RangeTabs, { rangeLabel, type RangeKey } from "@/components/RangeTabs";
+import RangeTabs, { rangeLabel, DEFAULT_RANGE, type RangeKey } from "@/components/RangeTabs";
 
 interface Bucket {
   /** Start of the bucket, epoch ms. */
@@ -59,7 +59,7 @@ const BUCKETS_PER_RANGE: Record<RangeKey, number> = {
 export default function StatusPageClient() {
   const [page, setPage] = useState<PublicStatus | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
-  const [range, setRange] = useState<RangeKey>("90d");
+  const [range, setRange] = useState<RangeKey>(DEFAULT_RANGE);
 
   useEffect(() => {
     const slug = slugFromPath();
