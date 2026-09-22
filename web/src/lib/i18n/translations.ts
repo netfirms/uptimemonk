@@ -346,12 +346,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     startFree: "Start Free",
     dashboardBtn: "Dashboard",
 
-    heroTag: "Sub-Minute Edge Checks · 100% Free Forever",
+    heroTag: "60-Second Edge Checks · 100% Free Forever",
     heroTitle1: "Keep your websites & APIs ",
     heroTitleHighlight: "online",
     heroTitle2: ".",
     heroDesc:
-      "Continuous HTTP, SSL expiry, TCP ping, and cron heartbeat monitoring with sub-minute checks and instant multi-channel alerts before your users notice downtime.",
+      "Continuous HTTP, SSL expiry, TCP ping, and cron heartbeat monitoring with 60-second checks and instant multi-channel alerts before your users notice downtime.",
     heroPlaceholder: "Enter your website or API (e.g. example.com)",
     heroStartBtn: "Start Monitoring",
     continueWithGoogle: "Continue with Google",
@@ -376,7 +376,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     demoTag: "Interactive Sandbox",
     demoTitle: "See How UptimeMonke Probes Your Stack",
     demoDesc:
-      "Real-time edge probes dispatched from AWS Lightsail Singapore with sub-minute resolution.",
+      "Real-time edge probes dispatched from AWS Lightsail Singapore with 60-second resolution.",
     tabHttp: "HTTP & APIs",
     tabSsl: "SSL Certificates",
     tabPorts: "TCP & DNS",
@@ -404,9 +404,9 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     whyTitle: "Why Teams Choose UptimeMonke",
     whyDesc:
       "No artificial paywalls, no bloated enterprise contracts. Just fast, dependable infrastructure monitoring.",
-    why1Title: "Sub-Minute Edge Checks",
+    why1Title: "60-Second Edge Checks",
     why1Desc:
-      "Traditional monitoring platforms lock free accounts to 5-minute intervals. UptimeMonke lets you run sub-minute checks right out of the box so you know about failures instantly.",
+      "Traditional monitoring platforms lock free accounts to 5-minute intervals. UptimeMonke lets you run 60-second checks right out of the box so you know about failures instantly.",
     why2Title: "SSRF-Hardened Cloud Fleet",
     why2Desc:
       "Engineered with strict RFC1918 link-local defense, AWS IMDSv2 metadata attack prevention, and DNS rebinding guards. Safe for corporate internal targets.",
@@ -420,11 +420,11 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     pricingTag: "Zero Subscriptions",
     pricingTitle: "There Is No Paid Plan",
     pricingLede:
-      "Every single feature works on a free account — all check types, sub-minute intervals, public status pages, and alerting. What an optional donation pays for is capacity, because that is the only part that costs real server resources.",
+      "Every single feature works on a free account — all check types, 60-second intervals, public status pages, and alerting. What an optional donation pays for is capacity, because that is the only part that costs real server resources.",
     freeForeverLabel: "Free, forever",
     checksPerDay: "checks a day",
     freeDesc:
-      "Ten monitors at one minute. Or fifty at five minutes. Or one at six seconds — it is the exact same compute load, so it is the exact same free price.",
+      "Ten monitors at one minute. Or fifty at five minutes. It is the exact same compute load, so it is the exact same free price — and supporting the project unlocks five-second checks.",
     coffeeAddsLabel: "One $2.99 coffee adds",
     checksUnit: "checks",
     coffeeDesc:
@@ -437,7 +437,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     graceDesc:
       "A week of grace at full capacity, then a seamless fallback to the free 14,400 daily allowance. Your monitors keep running throughout.",
     whyCapacityExplanation:
-      "Why checks and not monitors? A five-second check is twelve times the work of a one-minute one. Charging per monitor would price those the same — and it would stop a free account running a single fast check that costs no more than ten slow ones.",
+      "Why checks and not monitors? A five-second check is twelve times the work of a one-minute one. Charging per monitor would price those the same, which is why capacity is measured in checks.",
 
     faqTag: "Frequently Asked Questions",
     faqTitle: "Everything You Need to Know",
@@ -447,7 +447,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
       "Yes, completely free. Every account receives 14,400 checks every day forever, and no credit card is ever required.",
     faq2Q: "How is this different from UptimeRobot or competitors?",
     faq2A:
-      "Traditional competitors restrict free tiers to 5-minute intervals and charge monthly subscriptions for SSL and cron monitoring. UptimeMonke provides sub-minute checks, SSL alerts, and cron heartbeats 100% free forever, funded only by optional coffee donations.",
+      "Traditional competitors restrict free tiers to 5-minute intervals and charge monthly subscriptions for SSL and cron monitoring. UptimeMonke provides 60-second checks, SSL alerts, and cron heartbeats 100% free forever, funded only by optional coffee donations.",
     faq3Q: "Where are the monitoring probes dispatched from?",
     faq3A:
       "Probes originate from our dedicated worker fleet in AWS Lightsail Singapore (ap-southeast-1a). Keep-alive is deliberately disabled so we accurately measure cold-socket connection latency for first-time visitors.",
@@ -648,7 +648,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     // AI & Onboarding Enhancements
     heroAiBadge: "🤖 AI App & API Gateway Monitoring",
     heroAiHeadline: "Monitor your AI app with UptimeMonke",
-    heroAiSubtext: "Keep your LLM agents, OpenAI & Anthropic proxies, FastAPI backends, and web apps fast and available with sub-minute edge probes.",
+    heroAiSubtext: "Keep your LLM agents, OpenAI & Anthropic proxies, FastAPI backends, and web apps fast and available with 60-second edge probes.",
     presetAiApi: "🤖 AI / LLM API",
     presetWebApp: "🌐 Web App",
     presetSsl: "🔒 SSL Certificate",
@@ -691,12 +691,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     startFree: "免费开始",
     dashboardBtn: "控制台",
 
-    heroTag: "亚分钟级边缘探测 · 永久 100% 免费",
+    heroTag: "60 秒级边缘探测 · 永久 100% 免费",
     heroTitle1: "守护您的网站与 API ",
     heroTitleHighlight: "稳定在线",
     heroTitle2: "。",
     heroDesc:
-      "持续进行 HTTP、SSL 证书过期、TCP 与 Cron 心跳监控，具备亚分钟级检测频率，并在故障发生的第一时间向您发送多渠道即时告警。",
+      "持续进行 HTTP、SSL 证书过期、TCP 与 Cron 心跳监控，具备60 秒级检测频率，并在故障发生的第一时间向您发送多渠道即时告警。",
     heroPlaceholder: "输入您的网站或 API 地址 (例如 example.com)",
     heroStartBtn: "开始监控",
     continueWithGoogle: "使用 Google 继续",
@@ -720,7 +720,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
 
     demoTag: "交互式沙盒",
     demoTitle: "亲身体验 UptimeMonke 探针技术",
-    demoDesc: "来自 AWS 新加坡边缘节点的实时探测，亚分钟级高敏分辨率。",
+    demoDesc: "来自 AWS 新加坡边缘节点的实时探测，60 秒级分辨率。",
     tabHttp: "HTTP 与 API",
     tabSsl: "SSL 证书",
     tabPorts: "TCP 与 DNS",
@@ -747,9 +747,9 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     whyTitle: "为什么选择 UptimeMonke",
     whyDesc:
       "没有虚设的功能付费墙，拒绝冗余的企业销售套路。专注于极速、可靠的基础设施监控。",
-    why1Title: "亚分钟级边缘检测",
+    why1Title: "60 秒级边缘检测",
     why1Desc:
-      "传统平台对免费账户限制 5 分钟检测间隔。UptimeMonke 开箱即享亚分钟级探测，故障即发即知。",
+      "传统平台对免费账户限制 5 分钟检测间隔。UptimeMonke 开箱即享60 秒级探测，故障即发即知。",
     why2Title: "防 SSRF 强化的云端探针",
     why2Desc:
       "内置严苛的 RFC1918 局域网防御、AWS IMDSv2 元数据防线和 DNS 重绑定防护，企业内网目标同样安全。",
@@ -767,7 +767,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     freeForeverLabel: "永久免费",
     checksPerDay: "次检测 / 每天",
     freeDesc:
-      "10个1分钟监控，或50个5分钟监控，或1个6秒极速监控 — 它们的算力消耗相同，因而同样免费。",
+      "10 个 1 分钟监控，或 50 个 5 分钟监控 — 算力消耗相同，因而同样免费。捐赠支持即可解锁 5 秒级检测。",
     coffeeAddsLabel: "赞助一杯 $2.99 咖啡即可增加",
     checksUnit: "次检测",
     coffeeDesc:
@@ -1033,12 +1033,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     startFree: "無料で始める",
     dashboardBtn: "ダッシュボード",
 
-    heroTag: "1分未満のエッジ監視 · 完全永久無料",
+    heroTag: "60秒のエッジ監視 · 完全永久無料",
     heroTitle1: "WebサイトとAPIを常に",
     heroTitleHighlight: "オンライン",
     heroTitle2: "に維持します。",
     heroDesc:
-      "HTTP、SSL証明書有効期限、TCP ping、cronハートビートを1分未満間隔で継続監視。ユーザーがダウンタイムに気づく前にマルチチャネルで即座に通知します。",
+      "HTTP、SSL証明書有効期限、TCP ping、cronハートビートを60秒間隔で継続監視。ユーザーがダウンタイムに気づく前にマルチチャネルで即座に通知します。",
     heroPlaceholder: "WebサイトまたはAPIのURL (例: example.com)",
     heroStartBtn: "監視を開始",
     continueWithGoogle: "Googleで続ける",
@@ -1062,7 +1062,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
 
     demoTag: "インタラクティブ・サンドボックス",
     demoTitle: "スタックを監視する仕組み",
-    demoDesc: "AWS Lightsailシンガポールから1分未満の高精度でリアルタイムプローブを実行します。",
+    demoDesc: "AWS Lightsailシンガポールから60秒の精度でリアルタイムプローブを実行します。",
     tabHttp: "HTTP & API",
     tabSsl: "SSL証明書",
     tabPorts: "TCP & DNS",
@@ -1088,8 +1088,8 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     whyTag: "開発者のために設計",
     whyTitle: "UptimeMonkeが選ばれる理由",
     whyDesc: "人為的な課金障壁や無駄な法人契約は不要。迅速で信頼できるインフラ監視を提供します。",
-    why1Title: "1分未満のエッジ監視",
-    why1Desc: "従来の監視ツールは無料枠を5分間隔に制限しています。UptimeMonkeは最初から1分未満の高速チェックが可能で、障害を即座に検知します。",
+    why1Title: "60秒のエッジ監視",
+    why1Desc: "従来の監視ツールは無料枠を5分間隔に制限しています。UptimeMonkeは最初から60秒間隔のチェックが可能で、障害を即座に検知します。",
     why2Title: "SSRF対策済みの堅牢なクラウド",
     why2Desc: "RFC1918プライベート保護、AWS IMDSv2メタデータ攻撃防止、DNSリバインディングガードを標準装備。社内システム監視も安全です。",
     why3Title: "カスタム公開ステータスページ",
@@ -1102,7 +1102,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     pricingLede: "すべての機能が無料アカウントで利用可能。任意の寄付はサーバーリソースを消費する「キャパシティ（実行回数）」にのみ充当されます。",
     freeForeverLabel: "永久無料",
     checksPerDay: "回/日のチェック",
-    freeDesc: "1分間隔なら10台。5分間隔なら50台。6秒間隔なら1台。計算負荷は全く同じなので、すべて無料です。",
+    freeDesc: "1分間隔なら10台。5分間隔なら50台。計算負荷は同じなので、どちらも無料です。ご支援いただくと5秒間隔が使えます。",
     coffeeAddsLabel: "$2.99のコーヒー1杯で追加",
     checksUnit: "回のチェック",
     coffeeDesc: "20台を1分間隔で約1ヶ月分。未使用の枠は繰り越され、月額課金はありません。少なくなったら追加するだけです。",
@@ -1358,12 +1358,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     startFree: "무료로 시작하기",
     dashboardBtn: "대시보드",
 
-    heroTag: "1분 미만 엣지 모니터링 · 영구 완전 무료",
+    heroTag: "60초 엣지 모니터링 · 영구 완전 무료",
     heroTitle1: "웹사이트와 API를 언제나 ",
     heroTitleHighlight: "온라인",
     heroTitle2: " 상태로 유지하세요.",
     heroDesc:
-      "HTTP, SSL 인증서 만료, TCP 핑, cron 하트비트를 1분 미만 주기로 지속 모니터링합니다. 사용자가 장애를 알아채기 전에 멀티채널로 즉각 알림을 전송합니다.",
+      "HTTP, SSL 인증서 만료, TCP 핑, cron 하트비트를 60초 주기로 지속 모니터링합니다. 사용자가 장애를 알아채기 전에 멀티채널로 즉각 알림을 전송합니다.",
     heroPlaceholder: "웹사이트 또는 API 주소 입력 (예: example.com)",
     heroStartBtn: "모니터링 시작",
     continueWithGoogle: "Google 계정으로 계속하기",
@@ -1387,7 +1387,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
 
     demoTag: "인터랙티브 샌드박스",
     demoTitle: "인프라를 프로빙하는 방식 확인하기",
-    demoDesc: "AWS Lightsail 싱가포르 리전에서 1분 미만 정밀도로 실시간 엣지 프로브를 발송합니다.",
+    demoDesc: "AWS Lightsail 싱가포르 리전에서 60초 정밀도로 실시간 엣지 프로브를 발송합니다.",
     tabHttp: "HTTP 및 API",
     tabSsl: "SSL 인증서",
     tabPorts: "TCP 및 DNS",
@@ -1413,8 +1413,8 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     whyTag: "개발자를 위한 설계",
     whyTitle: "개발팀이 UptimeMonke를 선택하는 이유",
     whyDesc: "인위적인 유료 제한이나 복잡한 기업 계약 없음. 빠르고 신뢰할 수 있는 모니터링을 제공합니다.",
-    why1Title: "1분 미만 엣지 점검",
-    why1Desc: "기존 서비스는 무료 계정을 5분 간격으로 제한합니다. UptimeMonke는 기본적으로 1분 미만 점검을 제공하여 장애를 즉각 감지합니다.",
+    why1Title: "60초 엣지 점검",
+    why1Desc: "기존 서비스는 무료 계정을 5분 간격으로 제한합니다. UptimeMonke는 기본적으로 60초 점검을 제공하여 장애를 즉각 감지합니다.",
     why2Title: "SSRF 방어 클라우드 플릿",
     why2Desc: "RFC1918 사설망 보호, AWS IMDSv2 메타데이터 공격 방지 및 DNS 리바인딩 가드를 탑재하여 사내망 주소도 안전하게 모니터링합니다.",
     why3Title: "브랜드 맞춤 공개 상태 페이지",
@@ -1427,7 +1427,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     pricingLede: "모든 기능이 무료 계정에서 작동합니다. 자발적 후원은 서버 리소스를 사용하는 '실행 용량'에만 적용됩니다.",
     freeForeverLabel: "평생 무료",
     checksPerDay: "일일 점검 횟수",
-    freeDesc: "1분 주기 10개, 5분 주기 50개, 6초 주기 1개 — 서버 연산 부하가 동일하므로 모두 동일하게 무료입니다.",
+    freeDesc: "1분 주기 10개, 5분 주기 50개 — 서버 연산 부하가 동일하므로 모두 무료입니다. 후원하시면 5초 주기를 사용할 수 있습니다.",
     coffeeAddsLabel: "$2.99 커피 한 잔으로 추가",
     checksUnit: "회 점검 추가",
     coffeeDesc: "20개 모니터를 1분 주기로 한 달 동안 실행 가능한 용량. 미사용 용량은 소멸되지 않고 이월됩니다.",
@@ -1684,12 +1684,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     startFree: "Mula Percuma",
     dashboardBtn: "Papan Pemuka",
 
-    heroTag: "Pemeriksaan Tepi Bawah Seminit · 100% Percuma Selamanya",
+    heroTag: "Pemeriksaan Tepi 60 Saat · 100% Percuma Selamanya",
     heroTitle1: "Pastikan laman web & API anda sentiasa ",
     heroTitleHighlight: "dalam talian",
     heroTitle2: ".",
     heroDesc:
-      "Pemantauan berterusan HTTP, tarikh luput SSL, TCP ping, dan heartbeat cron dengan pemeriksaan bawah seminit serta amaran pantas sebelum pengguna menyedari gangguan.",
+      "Pemantauan berterusan HTTP, tarikh luput SSL, TCP ping, dan heartbeat cron dengan pemeriksaan 60 saat serta amaran pantas sebelum pengguna menyedari gangguan.",
     heroPlaceholder: "Masukkan laman web atau API anda (cth. example.com)",
     heroStartBtn: "Mula Memantau",
     continueWithGoogle: "Teruskan dengan Google",
@@ -1713,7 +1713,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
 
     demoTag: "Kotak Pasir Interaktif",
     demoTitle: "Lihat Cara UptimeMonke Memeriksa Sistem Anda",
-    demoDesc: "Prob masa nyata dihantar dari AWS Lightsail Singapura dengan resolusi bawah seminit.",
+    demoDesc: "Prob masa nyata dihantar dari AWS Lightsail Singapura dengan resolusi 60 saat.",
     tabHttp: "HTTP & API",
     tabSsl: "Sijil SSL",
     tabPorts: "TCP & DNS",
@@ -1739,8 +1739,8 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     whyTag: "Dibina untuk Pembangun",
     whyTitle: "Mengapa Pasukan Memilih UptimeMonke",
     whyDesc: "Tiada sekatan bayaran buatan, tiada kontrak perusahaan yang rumit. Pemantauan infrastruktur yang pantas dan boleh dipercayai.",
-    why1Title: "Semakan Tepi Bawah Seminit",
-    why1Desc: "Platform lama mengehadkan akaun percuma kepada selang 5 minit. UptimeMonke membolehkan semakan bawah seminit secara percuma supaya anda tahu tentang kegagalan dengan serta-merta.",
+    why1Title: "Semakan Tepi 60 Saat",
+    why1Desc: "Platform lama mengehadkan akaun percuma kepada selang 5 minit. UptimeMonke membolehkan semakan 60 saat secara percuma supaya anda tahu tentang kegagalan dengan serta-merta.",
     why2Title: "Armada Awan Kalis SSRF",
     why2Desc: "Direka dengan perlindungan ketat RFC1918, pertahanan metadata AWS IMDSv2, dan perlindungan DNS rebinding. Selamat untuk sasaran dalaman syarikat.",
     why3Title: "Halaman Status Awam Berjenama",
@@ -1753,7 +1753,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     pricingLede: "Setiap ciri berfungsi pada akaun percuma. Sumbangan pilihan hanya menampung 'kapasiti' penggunaan pelayan sebenar.",
     freeForeverLabel: "Percuma, selamanya",
     checksPerDay: "semakan setiap hari",
-    freeDesc: "Sepuluh pemantau pada 1 minit. Atau lima puluh pada 5 minit. Atau satu pada 6 saat — beban komputasinya sama, jadi harganya tetap percuma.",
+    freeDesc: "Sepuluh pemantau pada 1 minit. Atau lima puluh pada 5 minit — beban komputasinya sama, jadi harganya tetap percuma. Sokongan anda membuka semakan 5 saat.",
     coffeeAddsLabel: "Satu kopi $2.99 menambah",
     checksUnit: "semakan",
     coffeeDesc: "Sekitar sebulan untuk 20 pemantau pada 1 minit, atau 10 pada 30 saat. Kapasiti tidak luput dan dibawa ke hadapan tanpa langganan.",
@@ -2010,12 +2010,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     startFree: "Mulai Gratis",
     dashboardBtn: "Dasbor",
 
-    heroTag: "Pemeriksaan Edge Sub-Menit · 100% Gratis Selamanya",
+    heroTag: "Pemeriksaan Edge 60 Detik · 100% Gratis Selamanya",
     heroTitle1: "Jaga situs web & API Anda tetap ",
     heroTitleHighlight: "online",
     heroTitle2: ".",
     heroDesc:
-      "Pemantauan berkelanjutan HTTP, kedaluwarsa SSL, ping TCP, dan cron heartbeat dengan interval sub-menit serta peringatan multi-kanal instan sebelum pengguna menyadari downtime.",
+      "Pemantauan berkelanjutan HTTP, kedaluwarsa SSL, ping TCP, dan cron heartbeat dengan interval 60 detik serta peringatan multi-kanal instan sebelum pengguna menyadari downtime.",
     heroPlaceholder: "Masukkan URL situs web atau API Anda (cth. example.com)",
     heroStartBtn: "Mulai Memantau",
     continueWithGoogle: "Lanjutkan dengan Google",
@@ -2039,7 +2039,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
 
     demoTag: "Sandbox Interaktif",
     demoTitle: "Lihat Cara UptimeMonke Memeriksa Sistem Anda",
-    demoDesc: "Probe real-time dikirim dari AWS Lightsail Singapura dengan resolusi sub-menit.",
+    demoDesc: "Probe real-time dikirim dari AWS Lightsail Singapura dengan resolusi 60 detik.",
     tabHttp: "HTTP & API",
     tabSsl: "Sertifikat SSL",
     tabPorts: "TCP & DNS",
@@ -2065,8 +2065,8 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     whyTag: "Dirancang untuk Pengembang",
     whyTitle: "Mengapa Tim Memilih UptimeMonke",
     whyDesc: "Tanpa batasan berbayar buatan, tanpa kontrak korporat berbelit-belit. Pemantauan infrastruktur yang cepat dan andal.",
-    why1Title: "Pengecekan Edge Sub-Menit",
-    why1Desc: "Platform pemantauan lawas mengunci akun gratis pada interval 5 menit. UptimeMonke memungkinkan pengecekan sub-menit sejak awal sehingga Anda tahu kegagalan seketika.",
+    why1Title: "Pengecekan Edge 60 Detik",
+    why1Desc: "Platform pemantauan lawas mengunci akun gratis pada interval 5 menit. UptimeMonke memungkinkan pengecekan 60 detik sejak awal sehingga Anda tahu kegagalan seketika.",
     why2Title: "Armada Cloud Kebal SSRF",
     why2Desc: "Didesain dengan perlindungan ketat RFC1918, pencegahan serangan metadata AWS IMDSv2, dan pelindung DNS rebinding. Aman untuk sistem internal perusahaan.",
     why3Title: "Halaman Status Publik Berjenama",
@@ -2079,7 +2079,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     pricingLede: "Setiap fitur berfungsi di akun gratis. Donasi sukarela hanya membayar 'kapasitas' pemakaian server yang sebenarnya.",
     freeForeverLabel: "Gratis, selamanya",
     checksPerDay: "pengecekan per hari",
-    freeDesc: "Sepuluh monitor pada 1 menit. Atau lima puluh pada 5 menit. Atau satu pada 6 detik — beban komputasinya identik, jadi harganya sama-sama gratis.",
+    freeDesc: "Sepuluh monitor pada 1 menit. Atau lima puluh pada 5 menit — beban komputasinya identik, jadi harganya sama-sama gratis. Dukungan Anda membuka pengecekan 5 detik.",
     coffeeAddsLabel: "Satu cangkir kopi $2.99 menambah",
     checksUnit: "pengecekan",
     coffeeDesc: "Sekitar satu bulan untuk dua puluh monitor pada 1 menit, atau sepuluh pada 30 detik. Kapasitas tidak kedaluwarsa dan diakumulasi tanpa langganan.",
@@ -2336,12 +2336,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     startFree: "အခမဲ့စတင်ရန်",
     dashboardBtn: "ဒက်ရှ်ဘုတ်",
 
-    heroTag: "တစ်မိနစ်အောက် စောင့်ကြည့်စစ်ဆေးမှု · အမြဲတမ်း ၁၀၀% အခမဲ့",
+    heroTag: "၆၀ စက္ကန့် စောင့်ကြည့်စစ်ဆေးမှု · အမြဲတမ်း ၁၀၀% အခမဲ့",
     heroTitle1: "သင့်ဝဘ်ဆိုက်နှင့် API များကို အမြဲမပြတ် ",
     heroTitleHighlight: "အွန်လိုင်းပေါ်တွင်",
     heroTitle2: " ရှိနေပါစေ။",
     heroDesc:
-      "HTTP၊ SSL သက်တမ်းကုန်ဆုံးမှု၊ TCP ping နှင့် cron heartbeat များကို တစ်မိနစ်အောက်အကြိမ်ရေဖြင့် အဆက်မပြတ်စစ်ဆေးပြီး အသုံးပြုသူများ မသိရှိမီ ချက်ချင်းသတိပေးချက်များ ပေးပို့ပေးပါသည်။",
+      "HTTP၊ SSL သက်တမ်းကုန်ဆုံးမှု၊ TCP ping နှင့် cron heartbeat များကို ၆၀ စက္ကန့်အကြိမ်ရေဖြင့် အဆက်မပြတ်စစ်ဆေးပြီး အသုံးပြုသူများ မသိရှိမီ ချက်ချင်းသတိပေးချက်များ ပေးပို့ပေးပါသည်။",
     heroPlaceholder: "ဝဘ်ဆိုက် (သို့) API လိပ်စာထည့်ပါ (ဥပမာ- example.com)",
     heroStartBtn: "စောင့်ကြည့်စစ်ဆေးရန်",
     continueWithGoogle: "Google ဖြင့် ဆက်လက်လုပ်ဆောင်ရန်",
@@ -2365,7 +2365,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
 
     demoTag: "လက်တွေ့စမ်းသပ်ခန်း",
     demoTitle: "UptimeMonke မည်သို့စစ်ဆေးသည်ကို ကြည့်ရှုပါ",
-    demoDesc: "AWS Lightsail စင်ကာပူမှ တစ်မိနစ်အောက် အကြိမ်နှုန်းဖြင့် တိုက်ရိုက်စစ်ဆေးပေးပါသည်။",
+    demoDesc: "AWS Lightsail စင်ကာပူမှ ၆၀ စက္ကန့် အကြိမ်နှုန်းဖြင့် တိုက်ရိုက်စစ်ဆေးပေးပါသည်။",
     tabHttp: "HTTP နှင့် API",
     tabSsl: "SSL လက်မှတ်များ",
     tabPorts: "TCP နှင့် DNS",
@@ -2391,8 +2391,8 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     whyTag: "ဆော့ဖ်ဝဲရေးသားသူများအတွက် အထူးဖန်တီးထားသည်",
     whyTitle: "UptimeMonke ကို အဘယ်ကြောင့်ရွေးချယ်ကြသနည်း",
     whyDesc: "မလိုအပ်သော ကန့်သတ်ချက်များနှင့် ရှုပ်ထွေးသော စာချုပ်များမရှိဘဲ လျင်မြန်စိတ်ချရသော စနစ်စောင့်ကြည့်မှုသာ ဖြစ်ပါသည်။",
-    why1Title: "တစ်မိနစ်အောက် စစ်ဆေးမှုများ",
-    why1Desc: "ရိုးရိုးစနစ်များတွင် အခမဲ့အကောင့်များကို ၅ မိနစ်ခြားသာ စစ်ဆေးခွင့်ပေးထားသည်။ UptimeMonke သည် အစကတည်းက တစ်မိနစ်အောက် စစ်ဆေးခွင့်ပေးထားသဖြင့် ပြဿနာများကို ချက်ချင်းသိနိုင်သည်။",
+    why1Title: "၆၀ စက္ကန့် စစ်ဆေးမှုများ",
+    why1Desc: "ရိုးရိုးစနစ်များတွင် အခမဲ့အကောင့်များကို ၅ မိနစ်ခြားသာ စစ်ဆေးခွင့်ပေးထားသည်။ UptimeMonke သည် အစကတည်းက ၆၀ စက္ကန့် စစ်ဆေးခွင့်ပေးထားသဖြင့် ပြဿနာများကို ချက်ချင်းသိနိုင်သည်။",
     why2Title: "SSRF ကာကွယ်မှုအပြည့်ပါ ဆာဗာများ",
     why2Desc: "RFC1918 ကာကွယ်မှု၊ AWS IMDSv2 တိုက်ခိုက်မှုကာကွယ်မှုများနှင့် DNS rebinding တားဆီးမှုများ ပါဝင်သောကြောင့် ကုမ္ပဏီတွင်းစနစ်များအတွက်ပါ လုံခြုံစိတ်ချရသည်။",
     why3Title: "မိမိစိတ်ကြိုက် အများပြည်သူကြည့် စတေးတပ်စ်စာမျက်နှာ",
@@ -2405,7 +2405,7 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     pricingLede: "လုပ်ဆောင်ချက်အားလုံးကို အခမဲ့အကောင့်တွင် အသုံးပြုနိုင်ပါသည်။ မိမိဆန္ဒအလျောက် ကူညီပံ့ပိုးမှုသည် အမှန်တကယ်ဆာဗာကုန်ကျစရိတ်ဖြစ်သော စစ်ဆေးမှုအရေအတွက်အတွက်သာ ဖြစ်ပါသည်။",
     freeForeverLabel: "အမြဲတမ်း အခမဲ့",
     checksPerDay: "တစ်ရက်လျှင် စစ်ဆေးမှုအကြိမ်ရေ",
-    freeDesc: "၁ မိနစ်ခြားစစ်ဆေးမည့်စနစ် ၁၀ ခု (သို့မဟုတ်) ၅ မိနစ်ခြား စနစ် ၅၀ (သို့မဟုတ်) ၆ စက္ကန့်ခြား ၁ ခု — ဆာဗာအလုပ်လုပ်ရမှု တူညီသောကြောင့် အားလုံး အခမဲ့ဖြစ်ပါသည်။",
+    freeDesc: "၁ မိနစ်ခြားစစ်ဆေးမည့်စနစ် ၁၀ ခု (သို့မဟုတ်) ၅ မိနစ်ခြား စနစ် ၅၀ — ဆာဗာအလုပ်လုပ်ရမှု တူညီသောကြောင့် အခမဲ့ဖြစ်ပါသည်။ ပံ့ပိုးပေးပါက ၅ စက္ကန့်ခြား စစ်ဆေးမှု ရရှိမည်။",
     coffeeAddsLabel: "$၂.၉၉ တန် ကော်ဖီတစ်ခွက် ထည့်ဝင်ပါက",
     checksUnit: "အကြိမ် စစ်ဆေးမှု ထပ်တိုးရရှိမည်",
     coffeeDesc: "၁ မိနစ်ခြားစနစ် ၂၀ ခုအတွက် တစ်လစာခန့်။ အသုံးမပြုရသေးသော စစ်ဆေးမှုများ ဆုံးရှုံးမသွားဘဲ လစဉ်ကြေးမလိုဘဲ နောက်လများသို့ ကူးပြောင်းသွားမည်။",
