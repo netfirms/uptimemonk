@@ -135,33 +135,47 @@ void main() {
   });
 
   group('LiveState', () {
-    test('parses a full state map', () {
+    // The keys below are copied from `buildStatusDoc` in
+    // `server/src/sync/mirror.ts` — the only thing that ever writes this
+    // document. That matters more than it looks: the previous version of this
+    // test invented its own key names, matched them to whatever the model
+    // happened to read, and passed for months while every latency in the app
+    // came back null. A parser test that supplies its own input proves the
+    // parser is self-consistent, not that it can read real data.
+    test('parses a state map exactly as the worker writes it', () {
       final s = LiveState.fromMap({
         'status': 'up',
-        'responseTimeMs': 45,
+        'inMaintenance': false,
         'lastCheckedAt': 1700000000000,
+        'lastResponseTimeMs': 45,
+        'lastError': null,
         'uptime24h': 99.95,
-        'uptime7d': 99.9,
         'uptime30d': 99.8,
         'certExpiresAt': 1800000000000,
-        'certIssuer': "Let's Encrypt",
       });
 
       expect(s.status, 'up');
-      expect(s.responseTimeMs, 45);
+      expect(s.lastResponseTimeMs, 45,
+          reason: 'the mirror writes lastResponseTimeMs, not responseTimeMs');
       expect(s.lastCheckedAt, 1700000000000);
       expect(s.uptime24h, 99.95);
-      expect(s.uptime7d, 99.9);
       expect(s.uptime30d, 99.8);
       expect(s.certExpiresAt, 1800000000000);
-      expect(s.certIssuer, "Let's Encrypt");
+    });
+
+    test('a key the worker does not write stays null', () {
+      // Guards the failure mode directly: a mismatched key does not throw, it
+      // parses as null and renders as an em dash that looks like real
+      // "not measured yet" data.
+      final s = LiveState.fromMap({'status': 'up', 'responseTimeMs': 45});
+      expect(s.lastResponseTimeMs, isNull);
     });
 
     test('defaults status to pending on an empty map', () {
       final s = LiveState.fromMap({});
       expect(s.status, 'pending');
       expect(s.isPending, isTrue);
-      expect(s.responseTimeMs, isNull);
+      expect(s.lastResponseTimeMs, isNull);
       expect(s.uptime24h, isNull);
     });
 

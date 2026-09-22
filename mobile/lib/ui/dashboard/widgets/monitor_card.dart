@@ -104,27 +104,36 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
     }
   }
 
+  /// Steps along the cyan ramp, plus the two warm tones.
+  ///
+  /// This was seven unrelated hues — violet, pink, indigo, amber, green —
+  /// which is not a palette so much as the absence of one, and none of them
+  /// survived the move to Tron. Colour here is secondary encoding anyway:
+  /// every tag carries its own label, so these only have to be
+  /// distinguishable, not independently meaningful.
   Color _protocolColor(String type) {
     switch (type.toLowerCase()) {
       case 'http':
-        return AppTheme.primaryGreen;
+        return AppTheme.primary;
       case 'ssl':
-        return const Color(0xFF38BDF8);
+        return const Color(0xFF8FD8F0);
       case 'keyword':
-        return const Color(0xFFA78BFA);
-      case 'icmp':
-      case 'ping':
-        return const Color(0xFFFBBF24);
+        return AppTheme.accentDeep;
       case 'tcp':
       case 'port':
-        return const Color(0xFF34D399);
+        return const Color(0xFF5AB8D6);
       case 'dns':
-        return const Color(0xFF818CF8);
+        return const Color(0xFF2E8AA6);
+      // The two warm ones, for the types that benefit most from standing
+      // apart in a long list.
+      case 'icmp':
+      case 'ping':
+        return AppTheme.accent;
       case 'heartbeat':
       case 'cron':
-        return const Color(0xFFEC4899);
+        return AppTheme.statusMaintenance;
       default:
-        return AppTheme.primaryGreen;
+        return AppTheme.primary;
     }
   }
 
@@ -166,9 +175,9 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
     Color statusBorder;
 
     if (isUp) {
-      statusColor = AppTheme.primaryGreen;
-      statusBg = AppTheme.primaryGreen.withValues(alpha: 0.15);
-      statusBorder = AppTheme.primaryGreen.withValues(alpha: 0.35);
+      statusColor = AppTheme.primary;
+      statusBg = AppTheme.primary.withValues(alpha: 0.15);
+      statusBorder = AppTheme.primary.withValues(alpha: 0.35);
     } else if (isDown) {
       statusColor = AppTheme.statusDown;
       statusBg = AppTheme.statusDown.withValues(alpha: 0.15);
@@ -183,7 +192,7 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
       statusBorder = AppTheme.statusPending.withValues(alpha: 0.3);
     }
 
-    final latency = widget.live.responseTimeMs;
+    final latency = widget.live.lastResponseTimeMs;
     Color latencyColor;
     if (latency == null) {
       latencyColor = AppTheme.textMuted;
@@ -337,7 +346,7 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
                               ? Icons.play_arrow_rounded
                               : Icons.pause_rounded,
                           color: isPaused
-                              ? AppTheme.primaryGreen
+                              ? AppTheme.primary
                               : AppTheme.textMuted,
                           tooltip: isPaused ? 'Resume' : 'Pause',
                           onPressed: widget.onTogglePause,
@@ -417,8 +426,8 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
                     if (widget.config.publicOnStatusPage)
                       _buildTag(
                         'Public',
-                        AppTheme.accentCyan,
-                        AppTheme.accentCyan.withValues(alpha: 0.12),
+                        AppTheme.accentDeep,
+                        AppTheme.accentDeep.withValues(alpha: 0.12),
                       ),
                     if (widget.config.muteAlerts)
                       _buildTag(
@@ -463,11 +472,11 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             backgroundColor: _copied
-                                ? AppTheme.primaryGreen.withValues(alpha: 0.15)
+                                ? AppTheme.primary.withValues(alpha: 0.15)
                                 : Colors.white.withValues(alpha: 0.06),
                             side: BorderSide(
                               color: _copied
-                                  ? AppTheme.primaryGreen.withValues(alpha: 0.4)
+                                  ? AppTheme.primary.withValues(alpha: 0.4)
                                   : AppTheme.borderDark,
                             ),
                             padding: const EdgeInsets.symmetric(horizontal: 7),
@@ -479,14 +488,14 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
                           icon: Icon(
                             _copied ? Icons.check_rounded : Icons.copy_rounded,
                             size: 11,
-                            color: _copied ? AppTheme.primaryGreen : AppTheme.textSecondary,
+                            color: _copied ? AppTheme.primary : AppTheme.textSecondary,
                           ),
                           label: Text(
                             _copied ? 'Copied' : 'Copy URL',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: _copied ? AppTheme.primaryGreen : AppTheme.textSecondary,
+                              color: _copied ? AppTheme.primary : AppTheme.textSecondary,
                             ),
                           ),
                         ),
@@ -654,7 +663,7 @@ class _MonitorCardState extends State<MonitorCard> with SingleTickerProviderStat
       color = AppTheme.statusPending;
     } else {
       text = '${days}d left';
-      color = AppTheme.primaryGreen;
+      color = AppTheme.primary;
     }
 
     return Container(

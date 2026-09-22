@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
 import '../../widgets/animated_counter.dart';
+import '../../widgets/glass_panel.dart';
 import '../../widgets/status_dot.dart';
 
 class StatsHeader extends StatelessWidget {
@@ -38,13 +39,13 @@ class StatsHeader extends StatelessWidget {
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                      color: AppTheme.primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
                       '30 DAYS',
                       style: TextStyle(
-                        color: AppTheme.primaryGreen,
+                        color: AppTheme.primary,
                         fontSize: 9,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.3,
@@ -53,9 +54,9 @@ class StatsHeader extends StatelessWidget {
                   ),
                   value: avgUptime30d,
                   format: (v) => '${v.toStringAsFixed(2)}%',
-                  valueColor: AppTheme.primaryGreen,
+                  valueColor: AppTheme.primary,
                   subtext: 'System-wide operational ratio',
-                  accentColor: AppTheme.primaryGreen,
+                  accentColor: AppTheme.primary,
                 ),
               ),
               const SizedBox(width: 10),
@@ -65,14 +66,14 @@ class StatsHeader extends StatelessWidget {
                   // Pulses only while something is actually reporting healthy;
                   // an empty workspace has nothing live to show.
                   trailing: StatusDot(
-                    color: AppTheme.primaryGreen,
+                    color: AppTheme.primary,
                     pulsing: up > 0,
                   ),
                   value: up.toDouble(),
                   format: (v) => v.round().toString(),
-                  valueColor: AppTheme.primaryGreen,
+                  valueColor: AppTheme.primary,
                   subtext: 'Reporting healthy response',
-                  accentColor: AppTheme.primaryGreen,
+                  accentColor: AppTheme.primary,
                 ),
               ),
             ],
@@ -120,7 +121,7 @@ class StatsHeader extends StatelessWidget {
                               ? AppTheme.latencyMed
                               : AppTheme.latencySlow,
                   subtext: 'Fast global edge probes',
-                  accentColor: AppTheme.accentCyan,
+                  accentColor: AppTheme.accentDeep,
                 ),
               ),
             ],
@@ -139,13 +140,13 @@ class StatsHeader extends StatelessWidget {
     required String subtext,
     required Color accentColor,
   }) {
-    return Container(
+    // Glass here and not on the monitor rows below: there are exactly four of
+    // these and they sit over the Grid, which is the whole point of a frosted
+    // pane. A list of forty rows would pay the blur per row, per frame, for an
+    // effect nobody can see behind an opaque card.
+    return GlassPanel(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: AppTheme.bgSurfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.borderDark, width: 1),
-      ),
+      borderRadius: BorderRadius.circular(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

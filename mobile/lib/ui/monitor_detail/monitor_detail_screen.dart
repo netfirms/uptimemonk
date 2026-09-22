@@ -96,7 +96,7 @@ class MonitorDetailScreen extends StatelessWidget {
             ),
             body: RefreshIndicator(
               onRefresh: () => vm.fetchHistory(),
-              color: AppTheme.primaryEmerald,
+              color: AppTheme.primary,
               backgroundColor: AppTheme.bgSurface,
               child: ListView(
                 children: [

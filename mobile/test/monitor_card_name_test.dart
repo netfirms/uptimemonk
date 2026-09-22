@@ -30,7 +30,7 @@ void main() {
     const name = 'Production API Health'; // exactly 21 incl. spaces
     await tester.pumpWidget(_wrap(MonitorCard(
       config: _config(name),
-      live: LiveState.fromMap({'status': 'up', 'responseTimeMs': 120}),
+      live: LiveState.fromMap({'status': 'up', 'lastResponseTimeMs': 120}),
       onTap: () {},
       onEdit: () {},
       onTogglePause: () {},

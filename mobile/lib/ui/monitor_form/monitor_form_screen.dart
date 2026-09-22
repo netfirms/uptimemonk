@@ -448,7 +448,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                       Expanded(
                         child: SelectableText(
                           ingestUrl,
-                          style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppTheme.accentCyan),
+                          style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppTheme.accentDeep),
                         ),
                       ),
                       IconButton(
@@ -505,7 +505,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryEmerald,
+                backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.black,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
@@ -569,7 +569,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                       ? 'Target URL'
                       : 'Target Host / Domain / IP',
                   hintText: _selectedOption.hint,
-                  prefixIcon: Icon(_selectedOption.icon, size: 20, color: AppTheme.accentCyan),
+                  prefixIcon: Icon(_selectedOption.icon, size: 20, color: AppTheme.accentDeep),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Target is required';
@@ -586,7 +586,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Expected Keyword / Substring',
                   hintText: 'e.g. {"status":"ok"} or Welcome',
-                  prefixIcon: Icon(Icons.search, size: 20, color: AppTheme.accentCyan),
+                  prefixIcon: Icon(Icons.search, size: 20, color: AppTheme.accentDeep),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Keyword is required';
@@ -604,7 +604,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Port Number',
                   hintText: 'e.g. 443, 80, 5432, 22',
-                  prefixIcon: Icon(Icons.numbers, size: 20, color: AppTheme.accentCyan),
+                  prefixIcon: Icon(Icons.numbers, size: 20, color: AppTheme.accentDeep),
                 ),
                 validator: (v) {
                   final p = int.tryParse(v ?? '');
@@ -639,7 +639,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                 if (_planLabel != null)
                   Text(
                     'Plan: $_planLabel (${_formatInterval(_minIntervalSeconds)} min floor)',
-                    style: const TextStyle(color: AppTheme.accentCyan, fontSize: 11, fontWeight: FontWeight.w600),
+                    style: const TextStyle(color: AppTheme.accentDeep, fontSize: 11, fontWeight: FontWeight.w600),
                   ),
               ],
             ),
@@ -654,7 +654,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                 return ChoiceChip(
                   label: Text(opt.label),
                   selected: isSelected,
-                  selectedColor: AppTheme.primaryEmerald,
+                  selectedColor: AppTheme.primary,
                   backgroundColor: isBelowFloor ? AppTheme.bgSurface.withValues(alpha: 0.5) : AppTheme.bgSurface,
                   labelStyle: TextStyle(
                     color: isSelected
@@ -694,7 +694,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                   return FilterChip(
                     label: Text(days == 1 ? '1 day' : '$days days'),
                     selected: isSelected,
-                    selectedColor: AppTheme.primaryEmerald,
+                    selectedColor: AppTheme.primary,
                     backgroundColor: AppTheme.bgSurface,
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.black : Colors.white,
@@ -740,7 +740,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                     title: const Text('Publish on Public Status Page', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     subtitle: const Text('Show this monitor on your organization public status page', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
                     value: _publicOnStatusPage,
-                    activeThumbColor: AppTheme.primaryEmerald,
+                    activeThumbColor: AppTheme.primary,
                     onChanged: (v) => setState(() => _publicOnStatusPage = v),
                   ),
                   const Divider(height: 1),
@@ -748,7 +748,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                     title: const Text('Mute Alerts', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     subtitle: const Text('Do not send downtime notifications for this monitor', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
                     value: _muteAlerts,
-                    activeThumbColor: AppTheme.primaryEmerald,
+                    activeThumbColor: AppTheme.primary,
                     onChanged: (v) => setState(() => _muteAlerts = v),
                   ),
                 ],
@@ -764,7 +764,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
             ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryEmerald,
+                backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -816,11 +816,11 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? AppTheme.primaryEmerald.withValues(alpha: 0.15)
+                        ? AppTheme.primary.withValues(alpha: 0.15)
                         : AppTheme.bgSurface,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: isSelected ? AppTheme.primaryEmerald : AppTheme.borderDark,
+                      color: isSelected ? AppTheme.primary : AppTheme.borderDark,
                       width: isSelected ? 1.5 : 1.0,
                     ),
                   ),
@@ -830,7 +830,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                       Icon(
                         opt.icon,
                         size: 22,
-                        color: isSelected ? AppTheme.primaryEmerald : AppTheme.textSecondary,
+                        color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
                       ),
                       const SizedBox(height: 6),
                       Text(
@@ -838,7 +838,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? AppTheme.primaryEmerald : Colors.white,
+                          color: isSelected ? AppTheme.primary : Colors.white,
                         ),
                         textAlign: TextAlign.center,
                         maxLines: 1,
@@ -877,7 +877,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                 _contactIds.isEmpty
                     ? 'All confirmed contacts'
                     : '${_contactIds.length} contact${_contactIds.length == 1 ? "" : "s"} chosen',
-                style: const TextStyle(color: AppTheme.accentCyan, fontSize: 11, fontWeight: FontWeight.w600),
+                style: const TextStyle(color: AppTheme.accentDeep, fontSize: 11, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -898,7 +898,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                 style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
               ),
               value: _contactIds.isEmpty,
-              activeColor: AppTheme.primaryEmerald,
+              activeColor: AppTheme.primary,
               onChanged: (checked) {
                 setState(() {
                   _contactIds = (checked == true) ? [] : _contacts.map((c) => c.id).toList();
@@ -915,7 +915,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                   title: Text(c.name.isNotEmpty ? c.name : c.destination, style: const TextStyle(fontSize: 13)),
                   subtitle: Text('${c.channel.toUpperCase()} · ${c.destination}', style: const TextStyle(color: AppTheme.textMuted, fontSize: 11)),
                   value: isSelected,
-                  activeColor: AppTheme.primaryEmerald,
+                  activeColor: AppTheme.primary,
                   onChanged: (checked) {
                     setState(() {
                       if (checked == true) {
@@ -1006,7 +1006,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                       title: const Text('Regular Expression (Regex)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                       subtitle: const Text('Evaluates keyword as a regex pattern (e.g. /v[0-9]+\\.[0-9]+/i)', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
                       value: _keywordRegex,
-                      activeThumbColor: AppTheme.primaryEmerald,
+                      activeThumbColor: AppTheme.primary,
                       onChanged: (v) => setState(() => _keywordRegex = v),
                     ),
                     const SizedBox(height: 14),
@@ -1163,7 +1163,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                           Expanded(
                             child: SelectableText(
                               '${AppConstants.apiUrl}/heartbeat/${widget.existingMonitor!.heartbeatToken}',
-                              style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppTheme.accentCyan),
+                              style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppTheme.accentDeep),
                             ),
                           ),
                           IconButton(

@@ -125,7 +125,7 @@ class _ProbePulseState extends State<ProbePulse> with SingleTickerProviderStateM
                     painter: _PulsePainter(
                       progress: _controller.value,
                       ringCount: _ringCount,
-                      colour: AppTheme.primaryEmerald,
+                      colour: AppTheme.primary,
                     ),
                     child: child,
                   ),
@@ -175,7 +175,7 @@ class _Mark extends StatelessWidget {
           width: size * 0.16,
           height: size * 0.16,
           decoration: const BoxDecoration(
-            color: AppTheme.primaryEmerald,
+            color: AppTheme.primary,
             shape: BoxShape.circle,
           ),
         ),

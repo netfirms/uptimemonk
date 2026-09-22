@@ -192,7 +192,7 @@ class DashboardViewModel extends ChangeNotifier {
     int count = 0;
     for (final m in _monitors) {
       if (!m.enabled) continue;
-      final lat = _liveStates[m.id]?.responseTimeMs;
+      final lat = _liveStates[m.id]?.lastResponseTimeMs;
       if (lat != null && lat > 0) {
         total += lat;
         count++;

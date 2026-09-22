@@ -195,7 +195,7 @@ class _FilterBarState extends State<FilterBar> {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGreen,
+                      backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.black,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -212,7 +212,7 @@ class _FilterBarState extends State<FilterBar> {
                   height: 38,
                   child: OutlinedButton.icon(
                     onPressed: widget.onViewStatusPage,
-                    icon: const Icon(Icons.public_rounded, size: 16, color: AppTheme.accentCyan),
+                    icon: const Icon(Icons.public_rounded, size: 16, color: AppTheme.accentDeep),
                     label: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -225,7 +225,7 @@ class _FilterBarState extends State<FilterBar> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                             decoration: BoxDecoration(
-                              color: AppTheme.accentCyan.withValues(alpha: 0.15),
+                              color: AppTheme.accentDeep.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -233,7 +233,7 @@ class _FilterBarState extends State<FilterBar> {
                               style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
-                                color: AppTheme.accentCyan,
+                                color: AppTheme.accentDeep,
                               ),
                             ),
                           ),
@@ -272,8 +272,8 @@ class _FilterBarState extends State<FilterBar> {
     if (isActive) {
       switch (badgeType) {
         case _BadgeType.up:
-          badgeBg = AppTheme.primaryGreen.withValues(alpha: 0.2);
-          badgeText = AppTheme.primaryGreen;
+          badgeBg = AppTheme.primary.withValues(alpha: 0.2);
+          badgeText = AppTheme.primary;
           break;
         case _BadgeType.down:
           badgeBg = AppTheme.statusDown.withValues(alpha: 0.2);

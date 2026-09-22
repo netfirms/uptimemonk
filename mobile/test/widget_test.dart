@@ -20,12 +20,12 @@ void main() {
 
     final live = LiveState.fromMap({
       'status': 'up',
-      'responseTimeMs': 45,
+      'lastResponseTimeMs': 45,
       'uptime24h': 99.95,
     });
 
     expect(live.isUp, isTrue);
-    expect(live.responseTimeMs, 45);
+    expect(live.lastResponseTimeMs, 45);
     expect(live.uptime24h, 99.95);
   });
 }

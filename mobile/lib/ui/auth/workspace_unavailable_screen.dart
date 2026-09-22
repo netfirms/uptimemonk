@@ -121,7 +121,7 @@ class _WorkspaceUnavailableScreenState extends State<WorkspaceUnavailableScreen>
                     child: FilledButton(
                       onPressed: _retrying ? null : _retry,
                       style: FilledButton.styleFrom(
-                        backgroundColor: AppTheme.primaryEmerald,
+                        backgroundColor: AppTheme.primary,
                         foregroundColor: AppTheme.bgDark,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

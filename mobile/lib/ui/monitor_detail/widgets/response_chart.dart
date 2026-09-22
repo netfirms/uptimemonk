@@ -55,16 +55,16 @@ class ResponseChart extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppTheme.primaryEmerald.withValues(alpha: 0.2) : Colors.transparent,
+                          color: isSelected ? AppTheme.primary.withValues(alpha: 0.2) : Colors.transparent,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: isSelected ? AppTheme.primaryEmerald : AppTheme.borderDark,
+                            color: isSelected ? AppTheme.primary : AppTheme.borderDark,
                           ),
                         ),
                         child: Text(
                           r,
                           style: TextStyle(
-                            color: isSelected ? AppTheme.primaryEmerald : AppTheme.textMuted,
+                            color: isSelected ? AppTheme.primary : AppTheme.textMuted,
                             fontSize: 11,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                           ),
@@ -84,7 +84,7 @@ class ResponseChart extends StatelessWidget {
                 _buildMetric(
                   'AVG LATENCY',
                   '${(history.summary['avgMs'] as num).toInt()} ms',
-                  AppTheme.accentCyan,
+                  AppTheme.accentDeep,
                 ),
               const SizedBox(width: 24),
               if (history.summary['checks'] != null)
@@ -149,7 +149,7 @@ class ResponseChart extends StatelessWidget {
         LineChartBarData(
           spots: spots,
           isCurved: true,
-          color: AppTheme.accentCyan,
+          color: AppTheme.accentDeep,
           barWidth: 2,
           isStrokeCapRound: true,
           dotData: const FlDotData(show: false),
@@ -157,8 +157,8 @@ class ResponseChart extends StatelessWidget {
             show: true,
             gradient: LinearGradient(
               colors: [
-                AppTheme.accentCyan.withValues(alpha: 0.3),
-                AppTheme.accentCyan.withValues(alpha: 0.0),
+                AppTheme.accentDeep.withValues(alpha: 0.3),
+                AppTheme.accentDeep.withValues(alpha: 0.0),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -204,15 +204,15 @@ class ResponseChart extends StatelessWidget {
         LineChartBarData(
           spots: spots,
           isCurved: true,
-          color: AppTheme.primaryEmerald,
+          color: AppTheme.primary,
           barWidth: 2,
           dotData: const FlDotData(show: false),
           belowBarData: BarAreaData(
             show: true,
             gradient: LinearGradient(
               colors: [
-                AppTheme.primaryEmerald.withValues(alpha: 0.3),
-                AppTheme.primaryEmerald.withValues(alpha: 0.0),
+                AppTheme.primary.withValues(alpha: 0.3),
+                AppTheme.primary.withValues(alpha: 0.0),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,

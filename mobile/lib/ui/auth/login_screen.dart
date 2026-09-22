@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../widgets/grid_floor.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../widgets/app_version_label.dart';
 import 'register_screen.dart';
@@ -56,7 +57,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final isBusy = authVm.isAnyLoading;
 
     return Scaffold(
-      body: SafeArea(
+      body: GridBackdrop(
+          child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
@@ -288,7 +290,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 6,
                                   ),
-                                  foregroundColor: AppTheme.accentCyan,
+                                  foregroundColor: AppTheme.accentDeep,
                                 ),
                                 child: const Text(
                                   'Create workspace',
@@ -314,7 +316,7 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           },
         ),
-      ),
+      )),
     );
   }
 }
@@ -332,7 +334,7 @@ class _Header extends StatelessWidget {
             shape: BoxShape.circle,
             gradient: RadialGradient(
               colors: [
-                AppTheme.primaryEmerald.withValues(alpha: 0.10),
+                AppTheme.primary.withValues(alpha: 0.10),
                 Colors.transparent,
               ],
             ),
@@ -350,7 +352,7 @@ class _Header extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryEmerald.withValues(alpha: 0.18),
+                    color: AppTheme.primary.withValues(alpha: 0.18),
                     blurRadius: 28,
                     spreadRadius: 4,
                   ),

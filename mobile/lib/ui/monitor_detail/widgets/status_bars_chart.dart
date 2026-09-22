@@ -92,17 +92,17 @@ class StatusBarsChart extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppTheme.primaryEmerald.withValues(alpha: 0.2)
+                ? AppTheme.primary.withValues(alpha: 0.2)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: isSelected ? AppTheme.primaryEmerald : AppTheme.borderDark,
+              color: isSelected ? AppTheme.primary : AppTheme.borderDark,
             ),
           ),
           child: Text(
             r,
             style: TextStyle(
-              color: isSelected ? AppTheme.primaryEmerald : AppTheme.textMuted,
+              color: isSelected ? AppTheme.primary : AppTheme.textMuted,
               fontSize: 11,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),

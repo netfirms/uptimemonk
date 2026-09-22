@@ -3,6 +3,7 @@ import '../widgets/probe_pulse.dart';
 import '../widgets/stagger_in.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../core/external_link.dart';
 import '../../core/theme.dart';
 import '../../viewmodels/dashboard_viewmodel.dart';
 import '../monitor_detail/monitor_detail_screen.dart';
@@ -43,10 +44,10 @@ class DashboardScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppTheme.accentCyan.withValues(alpha: 0.15),
+                      color: AppTheme.accentDeep.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.public_rounded, color: AppTheme.accentCyan, size: 22),
+                    child: const Icon(Icons.public_rounded, color: AppTheme.accentDeep, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -88,7 +89,7 @@ class DashboardScreen extends StatelessWidget {
                         style: const TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 12,
-                          color: AppTheme.primaryGreen,
+                          color: AppTheme.primary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -97,7 +98,7 @@ class DashboardScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.copy_rounded, size: 18, color: AppTheme.textSecondary),
-                      tooltip: 'Copy heartbeat URL',
+                      tooltip: 'Copy status page link',
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: url));
                         Navigator.pop(ctx);
@@ -114,6 +115,61 @@ class DashboardScreen extends StatelessWidget {
                 'Share this link with your users or stakeholders to show real-time service uptime.',
                 style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
               ),
+              const SizedBox(height: 16),
+              // Seeing the page is what most people opened this sheet for.
+              // Copying a link is how you send it to someone else — a
+              // different job, and a worse default.
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: const Color(0xFF04121A),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                  label: const Text(
+                    'Open status page',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  onPressed: () async {
+                    // The sheet closes only once the browser has taken it.
+                    // Closing first would leave a failure message with
+                    // nothing on screen to explain what failed.
+                    final opened = await openExternalUrl(context, url);
+                    if (opened && ctx.mounted) Navigator.pop(ctx);
+                  },
+                ),
+              ),
+              if (publicCount == 0) ...[
+                const SizedBox(height: 10),
+                // Worth saying before they open it: the page exists, it is
+                // simply empty, and the fix is a per-monitor setting that is
+                // nowhere near this sheet.
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline_rounded,
+                        size: 14, color: AppTheme.statusMaintenance),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text(
+                        'No monitors are published yet, so the page will look '
+                        'empty. Turn on "Publish on Public Status Page" for a '
+                        'monitor to list it here.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.4,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         );
@@ -176,7 +232,7 @@ class DashboardScreen extends StatelessWidget {
                       height: 28,
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [AppTheme.primaryGreen, AppTheme.accentCyan],
+                          colors: [AppTheme.primary, AppTheme.accentDeep],
                         ),
                         shape: BoxShape.circle,
                       ),
@@ -186,16 +242,12 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                const Text(
-                  'UptimeMonke',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 17,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(width: 8),
+                // The wordmark is gone from here on purpose: anyone looking at
+                // this screen has already opened the app and knows what it is,
+                // and the row is tight — dropping it gives the workspace pill
+                // and the actions the width they were competing for. The
+                // mascot still carries the identity.
+                const SizedBox(width: 10),
                 // Workspace Pill Button
                 InkWell(
                   onTap: () {
@@ -244,9 +296,9 @@ class DashboardScreen extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryGreen.withValues(alpha: 0.12),
+                      color: AppTheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -256,7 +308,7 @@ class DashboardScreen extends StatelessWidget {
                         Text(
                           '${_compactChecks(vm.creditsRemaining!)} left',
                           style: const TextStyle(
-                            color: AppTheme.primaryGreen,
+                            color: AppTheme.primary,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                           ),
@@ -302,7 +354,7 @@ class DashboardScreen extends StatelessWidget {
                 )
               : RefreshIndicator(
                   onRefresh: vm.refreshAll,
-                  color: AppTheme.primaryGreen,
+                  color: AppTheme.primary,
                   backgroundColor: AppTheme.bgSurfaceElevated,
                   child: CustomScrollView(
                   // Always scrollable so pull-to-refresh still works when the
@@ -516,13 +568,13 @@ class DashboardScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                  color: AppTheme.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
                   'Ready to configure',
                   style: TextStyle(
-                    color: AppTheme.primaryGreen,
+                    color: AppTheme.primary,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
@@ -551,7 +603,7 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 12,
-                    backgroundColor: AppTheme.primaryGreen,
+                    backgroundColor: AppTheme.primary,
                     child: Text('1', style: TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)),
                   ),
                   SizedBox(width: 12),
@@ -590,7 +642,7 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 12,
-                    backgroundColor: AppTheme.accentCyan,
+                    backgroundColor: AppTheme.accentDeep,
                     child: Text('2', style: TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)),
                   ),
                   SizedBox(width: 12),

@@ -135,7 +135,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   const Icon(
                     Icons.mark_email_unread_outlined,
                     size: 56,
-                    color: AppTheme.primaryEmerald,
+                    color: AppTheme.primary,
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -177,7 +177,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   if (_notice != null)
                     _Banner(
                       text: _notice!,
-                      color: AppTheme.primaryEmerald,
+                      color: AppTheme.primary,
                       icon: Icons.check_circle_outline,
                     ),
                   if (_error != null)
@@ -194,7 +194,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                     child: FilledButton(
                       onPressed: _checking ? null : _checkNow,
                       style: FilledButton.styleFrom(
-                        backgroundColor: AppTheme.primaryEmerald,
+                        backgroundColor: AppTheme.primary,
                         foregroundColor: AppTheme.bgDark,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

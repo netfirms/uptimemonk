@@ -48,7 +48,7 @@ void main() {
       config: _config(
         name: 'A very long monitor name that would previously push the row wide',
       ),
-      live: LiveState.fromMap({'status': 'up', 'responseTimeMs': 1234}),
+      live: LiveState.fromMap({'status': 'up', 'lastResponseTimeMs': 1234}),
       onTap: () {},
       onEdit: () {},
       onTogglePause: () {},
@@ -63,7 +63,7 @@ void main() {
   testWidgets('renders a long status label without cropping', (tester) async {
     await tester.pumpWidget(_wrap(MonitorCard(
       config: _config(),
-      live: LiveState.fromMap({'status': 'maintenance', 'responseTimeMs': 1}),
+      live: LiveState.fromMap({'status': 'maintenance', 'lastResponseTimeMs': 1}),
       onTap: () {},
       onEdit: () {},
       onTogglePause: () {},
@@ -81,7 +81,7 @@ void main() {
         config: _config(publicOnStatusPage: true, muteAlerts: true),
         live: LiveState.fromMap({
           'status': 'down',
-          'responseTimeMs': 99999,
+          'lastResponseTimeMs': 99999,
           'uptime30d': 99.999,
           'lastCheckedAt': 0,
           'certExpiresAt': DateTime.now().millisecondsSinceEpoch + 86400000,

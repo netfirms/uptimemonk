@@ -155,7 +155,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.primaryEmerald,
+              backgroundColor: AppTheme.primary,
               foregroundColor: AppTheme.bgDark,
             ),
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
@@ -312,7 +312,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings & Notifications')),
       body: RefreshIndicator(
-        color: AppTheme.primaryEmerald,
+        color: AppTheme.primary,
         onRefresh: _load,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -355,7 +355,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Add'),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppTheme.primaryEmerald,
+                  foregroundColor: AppTheme.primary,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   visualDensity: VisualDensity.compact,
                 ),
@@ -365,7 +365,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const Padding(
                     padding: EdgeInsets.all(16),
                     child: Center(
-                      child: CircularProgressIndicator(color: AppTheme.primaryEmerald),
+                      child: CircularProgressIndicator(color: AppTheme.primary),
                     ),
                   )
                 else if (_contacts.isEmpty)
@@ -463,7 +463,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
-            Icon(icon, size: 24, color: AppTheme.accentCyan),
+            Icon(icon, size: 24, color: AppTheme.accentDeep),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -514,7 +514,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         opacity: c.enabled ? 1 : 0.55,
         child: Row(
           children: [
-            Icon(_iconFor(c.channel), size: 20, color: AppTheme.accentCyan),
+            Icon(_iconFor(c.channel), size: 20, color: AppTheme.accentDeep),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -716,7 +716,7 @@ class _AddContactSheetState extends State<_AddContactSheet> {
                       value: c.id,
                       child: Row(
                         children: [
-                          Icon(c.icon, size: 18, color: AppTheme.accentCyan),
+                          Icon(c.icon, size: 18, color: AppTheme.accentDeep),
                           const SizedBox(width: 10),
                           Text(c.label),
                         ],
@@ -783,7 +783,7 @@ class _AddContactSheetState extends State<_AddContactSheet> {
                 height: 48,
                 child: FilledButton(
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.primaryEmerald,
+                    backgroundColor: AppTheme.primary,
                     foregroundColor: AppTheme.bgDark,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
