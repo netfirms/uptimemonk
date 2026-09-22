@@ -183,7 +183,21 @@ export interface MonitorHistory {
   window: { hours: number; days: number };
 }
 
-export type AlertChannel = "email" | "slack" | "discord" | "telegram" | "webhook";
+/**
+ * Includes "fcm" — push to a registered device.
+ *
+ * It was missing here while the server had supported it for some time and
+ * `/v1/contacts` reported `fcm: "ready"` in its channels map. The type
+ * drifting behind the API is why push contacts rendered with fallback badge
+ * styling and why narrowing on the channel did not typecheck.
+ */
+export type AlertChannel =
+  | "email"
+  | "slack"
+  | "discord"
+  | "telegram"
+  | "webhook"
+  | "fcm";
 
 export interface AlertContact {
   id: string;

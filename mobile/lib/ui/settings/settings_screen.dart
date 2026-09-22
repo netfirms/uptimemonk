@@ -44,6 +44,18 @@ const List<_Channel> _addableChannels = [
       Icons.webhook_outlined, keyboard: TextInputType.url),
 ];
 
+/// What to call a contact on screen.
+///
+/// Never the destination for a push contact: that is the FCM device token,
+/// two hundred characters of base64 that means nothing to a reader and puts a
+/// device credential in the UI. Push contacts are named when the device
+/// registers, so an unnamed one is the rare case worth a generic label.
+String contactLabel(AlertContact c) {
+  if (c.name.trim().isNotEmpty) return c.name;
+  if (c.channel == 'fcm') return 'This device';
+  return c.destination;
+}
+
 IconData _iconFor(String channel) {
   if (channel == 'fcm') return Icons.phone_iphone;
   for (final c in _addableChannels) {
@@ -228,7 +240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
 
   Future<void> _deleteContact(AlertContact c) async {
-    final label = c.name.isNotEmpty ? c.name : c.destination;
+    final label = contactLabel(c);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -496,7 +508,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    c.name.isNotEmpty ? c.name : c.destination,
+                    contactLabel(c),
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

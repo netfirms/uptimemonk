@@ -2284,6 +2284,18 @@ button.btn-outline-red {
   gap: 8px;
   font-weight: 600;
   font-size: 0.9rem;
+  /* Without this the row cannot shrink past its content, so a long name
+     pushed out of its box and rendered over the verified badge beside it.
+     `.monitor-target` underneath already truncated, which is why the second
+     line looked right while the first did not. */
+  min-width: 0;
+}
+
+.contact-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .contact-add {
@@ -2326,6 +2338,9 @@ button.btn-outline-red {
 .protocol-tag.discord { background: rgba(167,139,250,.14); border-color: rgba(167,139,250,.32); color: #a78bfa; }
 .protocol-tag.telegram { background: rgba(56,189,248,.12); border-color: rgba(56,189,248,.3); color: #38bdf8; }
 .protocol-tag.webhook { background: rgba(148,163,184,.12); border-color: rgba(148,163,184,.3); color: #94a3b8; }
+/* Push. Had no rule at all, so device contacts fell back to the neutral
+   default and looked like an unrecognised channel. */
+.protocol-tag.fcm { background: rgba(167,139,250,.12); border-color: rgba(167,139,250,.3); color: #a78bfa; }
 
 /* --- Capacity & donations --- */
 

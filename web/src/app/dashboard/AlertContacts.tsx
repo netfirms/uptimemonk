@@ -176,9 +176,19 @@ export default function AlertContacts({
     setNotice(null);
     try {
       await api.testContact(c.id);
+      /**
+       * Names the contact, not the destination.
+       *
+       * For a push contact the destination is the FCM device token — two
+       * hundred characters of base64 that filled the banner, told the reader
+       * nothing, and put a device credential on screen. The name is what
+       * they chose it for.
+       */
+      const label = c.name?.trim() || (c.channel === "fcm" ? "your device" : c.destination);
       setNotice(
-        `Test alert sent to ${c.destination}. If it does not arrive, check spam — ` +
-          `the delivery itself succeeded.`
+        c.channel === "fcm"
+          ? `Test alert sent to ${label}. If it does not arrive, check that notifications are enabled for the app.`
+          : `Test alert sent to ${label}. If it does not arrive, check spam — the delivery itself succeeded.`
       );
       void events.contactTested(c.channel, true);
     } catch (err) {
@@ -250,7 +260,12 @@ export default function AlertContacts({
                 </span>
                 <div className="grow" style={{ minWidth: 0 }}>
                   <div className="contact-name">
-                    {c.name}
+                    {/* Wrapped, not bare: a loose text node is an anonymous
+                        flex item and cannot be truncated, so a long name
+                        overflowed the row and painted over the badge. */}
+                    <span className="contact-name-text" title={c.name}>
+                      {c.name}
+                    </span>
                     {!c.enabled && <span className="interval-tag">paused</span>}
                   </div>
                   <div className="monitor-target">{c.destination}</div>
