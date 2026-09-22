@@ -12,6 +12,7 @@ import {
   dayRollupsFor,
   getMonitor,
   getOrgCredit,
+  recentIncidents,
   getOrgPlan,
   historySummary,
   incidentsFor,
@@ -106,6 +107,43 @@ export async function monitorRoutes(app: FastifyInstance): Promise<void> {
 
       log.info({ monitorId: ref.id, orgId, type: monitor.type }, "monitor created");
       return reply.code(201).send({ id: ref.id, ...monitor });
+    }
+  );
+
+  /**
+   * Every incident in the workspace, newest first, open ones first of all.
+   *
+   * The dashboard could only reach incidents one monitor at a time, which is
+   * the wrong shape for the moment they matter: during an outage you want the
+   * whole picture, not to click through monitors guessing which broke.
+   *
+   * Served from SQLite like the rest of the history, so it costs no Firestore
+   * reads. Tenancy is scoped in the query itself — this path does not go
+   * through Firestore, so no rule would check it.
+   */
+  app.get<{ Querystring: { limit?: string } }>(
+    "/v1/incidents",
+    async (req) => {
+      const { orgId } = req.user!;
+      const asked = Number(req.query.limit);
+      // Clamped: this renders a list, and an unbounded limit is a way to make
+      // the box do arbitrary work from an authenticated request.
+      const limit = Number.isFinite(asked) ? Math.min(200, Math.max(1, Math.floor(asked))) : 50;
+
+      const incidents = recentIncidents(orgId, limit);
+      return {
+        incidents: incidents.map((i) => ({
+          id: i.id,
+          monitorId: i.monitorId,
+          monitorName: i.monitorName,
+          startedAt: i.startedAt,
+          resolvedAt: i.resolvedAt ?? null,
+          durationSeconds: i.durationSeconds ?? null,
+          cause: i.cause,
+          status: i.status,
+        })),
+        openCount: incidents.filter((i) => i.status === "open").length,
+      };
     }
   );
 

@@ -297,3 +297,78 @@ describe("incident retention", () => {
     );
   });
 });
+
+/**
+ * The workspace-wide incident feed.
+ *
+ * Incidents were only reachable one monitor at a time. This is the query
+ * behind the unified view, so what it must get right is the ordering an
+ * operator needs mid-outage and the tenancy boundary.
+ */
+describe("the workspace incident feed", () => {
+  const OTHER_ORG = "org-other";
+
+  const openOne = (id: string, org: string, monitor: string, startedAt: number) =>
+    getDb()
+      .prepare(
+        `INSERT INTO incidents (id, org_id, monitor_id, monitor_name, started_at, cause, status)
+         VALUES (?, ?, ?, ?, ?, 'timeout', 'open')`
+      )
+      .run(id, org, monitor, `Monitor ${monitor}`, startedAt);
+
+  const resolveOne = (id: string, resolvedAt: number) =>
+    getDb()
+      .prepare(`UPDATE incidents SET status = 'resolved', resolved_at = ? WHERE id = ?`)
+      .run(resolvedAt, id);
+
+  beforeEach(() => {
+    getDb().prepare("DELETE FROM incidents").run();
+  });
+
+  test("open incidents come first, however old they are", () => {
+    // Mid-outage the question is "what is broken now", not "what is newest".
+    openOne("old-open", ORG, MON, 1_000);
+    openOne("recent-resolved", ORG, MON, 9_000);
+    resolveOne("recent-resolved", 9_500);
+
+    const feed = repo.recentIncidents(ORG);
+    assert.equal(feed[0].id, "old-open", "the open one leads");
+    assert.equal(feed[1].id, "recent-resolved");
+  });
+
+  test("within the same status, newest first", () => {
+    openOne("a", ORG, MON, 1_000);
+    openOne("b", ORG, MON, 3_000);
+    openOne("c", ORG, MON, 2_000);
+
+    assert.deepEqual(repo.recentIncidents(ORG).map((i) => i.id), ["b", "c", "a"]);
+  });
+
+  test("it spans monitors — that is the whole point", () => {
+    openOne("i1", ORG, "mon-a", 1_000);
+    openOne("i2", ORG, "mon-b", 2_000);
+
+    const feed = repo.recentIncidents(ORG);
+    assert.equal(feed.length, 2);
+    assert.deepEqual(new Set(feed.map((i) => i.monitorId)), new Set(["mon-a", "mon-b"]));
+  });
+
+  test("another workspace's incidents are never returned", () => {
+    // Scoped in the query: this path does not go through Firestore, so no
+    // rule would catch a leak here.
+    openOne("mine", ORG, MON, 1_000);
+    openOne("theirs", OTHER_ORG, "their-mon", 2_000);
+
+    const feed = repo.recentIncidents(ORG);
+    assert.deepEqual(feed.map((i) => i.id), ["mine"]);
+  });
+
+  test("the limit is honoured", () => {
+    for (let i = 0; i < 10; i++) openOne(`x${i}`, ORG, MON, 1_000 + i);
+    assert.equal(repo.recentIncidents(ORG, 3).length, 3);
+  });
+
+  test("a workspace with no incidents gets an empty list, not an error", () => {
+    assert.deepEqual(repo.recentIncidents("org-with-nothing"), []);
+  });
+});

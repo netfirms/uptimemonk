@@ -132,6 +132,18 @@ export interface HistoryIncident {
   status: "open" | "resolved";
 }
 
+/** One row of the workspace-wide incident feed. */
+export interface FeedIncident {
+  id: string;
+  monitorId: string;
+  monitorName: string;
+  startedAt: number;
+  resolvedAt: number | null;
+  durationSeconds: number | null;
+  cause: string;
+  status: "open" | "resolved";
+}
+
 export interface MonitorHistory {
   monitor: {
     id: string;
@@ -360,6 +372,17 @@ export const api = {
     const qs = q.toString();
     return request<MonitorHistory>(`/v1/monitors/${id}/history${qs ? `?${qs}` : ""}`);
   },
+
+  /**
+   * Every incident in the workspace, newest first, open ones first of all.
+   *
+   * The dashboard could only reach incidents one monitor at a time, which is
+   * the wrong shape for the moment they matter.
+   */
+  incidents: (limit = 50) =>
+    request<{ incidents: FeedIncident[]; openCount: number }>(
+      `/v1/incidents?limit=${limit}`
+    ),
 
   me: async () => {
     const user = auth.currentUser;

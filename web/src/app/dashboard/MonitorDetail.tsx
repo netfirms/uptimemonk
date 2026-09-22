@@ -24,7 +24,9 @@ const fmtPct = (n: number | null | undefined) => (n == null ? "—" : `${n.toFix
 const latencyClass = (ms: number | null | undefined) =>
   ms == null ? "" : ms < 300 ? "latency-fast" : ms < 1000 ? "latency-med" : "latency-slow";
 
-function fmtDuration(seconds?: number) {
+/** Exported so the dashboard's incident feed formats the same way. Two
+ *  copies of this would drift the moment one of them gained a "d" unit. */
+export function fmtDuration(seconds?: number) {
   if (seconds == null) return "—";
   if (seconds < 60) return `${Math.round(seconds)}s`;
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`;

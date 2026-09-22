@@ -15,11 +15,12 @@ import NewMonitorForm, {
   protocolTag,
   type MonitorType,
 } from "./NewMonitorForm";
-import MonitorDetail from "./MonitorDetail";
+import MonitorDetail, { fmtDuration } from "./MonitorDetail";
 import Landing from "@/components/Landing";
 import VerifyEmailGate from "@/components/VerifyEmailGate";
 import ProfileModal from "@/components/ProfileModal";
 import LanguagePicker from "@/components/LanguagePicker";
+import type { FeedIncident } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
 import type { Translations } from "@/lib/i18n/translations";
 import { events, identify } from "@/lib/analytics";
@@ -171,6 +172,38 @@ export default function Dashboard() {
     };
   }, [orgId]);
 
+  /**
+   * The workspace incident feed.
+   *
+   * Polled rather than subscribed: incidents live in the worker's SQLite, not
+   * Firestore, so there is nothing to listen to — and that is deliberate, it
+   * is what keeps per-check history off the Firestore bill. A minute is well
+   * inside the window that matters, since an open incident is already on the
+   * monitor card in real time; this list is for the shape of the outage, not
+   * the first alarm.
+   */
+  useEffect(() => {
+    if (!orgId) return;
+    let live = true;
+
+    const load = async () => {
+      try {
+        const res = await api.incidents(50);
+        if (live) setIncidents(res.incidents);
+      } catch {
+        // A failed poll leaves the last good list up. An incident panel that
+        // empties itself on a blip is worse than one that is a minute stale.
+      }
+    };
+
+    void load();
+    const timer = setInterval(load, 60_000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [orgId]);
+
   // Arriving from the landing page's donate or hero quick-start button
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -194,6 +227,8 @@ export default function Dashboard() {
     .filter((m) => m.enabled !== false)
     .reduce((sum, m) => sum + checksPerDay(m.intervalSeconds ?? 60), 0);
   const [detailId, setDetailId] = useState<string | null>(null);
+  /** Workspace-wide incident feed — see `api.incidents`. */
+  const [incidents, setIncidents] = useState<FeedIncident[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "up" | "down" | "paused" | "pending">("all");
 
@@ -1094,6 +1129,46 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Workspace incidents.
+          Competitors put this front and centre (UptimeRobot shipped a unified
+          incidents tab; Better Stack builds its workflow around the timeline)
+          and we had nothing — incidents were reachable one monitor at a time,
+          which is the wrong shape for the moment they matter. */}
+      {incidents.length > 0 && (
+        <section className="incident-feed">
+          <div className="incident-feed-head">
+            <h2>Incidents</h2>
+            <span className="incident-feed-count">
+              {incidents.filter((i) => i.status === "open").length > 0
+                ? `${incidents.filter((i) => i.status === "open").length} open`
+                : "all resolved"}
+            </span>
+          </div>
+          <ul className="incident-feed-list">
+            {incidents.slice(0, 12).map((i) => (
+              <li key={i.id}>
+                <button
+                  className="incident-row"
+                  onClick={() => setDetailId(i.monitorId)}
+                  title={`Open ${i.monitorName}`}
+                >
+                  <span className={`status-dot ${i.status === "open" ? "down" : "up"}`} />
+                  <span className="incident-monitor">{i.monitorName}</span>
+                  <span className="incident-cause">{i.cause || "Unavailable"}</span>
+                  <span className="incident-when">
+                    {i.status === "open"
+                      ? `down ${fmtDuration((Date.now() - i.startedAt) / 1000)}`
+                      : i.durationSeconds != null
+                        ? `${fmtDuration(i.durationSeconds)} outage`
+                        : "resolved"}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Add New Monitor Modal */}
       <MonitorDetail monitorId={detailId} onClose={() => setDetailId(null)} />

@@ -995,6 +995,32 @@ export function recentSamples(
   return out;
 }
 
+/**
+ * Every incident in a workspace, newest first — open ones first of all.
+ *
+ * Incidents were only reachable one monitor at a time, which is backwards for
+ * the moment they matter: during an outage you want to see everything that is
+ * broken, not click through monitors guessing which. Open-before-resolved is
+ * the ordering that answers "what is wrong right now" before "what went wrong
+ * earlier".
+ *
+ * There is no org index on this table — `idx_incidents_open` leads with
+ * monitor_id — so this scans. That is fine at the current fleet size and
+ * cheap to fix later with an index on (org_id, started_at DESC) if the table
+ * grows; retention already prunes resolved incidents.
+ */
+export function recentIncidents(orgId: string, limit = 50): Incident[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT id FROM incidents
+        WHERE org_id = ?
+        ORDER BY (status = 'open') DESC, started_at DESC
+        LIMIT ?`
+    )
+    .all(orgId, limit) as Array<{ id: string }>;
+  return rows.map((r) => getIncident(r.id)!).filter(Boolean);
+}
+
 /** Incidents for one monitor, newest first. */
 export function incidentsFor(monitorId: string, limit = 25): Incident[] {
   const rows = getDb()

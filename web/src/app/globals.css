@@ -5221,3 +5221,105 @@ html[lang="my"] {
   border-color: rgba(59, 214, 113, 0.45);
   background: rgba(59, 214, 113, 0.08);
 }
+
+/* =======================================================================
+   INCIDENT FEED
+   =======================================================================
+   Workspace-wide, because incidents were only reachable one monitor at a
+   time — the wrong shape for the moment they matter. Dense and quiet: this
+   sits under the monitor list and should not compete with it until
+   something is actually open. */
+.incident-feed {
+  margin-top: 28px;
+  padding: 18px 20px 12px;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.incident-feed-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.incident-feed-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.incident-feed-count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.incident-feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.incident-row {
+  display: grid;
+  /* Fixed columns so the cause and duration line up down the list — a
+     ragged right edge is what makes a log hard to scan. */
+  grid-template-columns: 10px minmax(120px, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 4px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.incident-feed-list li:first-child .incident-row {
+  border-top: none;
+}
+
+.incident-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.incident-monitor {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.incident-cause {
+  color: var(--text-muted);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.74rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.incident-when {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  /* The cause is the first thing to go: on a phone, which monitor and how
+     long it was down are what you need. */
+  .incident-row {
+    grid-template-columns: 10px 1fr auto;
+  }
+  .incident-cause {
+    display: none;
+  }
+}
