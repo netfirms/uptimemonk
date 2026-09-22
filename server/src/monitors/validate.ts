@@ -11,7 +11,10 @@ import { normaliseAlertDays } from "./certWatch.js";
 import {
   MAX_MONITORS_DONOR,
   MAX_MONITORS_FREE,
-  HARD_MIN_INTERVAL_SECONDS,
+  minIntervalFor,
+  SCHEDULER_MIN_INTERVAL_SECONDS,
+  MIN_INTERVAL_SECONDS_FREE,
+  MIN_INTERVAL_SECONDS_DONOR,
   maxMonitorsFor,
   checksPerDay,
   fitsBudget,
@@ -109,7 +112,16 @@ export async function buildMonitor(
   input: MonitorInput,
   orgId: string,
   plan: Plan,
-  existing?: Monitor
+  existing?: Monitor,
+  /**
+   * The workspace's credit, for the per-standing interval floor.
+   *
+   * Passed in rather than read here so this stays a pure function — its
+   * tests call it without a database, the way they call it without Firestore.
+   * Omitted means the free floor, which is the conservative default: the API
+   * always has the credit and always passes it.
+   */
+  credit?: OrgCredit
 ): Promise<Partial<Monitor>> {
   const limits: PlanLimits = limitsFor(plan);
   const type = (input.type ?? existing?.type ?? "http") as MonitorType;
@@ -124,18 +136,34 @@ export async function buildMonitor(
   }
 
   /**
-   * The only floor is the scheduler's own.
+   * Two floors apply, and they answer different questions.
    *
-   * Frequency used to be gated by plan — free accounts were clamped to 60s no
-   * matter what they asked for. Under donation credits it is paid for out of
-   * the daily budget instead, so a free org may run one 10-second monitor if
-   * that is how it wants to spend its allowance. `assertFitsBudget` is what
-   * says no, and it says so with a number rather than a tier name.
+   * `SCHEDULER_MIN_INTERVAL_SECONDS` is what the scheduler can physically
+   * honour — nothing goes below it on any standing. On top of that sits a
+   * per-standing floor an operator sets: free workspaces are held to a slower
+   * interval than donors.
+   *
+   * The budget still applies on top of both. A donor may ask for 5s and
+   * `assertFitsBudget` may still refuse it, because the floor says what you
+   * may request and the budget says what you can afford.
+   *
+   * Asking below your floor is refused rather than quietly rounded up. A
+   * silently changed interval reads as a broken feature — the monitor would
+   * simply run at a rate nobody chose.
    */
-  const interval = Math.max(
-    HARD_MIN_INTERVAL_SECONDS,
-    Number(input.intervalSeconds ?? existing?.intervalSeconds) || 60
-  );
+  const requested = Number(input.intervalSeconds ?? existing?.intervalSeconds) || 60;
+  const standingFloor = credit ? minIntervalFor(credit) : MIN_INTERVAL_SECONDS_FREE;
+  const floor = Math.max(SCHEDULER_MIN_INTERVAL_SECONDS, standingFloor);
+
+  if (requested < floor) {
+    throw new ValidationError(
+      standingFloor > SCHEDULER_MIN_INTERVAL_SECONDS
+        ? `The fastest interval on a free workspace is ${floor} seconds. ` +
+          `Supporting the project lowers it to ${MIN_INTERVAL_SECONDS_DONOR} seconds.`
+        : `The fastest interval this fleet supports is ${floor} seconds.`
+    );
+  }
+  const interval = requested;
 
   let regions = ((input.regions as ProbeRegion[]) ??
     existing?.regions ?? [REGION]) as ProbeRegion[];

@@ -218,20 +218,43 @@ describe("UptimeMonk — All Features Verification Suite", () => {
         // a literal would report whatever the worker booted with. What this
         // still asserts is the point of the block: the floor is the same for
         // every plan, because no tier gates it.
-        assert.equal(limitsFor(p).minIntervalSeconds, 5, `${p} interval floor`);
+        // Every plan reports the same floor — the legacy plan name buys
+        // nothing. Standing is what moves it, and /v1/me resolves that.
+        assert.equal(limitsFor(p).minIntervalSeconds, 60, `${p} interval floor`);
         assert.ok(limitsFor(p).maxMonitors > 0, `${p} monitor cap`);
         assert.equal(PLANS[p].multiRegion, true, `${p} multi-region`);
         assert.equal(PLANS[p].apiAccess, true, `${p} api`);
       }
 
-      // A free workspace may ask for a sub-minute interval; whether it fits is
-      // a budget question, answered in credits.ts, not a tier question.
+      // Frequency is tiered: a free workspace is held to the free floor, and
+      // donating is what lowers it. Everything *else* is still untiered —
+      // which is what the assertions above check.
+      await assert.rejects(
+        async () =>
+          buildMonitor(
+            { name: "Free", type: "http", target: "https://example.com", intervalSeconds: 30 },
+            "org_1",
+            "free"
+          ),
+        /60 seconds/,
+        "a free workspace is held to the free floor"
+      );
+
+      const donorMonitor = await buildMonitor(
+        { name: "Donor", type: "http", target: "https://example.com", intervalSeconds: 5 },
+        "org_1",
+        "free",
+        undefined,
+        { credits: 500_000, donationUsdMonthly: 3, lastDonationAt: Date.now() }
+      );
+      assert.equal(donorMonitor.intervalSeconds, 5, "donating buys the fast floor");
+
       const freeMonitor = await buildMonitor(
-        { name: "Free", type: "http", target: "https://example.com", intervalSeconds: 30 },
+        { name: "Free", type: "http", target: "https://example.com", intervalSeconds: 60 },
         "org_1",
         "free"
       );
-      assert.equal(freeMonitor.intervalSeconds, 30);
+      assert.equal(freeMonitor.intervalSeconds, 60);
     });
 
     test("generates secure URL-safe heartbeat token for heartbeat monitors", async () => {

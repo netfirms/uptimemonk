@@ -1,6 +1,7 @@
 import type { Monitor } from "../types.js";
 import {
-  MIN_INTERVAL_SECONDS,
+  MIN_INTERVAL_SECONDS_FREE as CFG_MIN_INTERVAL_FREE,
+  MIN_INTERVAL_SECONDS_DONOR as CFG_MIN_INTERVAL_DONOR,
   MAX_MONITORS_DONOR as CFG_MAX_MONITORS_DONOR,
   MAX_MONITORS_FREE as CFG_MAX_MONITORS_FREE,
 } from "../config.js";
@@ -65,16 +66,41 @@ export const GRACE_DAYS = 7;
 export const ROLLOVER_CYCLES = 2;
 
 /**
- * The floor no amount of donation goes below — a scheduler limit, not a
- * commercial one.
+ * The scheduler's own floor. Nothing goes below this, on any standing.
  *
- * Now operator-settable from the ops console, so the floor can be raised to
- * shed load without a deploy. It is re-exported from `config.ts` rather than
- * declared here because `export let` bindings are live: reassigning it when
- * `system/config` changes updates every importer, with no restart. Clamped at
- * the source — see LIMIT_BOUNDS.
+ * Separate from the per-standing floors below because it answers a different
+ * question: those are policy and an operator moves them, this is what the
+ * scheduler can physically honour. Pricing uses this one, so what a check
+ * costs never depends on who is asking.
  */
-export { MIN_INTERVAL_SECONDS as HARD_MIN_INTERVAL_SECONDS } from "../config.js";
+export const SCHEDULER_MIN_INTERVAL_SECONDS = 5;
+
+/**
+ * The fastest interval a workspace may ask for, by standing.
+ *
+ * Operator-settable from the ops console, free and donor separately, so the
+ * free floor can be raised to shed load without a deploy. Re-exported from
+ * `config.ts` rather than declared here because `export let` bindings are
+ * live: reassigning them when `system/config` changes reaches every importer
+ * with no restart. Clamped at the source — see LIMIT_BOUNDS.
+ */
+export {
+  MIN_INTERVAL_SECONDS_FREE,
+  MIN_INTERVAL_SECONDS_DONOR,
+} from "../config.js";
+
+/**
+ * Which floor applies to this workspace.
+ *
+ * Mirrors `maxMonitorsFor`, including grace: a lapsed donor keeps the faster
+ * floor for the grace window, because that is what makes it grace.
+ */
+export function minIntervalFor(c: OrgCredit, now = Date.now()): number {
+  const standing = standingOf(c, now);
+  return standing === "donor" || standing === "grace"
+    ? CFG_MIN_INTERVAL_DONOR
+    : CFG_MIN_INTERVAL_FREE;
+}
 
 /**
  * A ceiling on monitor *count*, separate from the budget on check *rate*.
@@ -121,7 +147,7 @@ const baseOf = (c: OrgCredit) => c.baseChecksPerDay ?? FREE_CHECKS_PER_DAY;
 
 /** Checks per day a monitor at this interval performs. */
 export function checksPerDay(intervalSeconds: number): number {
-  return Math.ceil(86_400 / Math.max(MIN_INTERVAL_SECONDS, intervalSeconds));
+  return Math.ceil(86_400 / Math.max(SCHEDULER_MIN_INTERVAL_SECONDS, intervalSeconds));
 }
 
 /** What an org's whole monitor set costs per day. */

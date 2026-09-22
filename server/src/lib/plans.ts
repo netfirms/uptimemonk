@@ -1,5 +1,5 @@
 import type { Org } from "../types.js";
-import { FREE_CHECKS_PER_DAY, MAX_MONITORS_DONOR, HARD_MIN_INTERVAL_SECONDS } from "./credits.js";
+import { FREE_CHECKS_PER_DAY, MAX_MONITORS_DONOR, MIN_INTERVAL_SECONDS_FREE } from "./credits.js";
 
 /**
  * What used to be the paywall.
@@ -67,7 +67,9 @@ export function limitsFor(plan: Org["plan"] | undefined): PlanLimits {
   return {
     ...PLANS[plan ?? "free"],
     maxMonitors: MAX_MONITORS_DONOR,
-    minIntervalSeconds: HARD_MIN_INTERVAL_SECONDS,
+    // The floor depends on standing, which a plan does not carry. This is
+    // the conservative one; `/v1/me` reports the caller's actual floor.
+    minIntervalSeconds: MIN_INTERVAL_SECONDS_FREE,
   };
 }
 

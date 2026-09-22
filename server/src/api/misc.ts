@@ -2,8 +2,9 @@ import type { FastifyInstance } from "fastify";
 import { readFileSync } from "node:fs";
 import { Timestamp } from "firebase-admin/firestore";
 import { auth, col } from "../sync/firebase.js";
-import { getMonitorByHeartbeatToken, getMonitor, getOrgPlan, setDueAt } from "../db/repo.js";
+import { getMonitorByHeartbeatToken, getMonitor, getOrgPlan, getOrgCredit, setDueAt } from "../db/repo.js";
 import { limitsFor } from "../lib/plans.js";
+import { minIntervalFor, maxMonitorsFor } from "../lib/credits.js";
 import { flush, recordResult } from "../monitors/recordResult.js";
 import { handleVerifyRequest, signatureMatches } from "../probe/verify.js";
 import { requireAuth, needsEmailConfirmation } from "./auth.js";
@@ -335,6 +336,13 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
   app.get("/v1/me", { preHandler: requireAuth() }, async (req) => {
     const plan = getOrgPlan(req.user!.orgId) as Plan;
     const limits = limitsFor(plan);
+    /**
+     * Both limits depend on standing, which `limitsFor` cannot see — it only
+     * has the legacy plan name. Resolve them from the credit here, or the
+     * dashboard would tell a donor their floor is 60s and then the API would
+     * happily accept 5.
+     */
+    const credit = getOrgCredit(req.user!.orgId);
     return {
       uid: req.user!.uid,
       orgId: req.user!.orgId,
@@ -342,8 +350,8 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
       plan,
       limits: {
         label: limits.label,
-        minIntervalSeconds: limits.minIntervalSeconds,
-        maxMonitors: limits.maxMonitors,
+        minIntervalSeconds: minIntervalFor(credit),
+        maxMonitors: maxMonitorsFor(credit),
       },
     };
   });

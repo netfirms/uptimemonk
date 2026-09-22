@@ -50,7 +50,8 @@ function int(name: string, fallback: number): number {
  * console should be able to make.
  */
 const LIMIT_BOUNDS = {
-  minIntervalSeconds: { min: 5, max: 3_600 },
+  minIntervalSecondsFree: { min: 5, max: 3_600 },
+  minIntervalSecondsDonor: { min: 5, max: 3_600 },
   maxMonitorsFree: { min: 1, max: 5_000 },
   maxMonitorsDonor: { min: 1, max: 5_000 },
 } as const;
@@ -122,7 +123,8 @@ export interface AppConfig {
   heartbeatUrl: string;
 
   /** Capacity knobs. See LIMIT_BOUNDS — these are clamped, not trusted. */
-  minIntervalSeconds: number;
+  minIntervalSecondsFree: number;
+  minIntervalSecondsDonor: number;
   maxMonitorsFree: number;
   maxMonitorsDonor: number;
 
@@ -159,7 +161,8 @@ const envDefaults: AppConfig = {
   userAgent: optional("USER_AGENT", "UptimeMonke/1.0 (+https://uptimemonke.com/bot)"),
   heartbeatUrl: process.env.UPTIMEMONK_HEARTBEAT_URL ?? "",
 
-  minIntervalSeconds: boundedInt("MIN_INTERVAL_SECONDS", 5, "minIntervalSeconds"),
+  minIntervalSecondsFree: boundedInt("MIN_INTERVAL_SECONDS_FREE", 60, "minIntervalSecondsFree"),
+  minIntervalSecondsDonor: boundedInt("MIN_INTERVAL_SECONDS_DONOR", 5, "minIntervalSecondsDonor"),
   maxMonitorsFree: boundedInt("MAX_MONITORS_FREE", 50, "maxMonitorsFree"),
   maxMonitorsDonor: boundedInt("MAX_MONITORS_DONOR", 200, "maxMonitorsDonor"),
 
@@ -209,7 +212,8 @@ export let HEARTBEAT_URL = envDefaults.heartbeatUrl;
  * a new value the moment `applyOverrides` reassigns it. That is what makes the
  * ops console able to change these without a restart.
  */
-export let MIN_INTERVAL_SECONDS = envDefaults.minIntervalSeconds;
+export let MIN_INTERVAL_SECONDS_FREE = envDefaults.minIntervalSecondsFree;
+export let MIN_INTERVAL_SECONDS_DONOR = envDefaults.minIntervalSecondsDonor;
 export let MAX_MONITORS_FREE = envDefaults.maxMonitorsFree;
 export let MAX_MONITORS_DONOR = envDefaults.maxMonitorsDonor;
 
@@ -284,10 +288,16 @@ export function updateDynamicConfig(data?: Record<string, unknown> | null): void
 
     // Clamped on the way in, so a typo in the console cannot set a 1-second
     // floor across the fleet or a monitor cap the box cannot carry.
-    if (data.minIntervalSeconds != null && !Number.isNaN(Number(data.minIntervalSeconds))) {
-      activeOverrides.minIntervalSeconds = clampInt(
-        Number(data.minIntervalSeconds),
-        LIMIT_BOUNDS.minIntervalSeconds
+    if (data.minIntervalSecondsFree != null && !Number.isNaN(Number(data.minIntervalSecondsFree))) {
+      activeOverrides.minIntervalSecondsFree = clampInt(
+        Number(data.minIntervalSecondsFree),
+        LIMIT_BOUNDS.minIntervalSecondsFree
+      );
+    }
+    if (data.minIntervalSecondsDonor != null && !Number.isNaN(Number(data.minIntervalSecondsDonor))) {
+      activeOverrides.minIntervalSecondsDonor = clampInt(
+        Number(data.minIntervalSecondsDonor),
+        LIMIT_BOUNDS.minIntervalSecondsDonor
       );
     }
     if (data.maxMonitorsFree != null && !Number.isNaN(Number(data.maxMonitorsFree))) {
@@ -368,9 +378,20 @@ export function updateDynamicConfig(data?: Record<string, unknown> | null): void
   USER_AGENT = activeOverrides.userAgent ?? envDefaults.userAgent;
   HEARTBEAT_URL = activeOverrides.heartbeatUrl ?? envDefaults.heartbeatUrl;
 
-  MIN_INTERVAL_SECONDS = activeOverrides.minIntervalSeconds ?? envDefaults.minIntervalSeconds;
+  MIN_INTERVAL_SECONDS_FREE = activeOverrides.minIntervalSecondsFree ?? envDefaults.minIntervalSecondsFree;
+  MIN_INTERVAL_SECONDS_DONOR = activeOverrides.minIntervalSecondsDonor ?? envDefaults.minIntervalSecondsDonor;
   MAX_MONITORS_FREE = activeOverrides.maxMonitorsFree ?? envDefaults.maxMonitorsFree;
   MAX_MONITORS_DONOR = activeOverrides.maxMonitorsDonor ?? envDefaults.maxMonitorsDonor;
+
+  /**
+   * A donor floor slower than the free floor would make donating a
+   * downgrade — the opposite direction to the monitor caps, where the donor
+   * number is the larger one. Lower it to meet the free floor rather than
+   * reject the save.
+   */
+  if (MIN_INTERVAL_SECONDS_DONOR > MIN_INTERVAL_SECONDS_FREE) {
+    MIN_INTERVAL_SECONDS_DONOR = MIN_INTERVAL_SECONDS_FREE;
+  }
 
   /**
    * A donor cap below the free cap would make supporting the project a
@@ -451,7 +472,8 @@ export function getEffectiveConfig(): AppConfig {
     userAgent: USER_AGENT,
     heartbeatUrl: HEARTBEAT_URL,
 
-    minIntervalSeconds: MIN_INTERVAL_SECONDS,
+    minIntervalSecondsFree: MIN_INTERVAL_SECONDS_FREE,
+    minIntervalSecondsDonor: MIN_INTERVAL_SECONDS_DONOR,
     maxMonitorsFree: MAX_MONITORS_FREE,
     maxMonitorsDonor: MAX_MONITORS_DONOR,
 

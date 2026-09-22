@@ -85,7 +85,7 @@ export async function monitorRoutes(app: FastifyInstance): Promise<void> {
       const { orgId } = req.user!;
       const plan = getOrgPlan(orgId) as Plan;
 
-      const monitor = await buildMonitor(req.body, orgId, plan);
+      const monitor = await buildMonitor(req.body, orgId, plan, undefined, getOrgCredit(orgId));
 
       // Against the local mirror: authoritative enough for a budget check, and
       // it avoids a Firestore read on every create.
@@ -184,7 +184,7 @@ export async function monitorRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const plan = getOrgPlan(orgId) as Plan;
-      const monitor = await buildMonitor(req.body, orgId, plan, current as never);
+      const monitor = await buildMonitor(req.body, orgId, plan, current as never, getOrgCredit(orgId));
 
       // Editing is the other way to overspend: speeding an existing monitor up
       // costs exactly as much as adding a fast new one.

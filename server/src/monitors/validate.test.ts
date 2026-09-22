@@ -75,26 +75,71 @@ describe("Monitor Input Validation & Plan Limits", () => {
     );
   });
 
-  test("honours a sub-minute interval — frequency is budgeted, not tiered", async () => {
-    // Under donation credits there is no per-plan interval floor. A free
-    // workspace may run one fast monitor if that is how it spends its daily
-    // allowance; `assertFitsBudget` is what says no, and it says so with a
-    // number rather than a tier name.
-    const monitor = await buildMonitor(
-      { name: "Frequent check", type: "http", target: "https://example.com", intervalSeconds: 30 },
-      orgId,
-      "free"
+  test("a free workspace is held to the free floor", async () => {
+    // Frequency is tiered again: free workspaces are held to a slower floor
+    // than donors. The budget still applies on top — the floor says what you
+    // may ask for, the budget says what you can afford.
+    await assert.rejects(
+      async () =>
+        buildMonitor(
+          { name: "Frequent check", type: "http", target: "https://example.com", intervalSeconds: 30 },
+          orgId,
+          "free"
+        ),
+      /free workspace is 60 seconds/
     );
-    assert.equal(monitor.intervalSeconds, 30);
   });
 
-  test("still refuses to go below the scheduler's own floor", async () => {
-    const monitor = await buildMonitor(
-      { name: "Too fast", type: "http", target: "https://example.com", intervalSeconds: 1 },
-      orgId,
-      "free"
+  test("the refusal says how to lift the floor, not just that it exists", async () => {
+    // A limit with no way out reads as a broken feature.
+    await assert.rejects(
+      async () =>
+        buildMonitor(
+          { name: "Frequent check", type: "http", target: "https://example.com", intervalSeconds: 10 },
+          orgId,
+          "free"
+        ),
+      /Supporting the project lowers it to 5 seconds/
     );
-    assert.equal(monitor.intervalSeconds, 5, "clamped to MIN_INTERVAL_SECONDS");
+  });
+
+  test("a donor may ask for the fast floor", async () => {
+    const monitor = await buildMonitor(
+      { name: "Frequent check", type: "http", target: "https://example.com", intervalSeconds: 5 },
+      orgId,
+      "free",
+      undefined,
+      { credits: 500_000, donationUsdMonthly: 3, lastDonationAt: Date.now() } as never
+    );
+    assert.equal(monitor.intervalSeconds, 5);
+  });
+
+  test("nobody goes below the scheduler's own floor, donor included", async () => {
+    await assert.rejects(
+      async () =>
+        buildMonitor(
+          { name: "Too fast", type: "http", target: "https://example.com", intervalSeconds: 1 },
+          orgId,
+          "free",
+          undefined,
+          { credits: 500_000, donationUsdMonthly: 3, lastDonationAt: Date.now() } as never
+        ),
+      /fastest interval this fleet supports is 5 seconds/
+    );
+  });
+
+  test("asking below the floor is refused, not quietly rounded up", async () => {
+    // A silently raised interval means the monitor runs at a rate nobody
+    // chose, and the customer has no way to tell.
+    await assert.rejects(
+      async () =>
+        buildMonitor(
+          { name: "x", type: "http", target: "https://example.com", intervalSeconds: 45 },
+          orgId,
+          "free"
+        ),
+      (err: Error) => err.name === "ValidationError" || /60 seconds/.test(err.message)
+    );
   });
 
   test("allows 60-second interval for solo or team plan", async () => {
@@ -216,11 +261,13 @@ describe("editing an existing monitor", () => {
     );
   });
 
-  test("the scheduler floor still holds when editing the interval", async () => {
-    // Editing must not be a way around the one floor that remains. The budget
-    // gate is enforced by the route, not here — see assertFitsBudget.
-    const monitor = await buildMonitor({ intervalSeconds: 1 }, orgId, "free", existing as never);
-    assert.equal(monitor.intervalSeconds, 5);
+  test("the floor still holds when editing the interval", async () => {
+    // Editing must not be a way around it. The budget gate is enforced by the
+    // route, not here — see assertFitsBudget.
+    await assert.rejects(
+      async () => buildMonitor({ intervalSeconds: 1 }, orgId, "free", existing as never),
+      /60 seconds/
+    );
   });
 
   test("a heartbeat monitor keeps its token across an edit", async () => {
@@ -377,14 +424,29 @@ describe("keyword monitors must request a body", () => {
 describe("interval floors", () => {
   const orgId = "org-test-123";
 
-  test("any plan may ask for five seconds — the budget decides, not the tier", async () => {
+  test("the floor follows standing, not the legacy plan name", async () => {
+    // A grandfathered plan does not buy a faster floor; donating does.
+    const donor = { credits: 500_000, donationUsdMonthly: 3, lastDonationAt: Date.now() } as never;
     for (const plan of ["free", "solo", "team", "scale"] as const) {
+      await assert.rejects(
+        async () =>
+          buildMonitor(
+            { type: "http", target: "https://example.com", intervalSeconds: 5 },
+            orgId,
+            plan
+          ),
+        /60 seconds/,
+        `${plan} without credit`
+      );
+
       const m = await buildMonitor(
         { type: "http", target: "https://example.com", intervalSeconds: 5 },
         orgId,
-        plan
+        plan,
+        undefined,
+        donor
       );
-      assert.equal(m.intervalSeconds, 5, plan);
+      assert.equal(m.intervalSeconds, 5, `${plan} with credit`);
     }
   });
 
@@ -397,13 +459,26 @@ describe("interval floors", () => {
     assert.equal(m.intervalSeconds, 900);
   });
 
-  test("nothing goes below five seconds, on any plan", async () => {
-    const m = await buildMonitor(
-      { type: "http", target: "https://example.com", intervalSeconds: 1 },
-      orgId,
-      "scale"
-    );
-    assert.ok((m.intervalSeconds ?? 0) >= 5, `got ${m.intervalSeconds}`);
+  test("nothing goes below five seconds, on any standing", async () => {
+    // The scheduler floor is not policy — no standing and no operator setting
+    // gets under it, so it is refused rather than clamped.
+    for (const credit of [
+      undefined,
+      { credits: 500_000, donationUsdMonthly: 3, lastDonationAt: Date.now() } as never,
+    ]) {
+      await assert.rejects(
+        async () =>
+          buildMonitor(
+            { type: "http", target: "https://example.com", intervalSeconds: 1 },
+            orgId,
+            "scale",
+            undefined,
+            credit
+          ),
+        /seconds/,
+        credit ? "donor" : "free"
+      );
+    }
   });
 });
 

@@ -154,7 +154,8 @@ export interface SystemConfigState {
   userAgent: string;
   heartbeatUrl: string;
 
-  minIntervalSeconds: string;
+  minIntervalSecondsFree: string;
+  minIntervalSecondsDonor: string;
   maxMonitorsFree: string;
   maxMonitorsDonor: string;
 
@@ -193,7 +194,8 @@ const CONFIG_DEFAULTS: SystemConfigState = {
   userAgent: "UptimeMonke/1.0 (+https://uptimemonke.com/bot)",
   heartbeatUrl: "",
 
-  minIntervalSeconds: "5",
+  minIntervalSecondsFree: "60",
+  minIntervalSecondsDonor: "5",
   maxMonitorsFree: "50",
   maxMonitorsDonor: "200",
 
@@ -654,7 +656,8 @@ export default function AdminPage() {
             retentionDays: data.retentionDays != null ? String(data.retentionDays) : envDefaults.retentionDays,
             incidentRetentionDays: data.incidentRetentionDays != null ? String(data.incidentRetentionDays) : envDefaults.incidentRetentionDays,
             userAgent: data.userAgent != null ? String(data.userAgent) : envDefaults.userAgent,
-            minIntervalSeconds: data.minIntervalSeconds != null ? String(data.minIntervalSeconds) : envDefaults.minIntervalSeconds,
+            minIntervalSecondsFree: data.minIntervalSecondsFree != null ? String(data.minIntervalSecondsFree) : envDefaults.minIntervalSecondsFree,
+            minIntervalSecondsDonor: data.minIntervalSecondsDonor != null ? String(data.minIntervalSecondsDonor) : envDefaults.minIntervalSecondsDonor,
             maxMonitorsFree: data.maxMonitorsFree != null ? String(data.maxMonitorsFree) : envDefaults.maxMonitorsFree,
             maxMonitorsDonor: data.maxMonitorsDonor != null ? String(data.maxMonitorsDonor) : envDefaults.maxMonitorsDonor,
             heartbeatUrl: data.heartbeatUrl != null ? String(data.heartbeatUrl) : envDefaults.heartbeatUrl,
@@ -724,7 +727,8 @@ export default function AdminPage() {
           retentionDays: String(defaults.retentionDays ?? CONFIG_DEFAULTS.retentionDays),
           incidentRetentionDays: String(defaults.incidentRetentionDays ?? CONFIG_DEFAULTS.incidentRetentionDays),
           userAgent: String(defaults.userAgent ?? CONFIG_DEFAULTS.userAgent),
-          minIntervalSeconds: String(defaults.minIntervalSeconds ?? CONFIG_DEFAULTS.minIntervalSeconds),
+          minIntervalSecondsFree: String(defaults.minIntervalSecondsFree ?? CONFIG_DEFAULTS.minIntervalSecondsFree),
+          minIntervalSecondsDonor: String(defaults.minIntervalSecondsDonor ?? CONFIG_DEFAULTS.minIntervalSecondsDonor),
           maxMonitorsFree: String(defaults.maxMonitorsFree ?? CONFIG_DEFAULTS.maxMonitorsFree),
           maxMonitorsDonor: String(defaults.maxMonitorsDonor ?? CONFIG_DEFAULTS.maxMonitorsDonor),
           heartbeatUrl: String(defaults.heartbeatUrl ?? CONFIG_DEFAULTS.heartbeatUrl),
@@ -783,7 +787,8 @@ export default function AdminPage() {
 
         // The worker clamps these on the way in — see LIMIT_BOUNDS in
         // config.ts. These fallbacks only cover an empty field.
-        minIntervalSeconds: Number(configForm.minIntervalSeconds) || 5,
+        minIntervalSecondsFree: Number(configForm.minIntervalSecondsFree) || 60,
+        minIntervalSecondsDonor: Number(configForm.minIntervalSecondsDonor) || 5,
         maxMonitorsFree: Number(configForm.maxMonitorsFree) || 50,
         maxMonitorsDonor: Number(configForm.maxMonitorsDonor) || 200,
 
@@ -2534,9 +2539,9 @@ export default function AdminPage() {
                   work the fleet accepts — the rest are plumbing. */}
               <div className="config-field">
                 <div className="config-label-row">
-                  <label className="config-label">Minimum Check Interval, seconds (MIN_INTERVAL_SECONDS)</label>
-                  <span className={`config-badge ${isFieldCustom("minIntervalSeconds") ? "custom" : "default"}`}>
-                    {isFieldCustom("minIntervalSeconds") ? "Firestore Override" : "Env Default"}
+                  <label className="config-label">Minimum Check Interval — Free, seconds (MIN_INTERVAL_SECONDS_FREE)</label>
+                  <span className={`config-badge ${isFieldCustom("minIntervalSecondsFree") ? "custom" : "default"}`}>
+                    {isFieldCustom("minIntervalSecondsFree") ? "Firestore Override" : "Env Default"}
                   </span>
                 </div>
                 <input
@@ -2544,14 +2549,43 @@ export default function AdminPage() {
                   min={5}
                   max={3600}
                   className="config-input"
-                  value={configForm.minIntervalSeconds}
-                  onChange={(e) => setConfigForm({ ...configForm, minIntervalSeconds: e.target.value })}
-                  placeholder={envDefaults.minIntervalSeconds}
+                  value={configForm.minIntervalSecondsFree}
+                  onChange={(e) => setConfigForm({ ...configForm, minIntervalSecondsFree: e.target.value })}
+                  placeholder={envDefaults.minIntervalSecondsFree}
                 />
                 <span className="config-hint">
-                  The floor no workspace goes below. Clamped to 5–3600s by the worker;
-                  5s is the scheduler&apos;s own limit. <strong>Raising this sheds load</strong> across
-                  the whole fleet — halving the rate halves probe CPU and Firestore writes.
+                  The fastest interval a free workspace may request. Clamped to 5–3600s.
+                  <strong> This is the load lever</strong> — most workspaces are free, so raising
+                  it cuts probe CPU and Firestore writes across the fleet roughly in proportion.
+                </span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Minimum Check Interval — Donor, seconds (MIN_INTERVAL_SECONDS_DONOR)</label>
+                  <span className={`config-badge ${isFieldCustom("minIntervalSecondsDonor") ? "custom" : "default"}`}>
+                    {isFieldCustom("minIntervalSecondsDonor") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min={5}
+                  max={3600}
+                  className="config-input"
+                  value={configForm.minIntervalSecondsDonor}
+                  onChange={(e) => setConfigForm({ ...configForm, minIntervalSecondsDonor: e.target.value })}
+                  placeholder={envDefaults.minIntervalSecondsDonor}
+                />
+                <span className="config-hint">
+                  What donating buys. 5s is the scheduler&apos;s own limit and nothing goes under it.
+                  Note this one is the <em>smaller</em> number — the opposite of the monitor caps —
+                  and it is lowered to meet the free floor if set above it, since donating must
+                  never be a downgrade.
+                  {Number(configForm.minIntervalSecondsDonor) > Number(configForm.minIntervalSecondsFree) && (
+                    <strong style={{ color: "var(--amber, #f59e0b)", display: "block", marginTop: "4px" }}>
+                      Slower than the free floor ({configForm.minIntervalSecondsFree}s) — the worker will lower it to match.
+                    </strong>
+                  )}
                 </span>
               </div>
 

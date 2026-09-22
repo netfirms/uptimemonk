@@ -13,7 +13,8 @@ import {
   RECAPTCHA_SECRET,
   RECAPTCHA_MIN_SCORE,
   USER_AGENT,
-  MIN_INTERVAL_SECONDS,
+  MIN_INTERVAL_SECONDS_FREE,
+  MIN_INTERVAL_SECONDS_DONOR,
   MAX_MONITORS_FREE,
   MAX_MONITORS_DONOR,
   getEffectiveConfig,
@@ -164,31 +165,44 @@ describe("the capacity limits an operator can change", () => {
 
   test("a sane change is taken as given", () => {
     updateDynamicConfig({
-      minIntervalSeconds: 30,
+      minIntervalSecondsFree: 30,
+      minIntervalSecondsDonor: 10,
       maxMonitorsFree: 25,
       maxMonitorsDonor: 400,
     });
-    assert.equal(MIN_INTERVAL_SECONDS, 30);
+    assert.equal(MIN_INTERVAL_SECONDS_FREE, 30);
+    assert.equal(MIN_INTERVAL_SECONDS_DONOR, 10);
     assert.equal(MAX_MONITORS_FREE, 25);
     assert.equal(MAX_MONITORS_DONOR, 400);
   });
 
-  test("the interval floor cannot be lowered past the scheduler's own limit", () => {
-    // Raising the floor sheds load and is allowed. Lowering it below 5s is a
-    // capacity decision the console does not get to make.
-    updateDynamicConfig({ minIntervalSeconds: 1 });
-    assert.equal(MIN_INTERVAL_SECONDS, 5);
-
-    updateDynamicConfig({ minIntervalSeconds: 0 });
-    assert.equal(MIN_INTERVAL_SECONDS, 5);
-
-    updateDynamicConfig({ minIntervalSeconds: -60 });
-    assert.equal(MIN_INTERVAL_SECONDS, 5);
+  test("neither floor can be lowered past the scheduler's own limit", () => {
+    // Raising a floor sheds load and is allowed. Going below 5s is a capacity
+    // decision the console does not get to make, on either standing.
+    for (const v of [1, 0, -60]) {
+      updateDynamicConfig({ minIntervalSecondsFree: v, minIntervalSecondsDonor: v });
+      assert.equal(MIN_INTERVAL_SECONDS_FREE, 5, `free at ${v}`);
+      assert.equal(MIN_INTERVAL_SECONDS_DONOR, 5, `donor at ${v}`);
+    }
   });
 
   test("an absurd interval is clamped rather than accepted", () => {
-    updateDynamicConfig({ minIntervalSeconds: 999_999 });
-    assert.equal(MIN_INTERVAL_SECONDS, 3_600);
+    updateDynamicConfig({ minIntervalSecondsFree: 999_999 });
+    assert.equal(MIN_INTERVAL_SECONDS_FREE, 3_600);
+  });
+
+  test("a donor floor slower than the free floor is lowered to meet it", () => {
+    // The opposite direction to the monitor caps: here the donor number is
+    // the smaller one, because donating buys a faster check, and donating
+    // must never be a downgrade.
+    updateDynamicConfig({ minIntervalSecondsFree: 30, minIntervalSecondsDonor: 120 });
+    assert.equal(MIN_INTERVAL_SECONDS_FREE, 30);
+    assert.equal(MIN_INTERVAL_SECONDS_DONOR, 30);
+  });
+
+  test("the shipped defaults are one minute free, five seconds donor", () => {
+    assert.equal(MIN_INTERVAL_SECONDS_FREE, 60);
+    assert.equal(MIN_INTERVAL_SECONDS_DONOR, 5);
   });
 
   test("monitor caps are clamped at both ends", () => {
@@ -205,21 +219,22 @@ describe("the capacity limits an operator can change", () => {
   });
 
   test("a fractional value becomes a whole number, not a fraction of a check", () => {
-    updateDynamicConfig({ minIntervalSeconds: 30.7, maxMonitorsFree: 10.2 });
-    assert.equal(MIN_INTERVAL_SECONDS, 31);
+    updateDynamicConfig({ minIntervalSecondsFree: 30.7, maxMonitorsFree: 10.2 });
+    assert.equal(MIN_INTERVAL_SECONDS_FREE, 31);
     assert.equal(MAX_MONITORS_FREE, 10);
   });
 
   test("garbage leaves the previous value alone", () => {
-    updateDynamicConfig({ minIntervalSeconds: 45 });
-    assert.equal(MIN_INTERVAL_SECONDS, 45);
-    updateDynamicConfig({ minIntervalSeconds: "not a number" });
-    assert.equal(MIN_INTERVAL_SECONDS, 5, "falls back to the env default, not NaN");
+    updateDynamicConfig({ minIntervalSecondsFree: 45 });
+    assert.equal(MIN_INTERVAL_SECONDS_FREE, 45);
+    updateDynamicConfig({ minIntervalSecondsFree: "not a number" });
+    assert.equal(MIN_INTERVAL_SECONDS_FREE, 60, "falls back to the env default, not NaN");
   });
 
   test("they are exposed to the console, so it can render them", () => {
     const config = getEffectiveConfig();
-    assert.equal(typeof config.minIntervalSeconds, "number");
+    assert.equal(typeof config.minIntervalSecondsFree, "number");
+    assert.equal(typeof config.minIntervalSecondsDonor, "number");
     assert.equal(typeof config.maxMonitorsFree, "number");
     assert.equal(typeof config.maxMonitorsDonor, "number");
   });
