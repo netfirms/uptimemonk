@@ -27,15 +27,30 @@ wedged — that is the failure mode that matters, not process liveness.
 ## Commands
 
 ```bash
-npm test                     # everything that needs no emulator: 262 server
-                             # + 33 monitoring + 23 feature tests
-npm --prefix server test     # 262 server tests alone, no network or emulator
-npm run test:rules           # 18 rules tests; needs the Firestore emulator running
-npm run test:status          # 6 status-page integration tests; starts the emulator itself
+npm test                     # everything that needs no emulator: 436 server
+                             # + 34 monitoring + 28 feature tests
+npm --prefix server test     # 436 server tests alone, no network or emulator
+npm run test:rules           # 24 rules tests; needs the Firestore emulator running
+npm run test:status          # status-page integration tests; starts the emulator itself
 npm run emulators            # firebase-tools@14 — v15 requires Java 21, host has 17
 npm run deploy               # deploy/deploy-all.sh (Firebase + Lightsail)
+npm run deploy:firebase      # hosting + rules only; --skip-bump avoids a version bump
 npm run deploy:lightsail uptimemonk-worker-1     # worker only
+
+# Mobile is a separate toolchain and is NOT covered by `npm test`.
+# flutter is not on PATH: export PATH="$HOME/development/flutter/bin:$PATH"
+cd mobile && flutter test    # 119 widget/unit tests
+cd mobile && flutter analyze
+cd mobile && ./go releaseToAndroidStore   # fastlane android alpha_deploy
+cd mobile && ./go releaseToIosStore       # fastlane ios testflightupload — TestFlight, not the App Store
 ```
+
+The iOS lane needs `LC_ALL=en_US.UTF-8` and
+`FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT=180` on this host: the default 3-second
+`xcodebuild -showBuildSettings` probe times out *after* the build compiles
+successfully, which reads as a build failure and is not one. Both release lanes
+stamp the version from `number_of_commits()`, so `pubspec.yaml`'s `1.0.0+1`
+never ships.
 
 Deploys run the test suite first and will refuse to ship a failing tree.
 
@@ -251,6 +266,37 @@ alert contacts and last error are all withheld; a paused monitor reads as
 re-delivers every document as "added". `upsertMonitorConfig` deliberately
 excludes `status`, `due_at` and failure counts; otherwise every reconnect would
 restart every monitor's state machine.
+
+**The Firestore mirror is a wire contract, and breaking it is silent.** The
+keys in `buildStatusDoc` (`sync/mirror.ts`) are read by two clients:
+`web/src/app/dashboard/page.tsx` and `mobile/lib/data/models/live_state.dart`.
+A key that does not match does not throw — it parses as null and renders as an
+em dash, which is indistinguishable from a value that has honestly not been
+measured yet. Every latency in the mobile app read empty for months because the
+mirror wrote `lastResponseTimeMs` and the model read `responseTimeMs`, and the
+model's own test supplied its own key names, so it agreed with the bug. Build
+parser tests from the mirror's field list, not from invented input.
+
+**`DEFAULT_RANGE` is the only place a default window is decided.** It lives in
+`lib/ranges.ts` (24h) and `parseRange` falls back to it. `buildPublicStatus`
+and `web/src/components/RangeTabs.tsx` both route through it rather than
+restating the literal — a second hardcoded default is precisely how the public
+status page ended up opening on 90d, where an active outage averages down to a
+rounding error and the page reads green while the service is down.
+
+**The two clients share a palette, and it is asserted.** `mobile/lib/core/
+theme.dart` holds the same hex values as `web/src/app/globals.css`, token for
+token, checked by `mobile/test/glass_grid_test.dart`. Retuning one side without
+the other is invisible until someone puts the two side by side. Analytics event
+names are shared for the same reason: GA4 reports on the name, so identical
+names give one funnel across platforms instead of two half-populated ones.
+
+**Every animation stops under reduce-motion.** `ProbePulse`, `StatusDot`,
+`GridFloor`, `StaggerIn` and `AnimatedCounter` each read
+`MediaQuery.disableAnimationsOf`, and each has a test asserting it. A repeating
+animation is the precise thing that OS setting exists to suppress. `GlassPanel`
+is separately not free — `BackdropFilter` forces a `saveLayer` per panel, so it
+belongs on a handful of surfaces and not on list rows.
 
 ## Layout
 

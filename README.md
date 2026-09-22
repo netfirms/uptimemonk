@@ -127,6 +127,15 @@ shape a security decision rather than a convenience:
 - an unknown slug and a published-but-empty page return the **same** 404, so
   the endpoint cannot be walked to discover which orgs exist.
 
+It opens on the **24h** window. A status page answers "is it working right
+now", and over ninety days an active outage averages down to a rounding error —
+a visitor arriving mid-incident would find a green page while the service was
+down. The longer windows are one tap away for anyone asking a different
+question. `DEFAULT_RANGE` in `server/src/lib/ranges.ts` is authoritative, and
+`web/src/components/RangeTabs.tsx` mirrors it; neither should restate the
+literal, because a second hardcoded default is exactly how the two drifted
+apart once already.
+
 The page is client-rendered: a static export on Spark has no Node runtime, so
 one shell is prerendered and a hosting rewrite points `/status/**` at it. That
 costs server-rendered content for crawlers, so the page is `noindex` to match.
@@ -227,7 +236,8 @@ server/                 one worker. This is where the product runs.
       mirror.ts         worker → Firebase, aggregated
     lib/
       targetGuard.ts    SSRF defence — read this before touching a probe
-      ranges.ts         the four chart windows, and which table serves each
+      ranges.ts         the four chart windows, which table serves each,
+                    and DEFAULT_RANGE (24h) — the one place that decides
       plans.ts          plan limits
       readiness.ts      flags missing critical config at boot and on /healthz
     api/                Fastify routes, incl. the public status feed
@@ -236,10 +246,38 @@ server/                 one worker. This is where the product runs.
 server/test/            emulator-backed integration tests
 deploy/                 provision.sh, deploy.sh, Caddyfile, systemd units
 web/                    Next.js dashboard + public status page (static export)
+mobile/                 Flutter app — see mobile/README.md and ARCHITECTURE.md
 firestore.rules         tenancy; monitors are backend-only
-scripts/rules.test.mjs  16 emulator tests for the above
+scripts/rules.test.mjs  24 emulator tests for the above
 functions/              LEGACY — the Firebase-only build, kept for reference
 ```
+
+## The mobile app
+
+`mobile/` is a Flutter client, shipped on Google Play and distributed to iOS
+testers through TestFlight. It is a second front end over the same worker API,
+not a second product: it reads the `orgStatus` Firestore mirror for live state
+and performs **every mutation through the worker**, exactly as the web client
+does.
+
+Two contracts bind it to the rest of the system, and both fail quietly when
+broken:
+
+- **`LiveState.fromMap` must match `buildStatusDoc`** in `server/src/sync/
+  mirror.ts` key for key. A mismatch does not throw — it parses as `null` and
+  the UI renders an em dash indistinguishable from "not measured yet". Every
+  latency in the app read empty for months because the mirror wrote
+  `lastResponseTimeMs` and the model read `responseTimeMs`.
+- **`AppTheme` mirrors `web/src/app/globals.css`** token for token, asserted by
+  a test. Two clients that are meant to look like one product cannot each hold
+  their own idea of the brand colour.
+
+Analytics event names are likewise identical to the web client's, so the two
+platforms aggregate into one GA4 funnel rather than two half-populated ones.
+
+Releases are stamped from `number_of_commits()`, so a build is
+`1.0.<commit count>` — the `1.0.0+1` in `pubspec.yaml` never ships. See
+`mobile/README.md` for the design system, analytics and release lanes.
 
 ## The parts that are easy to get wrong
 
@@ -274,8 +312,8 @@ lock, and both are load-bearing.
 
 ```bash
 # Tests — no emulator, no network needed
-npm test                          # 165 server + 33 monitoring + 23 feature
-npm --prefix server test          # 165 server tests alone
+npm test                          # 436 server + 34 monitoring + 28 feature
+npm --prefix server test          # 436 server tests alone
 
 # Security rules, against the Firestore emulator
 npx firebase-tools@14 emulators:start --only firestore --project demo-uptimemonk

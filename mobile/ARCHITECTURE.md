@@ -74,20 +74,48 @@ it never writes `monitors` to Firestore directly.
 +-----------------------------------------------------------------------+
 ```
 
+**`LiveState.fromMap` is a wire contract, not a convenience.** Its keys must
+match `buildStatusDoc` in `server/src/sync/mirror.ts` exactly. A key that does
+not match never fails loudly — it parses as `null` and the UI renders an em
+dash, which looks exactly like a value that has legitimately not been measured
+yet. That is how every latency in the app read empty for months: the mirror
+writes `lastResponseTimeMs`, the model read `responseTimeMs`, and the test
+covering it supplied its own key names and so agreed with the bug.
+
+The model's test now builds its input from the mirror's field list, and asserts
+that an unknown key stays null. If you add a field to the mirror, add it in
+both places; if a field disappears from the mirror, delete it here rather than
+leaving a property that can only ever be null.
+
 ### Shared foundations (used by every layer)
 
 ```
 +-----------------------------------------------------------------------+
 |  lib/core/                                                             |
-|    theme.dart      AppTheme  - dark design system, status colors       |
+|    theme.dart      AppTheme  - Tron Legacy palette, status colors,     |
+|                    glass parameters. Hex values mirror the web's       |
+|                    globals.css token for token (asserted by a test).   |
 |    constants.dart  AppConstants - apiUrl, appUrl, timeouts, intervals  |
 |    email_verification.dart - needsEmailConfirmation() gate             |
+|    analytics.dart  GA4 events; names identical to the web client's     |
+|    external_link.dart - opens a URL in the device browser              |
 +-----------------------------------------------------------------------+
 |  lib/ui/widgets/                                                       |
 |    app_version_label.dart  - reads the build version via               |
 |                              package_info_plus; used by login+settings |
+|    probe_pulse.dart    - the app's loading state (radar sweep)         |
+|    glass_panel.dart    - frosted pane; blur, gradient fill, lit edge   |
+|    grid_floor.dart     - the Grid; perspective plane + GridBackdrop    |
+|    animated_counter.dart - numbers that travel to a new value          |
+|    stagger_in.dart     - list rows that arrive in sequence             |
+|    status_dot.dart     - a dot that breathes while the state is live   |
 +-----------------------------------------------------------------------+
 ```
+
+Every animation here reads `MediaQuery.disableAnimationsOf` and stops when
+the OS reduce-motion switch is on. That is not decoration: a looping
+animation is the precise thing that setting exists to suppress, and each of
+these widgets has a test asserting it.
 
 ### Charts and their data
 
@@ -170,12 +198,17 @@ tokens.
 | Design system      | `lib/core/theme.dart` (`AppTheme`)             |
 | Constants          | `lib/core/constants.dart` (`AppConstants`)     |
 | Email gate         | `lib/core/email_verification.dart`             |
+| Analytics          | `lib/core/analytics.dart` (`Analytics`, `AnalyticsEvents`) |
+| External links     | `lib/core/external_link.dart` (`openExternalUrl`) |
 | Models             | `lib/data/models/` (`MonitorConfig`, `LiveState`, `MonitorHistory`, `AlertContact`) |
 | API client         | `lib/data/services/api_client.dart` (`ApiClient`) |
 | Push               | `lib/data/services/push_service.dart`          |
 | Card sparkline     | `lib/ui/dashboard/widgets/hourly_bars.dart`     |
 | Detail charts      | `lib/ui/monitor_detail/widgets/status_bars_chart.dart`, `response_chart.dart` |
 | Version label      | `lib/ui/widgets/app_version_label.dart`        |
+| Glass surfaces     | `lib/ui/widgets/glass_panel.dart` (`GlassPanel`) |
+| Grid graphics      | `lib/ui/widgets/grid_floor.dart` (`GridFloor`, `GridBackdrop`) |
+| Motion primitives  | `lib/ui/widgets/animated_counter.dart`, `stagger_in.dart`, `status_dot.dart`, `probe_pulse.dart` |
 | Android shell      | `android/app/src/main/` and `MainActivity.kt`  |
 | iOS shell          | `ios/Runner/AppDelegate.swift`, `project.pbxproj` |
 | Release identity   | `ios/fastlane/Appfile`                         |
