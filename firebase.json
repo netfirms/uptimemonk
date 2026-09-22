@@ -33,10 +33,6 @@
         {
           "source": "/status/**",
           "destination": "/status/_shell.html"
-        },
-        {
-          "source": "**",
-          "destination": "/index.html"
         }
       ],
       "headers": [
