@@ -15,6 +15,8 @@ import { events } from "@/lib/analytics";
 import AuthModal from "./AuthModal";
 import LanguagePicker from "./LanguagePicker";
 import { useI18n } from "@/lib/i18n/context";
+import Reveal from "./Reveal";
+import LatencyChart from "./LatencyChart";
 
 /**
  * Public marketing landing page for UptimeMonke.
@@ -227,7 +229,7 @@ export default function Landing({
   return (
     <main className="wrap landing-page">
       {/* 1. STICKY TOP NAVIGATION BAR */}
-      <header className="topbar landing-topbar">
+      <header className="topbar landing-topbar glass">
         <div className="brand-badge">
           <span className="brand-robot">
             <img src="/mascot-128.png" alt="UptimeMonke" width={56} height={56} />
@@ -304,7 +306,7 @@ export default function Landing({
         </p>
 
         {/* Interactive Quickstart Form */}
-        <div className="hero-quickstart-container">
+        <div className="hero-quickstart-container glass-strong">
           {authError && (
             <div className="hero-auth-error" role="alert" style={{ marginBottom: "16px" }}>
               {authError}
@@ -440,11 +442,10 @@ export default function Landing({
             </button>
           </div>
 
+          {/* The pills below already say HTTP/SSL/cron — repeating them here
+              made eight feature mentions stack under the CTA. Only the trust
+              signal, which the pills do not carry, stays. */}
           <div className="hero-feature-tags">
-            <span>{t("featureIntervals")}</span>
-            <span>•</span>
-            <span>{t("featureSsl")}</span>
-            <span>•</span>
             <span>{t("featureNoCard")}</span>
           </div>
         </div>
@@ -485,6 +486,19 @@ export default function Landing({
             <span>{t("pillStatusPage")}</span>
           </div>
         </div>
+
+        {/* Who this is for. Named explicitly, because "monitoring" means
+            something different to an SRE than to someone shipping a weekend
+            app, and the page has to tell them it is for both. */}
+        <Reveal className="audience-band" delay={120} rootMargin="0px 0px 14% 0px">
+          <span className="audience-tag">{t("audienceTag")}</span>
+          <div className="audience-roles">
+            <span className="audience-role">{t("audienceDataEng")}</span>
+            <span className="audience-role">{t("audienceDevOps")}</span>
+            <span className="audience-role">{t("audienceSre")}</span>
+            <span className="audience-role">{t("audienceVibe")}</span>
+          </div>
+        </Reveal>
       </section>
 
       {/* 2.5. ONBOARDING JOURNEY SECTION */}
@@ -493,7 +507,7 @@ export default function Landing({
           <span className="section-tag">{t("onboardingJourneyTag")}</span>
           <h2>{t("onboardingJourneyTitle")}</h2>
         </div>
-        <div className="journey-cards-grid">
+        <Reveal as="div" className="journey-cards-grid" stagger>
           <div className="journey-card">
             <div className="journey-badge">1</div>
             <h3>{t("onboardingStep1")}</h3>
@@ -509,18 +523,18 @@ export default function Landing({
             <h3>{t("onboardingStep3")}</h3>
             <p>{t("onboardingStep3Desc")}</p>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* 3. INTERACTIVE "LIVE EDGE PROBES" SANDBOX */}
       <section className="demo-section" id="demo">
-        <div className="section-head">
+        <Reveal className="section-head">
           <span className="section-tag">{t("demoTag")}</span>
           <h2>{t("demoTitle")}</h2>
           <p className="dim">{t("demoDesc")}</p>
-        </div>
+        </Reveal>
 
-        <div className="preview-box preview-box-interactive">
+        <div className="preview-box preview-box-interactive glass">
           {/* Tab bar inside preview */}
           <div className="preview-nav-tabs">
             <button
@@ -824,16 +838,19 @@ export default function Landing({
               </>
             )}
           </div>
+          <div className="preview-chart-slot">
+            <LatencyChart title={t("demoChartTitle")} />
+          </div>
         </div>
       </section>
 
       {/* 4. MULTI-CHANNEL ALERT SHOWCASE */}
       <section className="alerts-section" id="alerts">
-        <div className="section-head">
+        <Reveal className="section-head">
           <span className="section-tag">{t("alertsTag")}</span>
           <h2>{t("alertsTitle")}</h2>
           <p className="dim">{t("alertsDesc")}</p>
-        </div>
+        </Reveal>
 
         {/* Channel Selector */}
         <div className="channel-tabs">
@@ -1008,11 +1025,11 @@ export default function Landing({
 
       {/* 5. WHY UPTIMEMONKE / FEATURES GRID */}
       <section className="features-grid-section" id="features">
-        <div className="section-head">
+        <Reveal className="section-head">
           <span className="section-tag">{t("whyTag")}</span>
           <h2>{t("whyTitle")}</h2>
           <p className="dim">{t("whyDesc")}</p>
-        </div>
+        </Reveal>
 
         <div className="why-grid">
           <div className="why-card">
@@ -1070,13 +1087,13 @@ export default function Landing({
 
       {/* 6. TRANSPARENT CAPACITY PRICING */}
       <section className="donate-strip" id="pricing">
-        <div className="section-head">
+        <Reveal className="section-head">
           <span className="section-tag">{t("pricingTag")}</span>
           <h2>{t("pricingTitle")}</h2>
           <p className="donate-lede">
             {t("pricingLede")}
           </p>
-        </div>
+        </Reveal>
 
         <div className="donate-grid">
           <div className="donate-card">
@@ -1127,13 +1144,13 @@ export default function Landing({
 
       {/* 7. SEMANTIC ACCESSIBLE FAQ ACCORDION */}
       <section className="faq-section" id="faq">
-        <div className="section-head">
+        <Reveal className="section-head">
           <span className="section-tag">{t("faqTag")}</span>
           <h2>{t("faqTitle")}</h2>
           <p className="dim">{t("faqDesc")}</p>
-        </div>
+        </Reveal>
 
-        <div className="faq-accordion-wrap">
+        <div className="faq-accordion-wrap glass">
           <details name="faq" className="faq-item" open>
             <summary className="faq-summary">
               <span>{t("faq1Q")}</span>
@@ -1187,7 +1204,7 @@ export default function Landing({
       </section>
 
       {/* 8. FRICTIONLESS BOTTOM CONVERSION BANNER */}
-      <section className="cta-banner">
+      <section className="cta-banner glass-strong">
         <div className="cta-banner-content">
           <div className="cta-tag">{t("ctaTag")}</div>
           <h2>{t("ctaTitle")}</h2>

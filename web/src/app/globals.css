@@ -33,7 +33,128 @@
   --maintenance: #f59e0b;
   --maintenance-bg: rgba(245, 158, 11, 0.12);
 
+  /* --- Glass -------------------------------------------------------------
+     One set of tokens instead of the eleven ad-hoc `backdrop-filter` values
+     this file grew. Glass reads as glass only when the blur, the translucent
+     fill, the hairline top edge and the shadow move together — tune them here
+     and every surface stays in the same material. */
+  --glass-bg: rgba(255, 255, 255, 0.045);
+  --glass-bg-strong: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.11);
+  --glass-border-lit: rgba(255, 255, 255, 0.2);
+  --glass-blur: 18px;
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.36);
+  --glass-shadow-lg: 0 18px 54px rgba(0, 0, 0, 0.45);
+
+  /* --- Motion ------------------------------------------------------------ */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --reveal-distance: 18px;
+
   color-scheme: dark;
+}
+
+/* =======================================================================
+   GLASS
+   =======================================================================
+   `.glass` is the material; the `::before` is the specular top edge that
+   sells it. Without that highlight a blurred panel just looks grey. */
+.glass,
+.glass-strong {
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-strong {
+  background: var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow-lg);
+}
+
+.glass::before,
+.glass-strong::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--glass-border-lit) 18%,
+    var(--glass-border-lit) 82%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* =======================================================================
+   SCROLL REVEAL
+   =======================================================================
+   Driven by the `Reveal` component's IntersectionObserver, which adds
+   `.is-visible`. Elements must be readable if the observer never runs — a
+   page that stays invisible when JS fails is worse than one that never
+   animated — so the hidden state is opacity only down to 0, never
+   `visibility: hidden`, and `.no-js` opts out entirely. */
+.js-ready .reveal {
+  opacity: 0;
+  transform: translate3d(0, var(--reveal-distance), 0);
+  transition:
+    opacity 0.62s var(--ease-out),
+    transform 0.62s var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Children stagger without needing a delay hand-written per element. */
+.js-ready .reveal-stagger > * {
+  opacity: 0;
+  transform: translate3d(0, var(--reveal-distance), 0);
+  transition:
+    opacity 0.55s var(--ease-out),
+    transform 0.55s var(--ease-out);
+}
+
+.reveal-stagger.is-visible > * {
+  opacity: 1;
+  transform: none;
+}
+
+.reveal-stagger.is-visible > *:nth-child(1) { transition-delay: 0ms; }
+.reveal-stagger.is-visible > *:nth-child(2) { transition-delay: 70ms; }
+.reveal-stagger.is-visible > *:nth-child(3) { transition-delay: 140ms; }
+.reveal-stagger.is-visible > *:nth-child(4) { transition-delay: 210ms; }
+.reveal-stagger.is-visible > *:nth-child(5) { transition-delay: 280ms; }
+.reveal-stagger.is-visible > *:nth-child(6) { transition-delay: 350ms; }
+
+/* =======================================================================
+   REDUCED MOTION
+   =======================================================================
+   This file had no such block, and adding motion without one would make the
+   page actively unpleasant for people who ask their OS to stop it. Anything
+   revealed by motion must end up visible, not merely un-animated. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .reveal,
+  .reveal-stagger > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 
 * {
@@ -4701,4 +4822,221 @@ html[lang="my"] {
   background: rgba(99, 102, 241, 0.15);
   color: #818cf8;
   border: 1px solid rgba(99, 102, 241, 0.35);
+}
+
+/* =======================================================================
+   SCREEN-READER ONLY
+   ======================================================================= */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* =======================================================================
+   LATENCY CHART
+   ======================================================================= */
+.latency-chart {
+  position: relative;
+  margin: 0;
+  padding: 16px 18px 10px;
+  border-radius: 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+}
+
+.latency-chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+
+.latency-chart-title {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+
+.latency-chart-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+/* The headline number wears text tokens, not the series colour — only the
+   mark in the plot carries the hue. */
+.latency-chart-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.latency-chart-stat strong {
+  font-size: 1.32rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1;
+}
+
+.latency-chart-stat span {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.latency-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.latency-chart-tick {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  fill: var(--text-dim);
+}
+
+/* The line draws itself once on entry. `stroke-dasharray` on a path of
+   unknown length needs a value larger than the path — 2000 covers this
+   viewBox comfortably. */
+.latency-chart-line {
+  /* Unit length, set via the path's own `pathLength` attribute. */
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: lcDraw 1.4s var(--ease-out) forwards;
+}
+
+.latency-chart-area {
+  opacity: 0;
+  animation: lcFadeArea 0.9s var(--ease-out) 0.5s forwards;
+}
+
+@keyframes lcDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* The area fades in under the line rather than with it, so the line reads as
+   drawing the shape rather than the shape appearing whole. */
+
+@keyframes lcFadeArea {
+  to { opacity: 1; }
+}
+
+.latency-chart-tip {
+  position: absolute;
+  top: 6px;
+  transform: translateX(-50%);
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: rgba(8, 14, 22, 0.94);
+  border: 1px solid var(--glass-border-lit);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  white-space: nowrap;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.latency-chart-tip strong {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.latency-chart-tip span {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+/* A chart that animates on every scroll-by is a distraction, and the draw-in
+   is decoration rather than information — so it simply arrives complete. */
+@media (prefers-reduced-motion: reduce) {
+  .latency-chart-line {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+  .latency-chart-area {
+    opacity: 1;
+    animation: none;
+  }
+}
+
+/* =======================================================================
+   AUDIENCE BAND
+   =======================================================================
+   Four roles, named plainly. Glass chips rather than cards: this is a
+   qualifier under the CTA, not a feature section, and it should not compete
+   with the buttons above it. */
+.audience-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 34px auto 0;
+  max-width: 720px;
+}
+
+.audience-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.audience-roles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.audience-role {
+  padding: 7px 15px;
+  border-radius: 999px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  transition:
+    transform 0.22s var(--ease-out),
+    border-color 0.22s var(--ease-out),
+    background 0.22s var(--ease-out);
+}
+
+.audience-role:hover {
+  transform: translateY(-2px);
+  border-color: rgba(var(--primary-rgb), 0.5);
+  background: rgba(var(--primary-rgb), 0.1);
+}
+
+.preview-chart-slot {
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--glass-border);
+}
+
+@media (max-width: 640px) {
+  .audience-band { margin-top: 26px; }
+  .audience-role { font-size: 0.78rem; padding: 6px 12px; }
+  .preview-chart-slot { padding: 10px 10px 12px; }
+  .latency-chart { padding: 12px 12px 8px; }
 }

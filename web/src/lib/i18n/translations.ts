@@ -22,6 +22,12 @@ export interface Translations {
   heroStartBtn: string;
   continueWithGoogle: string;
   continueWithGithub: string;
+  audienceTag: string;
+  audienceDataEng: string;
+  audienceDevOps: string;
+  audienceSre: string;
+  audienceVibe: string;
+  demoChartTitle: string;
   signUpWithEmail: string;
   heroConnecting: string;
   featureIntervals: string;
@@ -350,6 +356,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroStartBtn: "Start Monitoring",
     continueWithGoogle: "Continue with Google",
     continueWithGithub: "Continue with GitHub",
+    audienceTag: "BUILT FOR",
+    audienceDataEng: "Data engineers",
+    audienceDevOps: "DevOps",
+    audienceSre: "SREs",
+    audienceVibe: "Vibe coders",
+    demoChartTitle: "Response time",
     signUpWithEmail: "Sign up with Email",
     heroConnecting: "Connecting…",
     featureIntervals: "⚡ 60s Check Intervals",
@@ -689,6 +701,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroStartBtn: "开始监控",
     continueWithGoogle: "使用 Google 继续",
     continueWithGithub: "使用 GitHub 继续",
+    audienceTag: "专为以下人群打造",
+    audienceDataEng: "数据工程师",
+    audienceDevOps: "DevOps",
+    audienceSre: "SRE",
+    audienceVibe: "Vibe Coder",
+    demoChartTitle: "响应时间",
     signUpWithEmail: "使用邮箱注册",
     heroConnecting: "连接中…",
     featureIntervals: "⚡ 60秒检测间隔",
@@ -1025,6 +1043,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroStartBtn: "監視を開始",
     continueWithGoogle: "Googleで続ける",
     continueWithGithub: "GitHubで続ける",
+    audienceTag: "対象ユーザー",
+    audienceDataEng: "データエンジニア",
+    audienceDevOps: "DevOps",
+    audienceSre: "SRE",
+    audienceVibe: "バイブコーダー",
+    demoChartTitle: "応答時間",
     signUpWithEmail: "メールアドレスで登録",
     heroConnecting: "接続中…",
     featureIntervals: "⚡ 60秒チェック間隔",
@@ -1344,6 +1368,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroStartBtn: "모니터링 시작",
     continueWithGoogle: "Google 계정으로 계속하기",
     continueWithGithub: "GitHub 계정으로 계속하기",
+    audienceTag: "사용 대상",
+    audienceDataEng: "데이터 엔지니어",
+    audienceDevOps: "DevOps",
+    audienceSre: "SRE",
+    audienceVibe: "바이브 코더",
+    demoChartTitle: "응답 시간",
     signUpWithEmail: "이메일로 회원가입",
     heroConnecting: "연결 중…",
     featureIntervals: "⚡ 60초 점검 주기",
@@ -1664,6 +1694,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroStartBtn: "Mula Memantau",
     continueWithGoogle: "Teruskan dengan Google",
     continueWithGithub: "Teruskan dengan GitHub",
+    audienceTag: "DIBINA UNTUK",
+    audienceDataEng: "Jurutera data",
+    audienceDevOps: "DevOps",
+    audienceSre: "SRE",
+    audienceVibe: "Vibe coder",
+    demoChartTitle: "Masa respons",
     signUpWithEmail: "Daftar dengan Emel",
     heroConnecting: "Menyambung…",
     featureIntervals: "⚡ Selang Semakan 60s",
@@ -1984,6 +2020,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroStartBtn: "Mulai Memantau",
     continueWithGoogle: "Lanjutkan dengan Google",
     continueWithGithub: "Lanjutkan dengan GitHub",
+    audienceTag: "DIBUAT UNTUK",
+    audienceDataEng: "Data engineer",
+    audienceDevOps: "DevOps",
+    audienceSre: "SRE",
+    audienceVibe: "Vibe coder",
+    demoChartTitle: "Waktu respons",
     signUpWithEmail: "Daftar dengan Email",
     heroConnecting: "Menghubungkan…",
     featureIntervals: "⚡ Interval Pengecekan 60d",
@@ -2304,6 +2346,12 @@ export const TRANSLATIONS: Record<SupportedLocale, Translations> = {
     heroStartBtn: "စောင့်ကြည့်စစ်ဆေးရန်",
     continueWithGoogle: "Google ဖြင့် ဆက်လက်လုပ်ဆောင်ရန်",
     continueWithGithub: "GitHub ဖြင့် ဆက်လက်လုပ်ဆောင်ရန်",
+    audienceTag: "အတွက် ဖန်တီးထားသည်",
+    audienceDataEng: "ဒေတာ အင်ဂျင်နီယာ",
+    audienceDevOps: "DevOps",
+    audienceSre: "SRE",
+    audienceVibe: "Vibe coder",
+    demoChartTitle: "တုံ့ပြန်ချိန်",
     signUpWithEmail: "အီးမေးလ်ဖြင့် အကောင့်ဖွင့်ရန်",
     heroConnecting: "ချိတ်ဆက်နေသည်…",
     featureIntervals: "⚡ ၆၀ စက္ကန့် စစ်ဆေးမှုနှုန်း",
