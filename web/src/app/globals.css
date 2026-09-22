@@ -1081,8 +1081,16 @@ button.btn-outline-red {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  /* Row gap is larger than the column gap on purpose: these pills wrap to a
+     second line at most widths, and an 8px row gap left the two rows reading
+     as one crowded block. */
+  gap: 10px 8px;
   flex-wrap: wrap;
+  /* Matches the quickstart card's own 28px top margin, so the hero keeps one
+     rhythm. Without it the strip sat flush against "No Credit Card Required" —
+     the card ends with `margin: 28px auto 0`, so neither side contributed any
+     separation and the two collided at 0px. */
+  margin-top: 28px;
   margin-bottom: 24px;
 }
 
@@ -3576,6 +3584,11 @@ button.workspace-pill:hover {
 .hero-quickstart-bar {
   display: flex;
   align-items: center;
+  /* The input flexes to fill whatever the button leaves, so at narrow widths
+     its right edge lands exactly on the button's left edge and the URL is
+     clipped flush against it with nothing between them. This gap is the
+     separation the layout never had. */
+  gap: 10px;
   background: rgba(18, 26, 36, 0.88);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(59, 214, 113, 0.35);
@@ -3592,7 +3605,8 @@ button.workspace-pill:hover {
 
 .hero-quickstart-icon {
   font-size: 1.25rem;
-  margin-right: 10px;
+  /* Spacing comes from the bar's flex `gap` now. Keeping margin-right here as
+     well gave the icon 20px while the button got 10px. */
   user-select: none;
 }
 
