@@ -1,6 +1,6 @@
 import { test, describe, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { sendEmail, type AlertSecrets, type AlertPayload } from "./channels.js";
+import { sendEmail, sendPlainEmail, type AlertSecrets, type AlertPayload } from "./channels.js";
 
 /**
  * Email transport selection.
@@ -109,5 +109,89 @@ describe("the Mailgun request", () => {
         return true;
       }
     );
+  });
+});
+
+/**
+ * The generic sender.
+ *
+ * Extracted so not everything this service mails has to look like an
+ * incident. These pin that an arbitrary subject survives to the wire — the
+ * bug being guarded against is a signup notice going out titled "DOWN:".
+ */
+describe("sending a plain email", () => {
+  let calls: Array<{ url: string; init: RequestInit }> = [];
+  const realFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    calls = [];
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
+    }) as unknown as typeof fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  const mailgun = {
+    mailgunKey: "key-abc",
+    mailgunDomain: "mg.example.com",
+    mailgunBaseUrl: "https://api.mailgun.net",
+    from: "ops@example.com",
+  };
+
+  test("the caller's subject and body reach Mailgun unchanged", async () => {
+    await sendPlainEmail("admin@example.com", "New signup: a@b.com", "body text", mailgun);
+
+    assert.equal(calls.length, 1);
+    const body = new URLSearchParams(String(calls[0].init.body));
+    assert.equal(body.get("subject"), "New signup: a@b.com");
+    assert.equal(body.get("text"), "body text");
+    assert.equal(body.get("to"), "admin@example.com");
+    assert.equal(body.get("from"), "ops@example.com");
+  });
+
+  test("it is form-encoded, not JSON — Mailgun rejects a JSON body", async () => {
+    await sendPlainEmail("a@b.com", "s", "t", mailgun);
+    const headers = calls[0].init.headers as Record<string, string>;
+    assert.equal(headers["content-type"], "application/x-www-form-urlencoded");
+  });
+
+  test("the key never appears in the error text", async () => {
+    // This string reaches the logs and alert_outbox.last_error.
+    globalThis.fetch = (async () => ({
+      ok: false,
+      status: 401,
+      text: async () => "Forbidden",
+    })) as unknown as typeof fetch;
+
+    await assert.rejects(
+      () => sendPlainEmail("a@b.com", "s", "t", mailgun),
+      (err: Error) => !err.message.includes("key-abc") && /401/.test(err.message)
+    );
+  });
+
+  test("Resend is used when Mailgun has no key", async () => {
+    await sendPlainEmail("a@b.com", "subj", "text", { resendKey: "re_x", from: "ops@example.com" });
+    assert.match(calls[0].url, /api\.resend\.com/);
+    const sent = JSON.parse(String(calls[0].init.body));
+    assert.equal(sent.subject, "subj");
+    assert.equal(sent.text, "text");
+  });
+
+  test("no provider configured is a loud failure, not a silent drop", async () => {
+    await assert.rejects(
+      () => sendPlainEmail("a@b.com", "s", "t", {}),
+      /No email provider configured/
+    );
+    assert.equal(calls.length, 0);
+  });
+
+  test("an alert still gets its incident-derived subject", async () => {
+    // sendEmail is now a wrapper, so this guards the wrapper still wraps.
+    await sendEmail("a@b.com", payload, mailgun);
+    const body = new URLSearchParams(String(calls[0].init.body));
+    assert.match(String(body.get("subject")), /Checkout API/);
   });
 });

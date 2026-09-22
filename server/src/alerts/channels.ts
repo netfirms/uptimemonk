@@ -78,88 +78,79 @@ async function postJsonToUserUrl(
   return postJson(url, body, headers);
 }
 
-/** Resend — swap for SendGrid/Postmark by changing this one function. */
-/**
- * Mailgun's send endpoint.
- *
- * Form-encoded, not JSON — the v3 messages API does not accept a JSON body,
- * and posting one gets a 400 that reads like an auth failure. Auth is HTTP
- * Basic with the literal username `api` and the private key as the password.
- */
-export async function sendEmailMailgun(
-  to: string,
-  p: AlertPayload,
-  opts: { apiKey: string; domain: string; baseUrl: string; from: string }
-): Promise<void> {
-  const form = new URLSearchParams({
-    from: opts.from,
-    to,
-    subject: subjectFor(p),
-    text: bodyFor(p),
-  });
+export interface EmailSecrets {
+  mailgunKey?: string;
+  mailgunDomain?: string;
+  mailgunBaseUrl?: string;
+  from?: string;
+  resendKey?: string;
+}
 
-  const res = await fetch(
-    `${opts.baseUrl.replace(/\/$/, "")}/v3/${encodeURIComponent(opts.domain)}/messages`,
-    {
+/**
+ * Send an arbitrary subject and body through whichever provider is configured.
+ *
+ * Extracted from `sendEmail` because not everything this service mails is an
+ * alert. `sendEmail` derives its subject from an incident, so anything else
+ * routed through it arrives looking like an outage. `contacts.ts` avoided
+ * that by inlining its own copy of the Mailgun call — a second copy of the
+ * form-encoding and the auth header. This is the one place that knows how to
+ * talk to a provider.
+ *
+ * Mailgun wins when it has a key. Neither being configured is a clear error
+ * rather than a silent no-op — mail that is not sent must fail loudly enough
+ * to land in the caller's error path.
+ */
+export async function sendPlainEmail(
+  to: string,
+  subject: string,
+  text: string,
+  secrets: EmailSecrets
+): Promise<void> {
+  if (secrets.mailgunKey) {
+    const domain = secrets.mailgunDomain || "";
+    const baseUrl = (secrets.mailgunBaseUrl || "https://api.mailgun.net").replace(/\/$/, "");
+    const res = await fetch(`${baseUrl}/v3/${encodeURIComponent(domain)}/messages`, {
       method: "POST",
       headers: {
-        authorization: `Basic ${Buffer.from(`api:${opts.apiKey}`).toString("base64")}`,
+        authorization: `Basic ${Buffer.from(`api:${secrets.mailgunKey}`).toString("base64")}`,
         "content-type": "application/x-www-form-urlencoded",
         "user-agent": USER_AGENT,
       },
-      body: form,
+      body: new URLSearchParams({
+        from: secrets.from || ALERT_FROM_EMAIL,
+        to,
+        subject,
+        text,
+      }),
       signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      // Never include the key: this string reaches logs and, for alerts,
+      // `alert_outbox.last_error`.
+      throw new Error(`Mailgun responded ${res.status}: ${(await res.text()).slice(0, 200)}`);
     }
-  );
-
-  if (!res.ok) {
-    const detail = (await res.text()).slice(0, 200);
-    // Never include the key: this string ends up in `alert_outbox.last_error`
-    // and in the logs.
-    throw new Error(`Mailgun responded ${res.status}: ${detail}`);
+    return;
   }
+
+  if (secrets.resendKey) {
+    await postJson(
+      "https://api.resend.com/emails",
+      { from: secrets.from || ALERT_FROM_EMAIL, to, subject, text },
+      { authorization: `Bearer ${secrets.resendKey}` }
+    );
+    return;
+  }
+
+  throw new Error("No email provider configured (set MAILGUN_API_KEY or RESEND_API_KEY)");
 }
 
-export async function sendEmailResend(
-  to: string,
-  p: AlertPayload,
-  apiKey: string
-): Promise<void> {
-  await postJson(
-    "https://api.resend.com/emails",
-    {
-      from: ALERT_FROM_EMAIL,
-      to,
-      subject: subjectFor(p),
-      text: bodyFor(p),
-    },
-    { authorization: `Bearer ${apiKey}` }
-  );
-}
-
-/**
- * Send an alert email through whichever provider is configured.
- *
- * Mailgun wins when it has a key. Neither being configured is a clear error
- * rather than a silent no-op — an alert that is not sent must fail loudly
- * enough to land in the outbox's `last_error`.
- */
+/** Send an alert email. Subject and body come from the incident. */
 export async function sendEmail(
   to: string,
   p: AlertPayload,
-  secrets: { mailgunKey?: string; mailgunDomain?: string; mailgunBaseUrl?: string;
-             from?: string; resendKey?: string }
+  secrets: EmailSecrets
 ): Promise<void> {
-  if (secrets.mailgunKey) {
-    return sendEmailMailgun(to, p, {
-      apiKey: secrets.mailgunKey,
-      domain: secrets.mailgunDomain || "",
-      baseUrl: secrets.mailgunBaseUrl || "https://api.mailgun.net",
-      from: secrets.from || ALERT_FROM_EMAIL,
-    });
-  }
-  if (secrets.resendKey) return sendEmailResend(to, p, secrets.resendKey);
-  throw new Error("No email provider configured (set MAILGUN_API_KEY or RESEND_API_KEY)");
+  return sendPlainEmail(to, subjectFor(p), bodyFor(p), secrets);
 }
 
 export async function sendSlack(webhookUrl: string, p: AlertPayload): Promise<void> {

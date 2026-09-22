@@ -10,7 +10,17 @@ import { handleVerifyRequest, signatureMatches } from "../probe/verify.js";
 import { requireAuth, needsEmailConfirmation } from "./auth.js";
 import { log } from "../lib/log.js";
 import { verifyRecaptcha, botGateApplies } from "../lib/recaptcha.js";
-import { SECRET_CONFIG_KEYS } from "../config.js";
+import {
+  SECRET_CONFIG_KEYS,
+  SIGNUP_NOTIFY_EMAIL,
+  APP_URL,
+  ALERT_FROM_EMAIL,
+  MAILGUN_API_KEY,
+  MAILGUN_DOMAIN,
+  MAILGUN_BASE_URL,
+  RESEND_API_KEY,
+} from "../config.js";
+import { sendPlainEmail } from "../alerts/channels.js";
 import { requireAdmin } from "./auth.js";
 import { readinessSummary } from "../lib/readiness.js";
 import { API_VERSION, REGION, VERIFY_SECRET, getConfigMetadata } from "../config.js";
@@ -322,6 +332,13 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
     await auth().setCustomUserClaims(decoded.uid, { orgId: orgRef.id, role: "owner" });
     log.info({ uid: decoded.uid, orgId: orgRef.id }, "workspace bootstrapped");
 
+    void notifyOperatorOfSignup({
+      uid: decoded.uid,
+      email: decoded.email ?? null,
+      orgId: orgRef.id,
+      provider: decoded.firebase?.sign_in_provider ?? "unknown",
+    });
+
     return reply.code(201).send({ orgId: orgRef.id, created: true });
   });
 
@@ -333,6 +350,58 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
    * server clamped it to the plan floor, and the value silently came back
    * different from what the user picked — which reads as "saving is broken".
    */
+  /**
+   * Tell the operator a workspace was created.
+   *
+   * Deliberately not awaited by the caller, and it swallows everything it can
+   * go wrong with. This runs at the end of the one request standing between a
+   * new customer and a working account — a slow mail provider must not add
+   * seconds to their signup, and a misconfigured one must not fail it. If the
+   * notice is lost, the console still lists the account.
+   *
+   * Off unless `signupNotifyEmail` is set. An empty recipient is the switch,
+   * rather than a separate boolean that can disagree with it.
+   */
+  async function notifyOperatorOfSignup(info: {
+    uid: string;
+    email: string | null;
+    orgId: string;
+    provider: string;
+  }): Promise<void> {
+    const to = SIGNUP_NOTIFY_EMAIL.trim();
+    if (!to) return;
+
+    try {
+      await sendPlainEmail(
+        to,
+        `New UptimeMonke signup: ${info.email ?? info.uid}`,
+        [
+          `A workspace was just created.`,
+          ``,
+          `Account:   ${info.email ?? "(no address on the token)"}`,
+          `Sign-in:   ${info.provider}`,
+          `Workspace: ${info.orgId}`,
+          `User id:   ${info.uid}`,
+          `When:      ${new Date().toISOString()}`,
+          ``,
+          `Console: ${APP_URL.replace(/\/$/, "")}`,
+        ].join("\n"),
+        {
+          mailgunKey: MAILGUN_API_KEY,
+          mailgunDomain: MAILGUN_DOMAIN,
+          mailgunBaseUrl: MAILGUN_BASE_URL,
+          from: ALERT_FROM_EMAIL,
+          resendKey: RESEND_API_KEY,
+        }
+      );
+      log.info({ orgId: info.orgId, to }, "signup notice sent");
+    } catch (err) {
+      // Warn, never throw: the customer's account is already created and
+      // working, and their signup must not fail over our notification.
+      log.warn({ err, orgId: info.orgId }, "signup notice could not be sent");
+    }
+  }
+
   app.get("/v1/me", { preHandler: requireAuth() }, async (req) => {
     const plan = getOrgPlan(req.user!.orgId) as Plan;
     const limits = limitsFor(plan);

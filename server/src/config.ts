@@ -122,6 +122,9 @@ export interface AppConfig {
   userAgent: string;
   heartbeatUrl: string;
 
+  /** Where to mail new-signup notices. Empty means the notice is off. */
+  signupNotifyEmail: string;
+
   /** Capacity knobs. See LIMIT_BOUNDS — these are clamped, not trusted. */
   minIntervalSecondsFree: number;
   minIntervalSecondsDonor: number;
@@ -160,6 +163,7 @@ const envDefaults: AppConfig = {
   incidentRetentionDays: int("INCIDENT_RETENTION_DAYS", 365),
   userAgent: optional("USER_AGENT", "UptimeMonke/1.0 (+https://uptimemonke.com/bot)"),
   heartbeatUrl: process.env.UPTIMEMONK_HEARTBEAT_URL ?? "",
+  signupNotifyEmail: process.env.SIGNUP_NOTIFY_EMAIL ?? "",
 
   minIntervalSecondsFree: boundedInt("MIN_INTERVAL_SECONDS_FREE", 60, "minIntervalSecondsFree"),
   minIntervalSecondsDonor: boundedInt("MIN_INTERVAL_SECONDS_DONOR", 5, "minIntervalSecondsDonor"),
@@ -206,6 +210,7 @@ export let RETENTION_DAYS = envDefaults.retentionDays;
 export let INCIDENT_RETENTION_DAYS = envDefaults.incidentRetentionDays;
 export let USER_AGENT = envDefaults.userAgent;
 export let HEARTBEAT_URL = envDefaults.heartbeatUrl;
+export let SIGNUP_NOTIFY_EMAIL = envDefaults.signupNotifyEmail;
 
 /**
  * `export let` on purpose: ES module bindings are live, so every importer sees
@@ -284,6 +289,9 @@ export function updateDynamicConfig(data?: Record<string, unknown> | null): void
     }
     if (typeof data.heartbeatUrl === "string") {
       activeOverrides.heartbeatUrl = data.heartbeatUrl.trim();
+    }
+    if (typeof data.signupNotifyEmail === "string") {
+      activeOverrides.signupNotifyEmail = data.signupNotifyEmail.trim();
     }
 
     // Clamped on the way in, so a typo in the console cannot set a 1-second
@@ -377,6 +385,7 @@ export function updateDynamicConfig(data?: Record<string, unknown> | null): void
   INCIDENT_RETENTION_DAYS = activeOverrides.incidentRetentionDays ?? envDefaults.incidentRetentionDays;
   USER_AGENT = activeOverrides.userAgent ?? envDefaults.userAgent;
   HEARTBEAT_URL = activeOverrides.heartbeatUrl ?? envDefaults.heartbeatUrl;
+  SIGNUP_NOTIFY_EMAIL = activeOverrides.signupNotifyEmail ?? envDefaults.signupNotifyEmail;
 
   MIN_INTERVAL_SECONDS_FREE = activeOverrides.minIntervalSecondsFree ?? envDefaults.minIntervalSecondsFree;
   MIN_INTERVAL_SECONDS_DONOR = activeOverrides.minIntervalSecondsDonor ?? envDefaults.minIntervalSecondsDonor;
@@ -471,6 +480,7 @@ export function getEffectiveConfig(): AppConfig {
     incidentRetentionDays: INCIDENT_RETENTION_DAYS,
     userAgent: USER_AGENT,
     heartbeatUrl: HEARTBEAT_URL,
+    signupNotifyEmail: SIGNUP_NOTIFY_EMAIL,
 
     minIntervalSecondsFree: MIN_INTERVAL_SECONDS_FREE,
     minIntervalSecondsDonor: MIN_INTERVAL_SECONDS_DONOR,

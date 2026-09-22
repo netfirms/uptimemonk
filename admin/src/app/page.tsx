@@ -153,6 +153,7 @@ export interface SystemConfigState {
   incidentRetentionDays: string;
   userAgent: string;
   heartbeatUrl: string;
+  signupNotifyEmail: string;
 
   minIntervalSecondsFree: string;
   minIntervalSecondsDonor: string;
@@ -193,6 +194,7 @@ const CONFIG_DEFAULTS: SystemConfigState = {
   incidentRetentionDays: "365",
   userAgent: "UptimeMonke/1.0 (+https://uptimemonke.com/bot)",
   heartbeatUrl: "",
+  signupNotifyEmail: "",
 
   minIntervalSecondsFree: "60",
   minIntervalSecondsDonor: "5",
@@ -656,6 +658,7 @@ export default function AdminPage() {
             retentionDays: data.retentionDays != null ? String(data.retentionDays) : envDefaults.retentionDays,
             incidentRetentionDays: data.incidentRetentionDays != null ? String(data.incidentRetentionDays) : envDefaults.incidentRetentionDays,
             userAgent: data.userAgent != null ? String(data.userAgent) : envDefaults.userAgent,
+            signupNotifyEmail: data.signupNotifyEmail != null ? String(data.signupNotifyEmail) : envDefaults.signupNotifyEmail,
             minIntervalSecondsFree: data.minIntervalSecondsFree != null ? String(data.minIntervalSecondsFree) : envDefaults.minIntervalSecondsFree,
             minIntervalSecondsDonor: data.minIntervalSecondsDonor != null ? String(data.minIntervalSecondsDonor) : envDefaults.minIntervalSecondsDonor,
             maxMonitorsFree: data.maxMonitorsFree != null ? String(data.maxMonitorsFree) : envDefaults.maxMonitorsFree,
@@ -727,6 +730,7 @@ export default function AdminPage() {
           retentionDays: String(defaults.retentionDays ?? CONFIG_DEFAULTS.retentionDays),
           incidentRetentionDays: String(defaults.incidentRetentionDays ?? CONFIG_DEFAULTS.incidentRetentionDays),
           userAgent: String(defaults.userAgent ?? CONFIG_DEFAULTS.userAgent),
+          signupNotifyEmail: String(defaults.signupNotifyEmail ?? CONFIG_DEFAULTS.signupNotifyEmail),
           minIntervalSecondsFree: String(defaults.minIntervalSecondsFree ?? CONFIG_DEFAULTS.minIntervalSecondsFree),
           minIntervalSecondsDonor: String(defaults.minIntervalSecondsDonor ?? CONFIG_DEFAULTS.minIntervalSecondsDonor),
           maxMonitorsFree: String(defaults.maxMonitorsFree ?? CONFIG_DEFAULTS.maxMonitorsFree),
@@ -784,6 +788,7 @@ export default function AdminPage() {
         incidentRetentionDays: Number(configForm.incidentRetentionDays) || 365,
         userAgent: configForm.userAgent.trim(),
         heartbeatUrl: configForm.heartbeatUrl.trim(),
+        signupNotifyEmail: configForm.signupNotifyEmail.trim(),
 
         // The worker clamps these on the way in — see LIMIT_BOUNDS in
         // config.ts. These fallbacks only cover an empty field.
@@ -2534,6 +2539,36 @@ export default function AdminPage() {
             </div>
 
             <div className="config-grid">
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Notify On New Signup (SIGNUP_NOTIFY_EMAIL)</label>
+                  <span className={`config-badge ${isFieldCustom("signupNotifyEmail") ? "custom" : "default"}`}>
+                    {isFieldCustom("signupNotifyEmail") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="email"
+                  className="config-input"
+                  value={configForm.signupNotifyEmail}
+                  onChange={(e) => setConfigForm({ ...configForm, signupNotifyEmail: e.target.value })}
+                  placeholder="leave blank to send nothing"
+                />
+                <span className="config-hint">
+                  Mailed once per workspace created, with the account, sign-in provider and
+                  workspace id. <strong>Blank turns it off</strong> — an empty recipient is the
+                  switch, rather than a separate toggle that can disagree with it. Sent after the
+                  account already exists and never awaited, so a slow or broken mail provider
+                  cannot delay or fail somebody&apos;s signup.
+                  {configForm.signupNotifyEmail.trim() !== "" &&
+                    !configForm.mailgunApiKey &&
+                    !configForm.resendApiKey && (
+                      <strong style={{ color: "var(--amber, #f59e0b)", display: "block", marginTop: "4px" }}>
+                        No mail provider is configured, so nothing will actually send.
+                      </strong>
+                    )}
+                </span>
+              </div>
+
               {/* Capacity limits. Grouped and labelled with their bounds,
                   because these are the only fields here that change how much
                   work the fleet accepts — the rest are plumbing. */}
