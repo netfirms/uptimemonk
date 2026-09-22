@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'core/auth_routing.dart';
 import 'core/theme.dart';
 import 'data/services/push_service.dart';
 import 'viewmodels/auth_viewmodel.dart';
 import 'viewmodels/dashboard_viewmodel.dart';
 import 'ui/auth/login_screen.dart';
 import 'ui/auth/verify_email_screen.dart';
+import 'ui/auth/workspace_unavailable_screen.dart';
 import 'ui/dashboard/dashboard_screen.dart';
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -50,31 +52,39 @@ class UptimeMonkeApp extends StatelessWidget {
   }
 
   Widget _resolveHome(AuthViewModel authVm) {
-    if (authVm.status == AuthStatus.initial) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(color: AppTheme.primaryEmerald),
-        ),
-      );
-    }
+    // The decision lives in `resolveDestination` so it can be tested without
+    // Firebase. Leaving a second copy of it here is how the two drift.
+    final destination = resolveDestination(
+      initial: authVm.status == AuthStatus.initial,
+      signedIn: authVm.user != null,
+      needsEmailVerification: authVm.needsEmailVerification,
+      orgId: authVm.orgId,
+      workspaceLookupFailed: authVm.workspaceLookupFailed,
+    );
 
-    // Signed in, but a password account with an unconfirmed address. The API
-    // refuses these tokens, so without this screen the user lands back on the
-    // login form with nothing explaining why. Checked before the dashboard,
-    // because `orgId` is deliberately left null while unverified.
-    if (authVm.status == AuthStatus.authenticated &&
-        authVm.needsEmailVerification) {
-      return const VerifyEmailScreen();
-    }
+    switch (destination) {
+      case AuthDestination.loading:
+        return const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(color: AppTheme.primaryEmerald),
+          ),
+        );
 
-    if (authVm.isAuthenticated && authVm.orgId != null) {
-      return ChangeNotifierProvider(
-        key: ValueKey(authVm.orgId),
-        create: (_) => DashboardViewModel(orgId: authVm.orgId!),
-        child: const DashboardScreen(),
-      );
-    }
+      case AuthDestination.verifyEmail:
+        return const VerifyEmailScreen();
 
-    return const LoginScreen();
+      case AuthDestination.workspaceUnavailable:
+        return const WorkspaceUnavailableScreen();
+
+      case AuthDestination.dashboard:
+        return ChangeNotifierProvider(
+          key: ValueKey(authVm.orgId),
+          create: (_) => DashboardViewModel(orgId: authVm.orgId!),
+          child: const DashboardScreen(),
+        );
+
+      case AuthDestination.login:
+        return const LoginScreen();
+    }
   }
 }

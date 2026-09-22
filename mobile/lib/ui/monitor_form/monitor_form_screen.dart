@@ -731,7 +731,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                     title: const Text('Publish on Public Status Page', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     subtitle: const Text('Show this monitor on your organization public status page', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
                     value: _publicOnStatusPage,
-                    activeColor: AppTheme.primaryEmerald,
+                    activeThumbColor: AppTheme.primaryEmerald,
                     onChanged: (v) => setState(() => _publicOnStatusPage = v),
                   ),
                   const Divider(height: 1),
@@ -739,7 +739,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                     title: const Text('Mute Alerts', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     subtitle: const Text('Do not send downtime notifications for this monitor', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
                     value: _muteAlerts,
-                    activeColor: AppTheme.primaryEmerald,
+                    activeThumbColor: AppTheme.primaryEmerald,
                     onChanged: (v) => setState(() => _muteAlerts = v),
                   ),
                 ],
@@ -957,7 +957,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                   // HTTP & Keyword Advanced
                   if (_type == 'http' || _type == 'keyword') ...[
                     DropdownButtonFormField<String>(
-                      value: _method,
+                      initialValue: _method,
                       decoration: const InputDecoration(labelText: 'HTTP Method'),
                       dropdownColor: AppTheme.bgSurfaceElevated,
                       items: [
@@ -997,7 +997,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                       title: const Text('Regular Expression (Regex)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                       subtitle: const Text('Evaluates keyword as a regex pattern (e.g. /v[0-9]+\\.[0-9]+/i)', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
                       value: _keywordRegex,
-                      activeColor: AppTheme.primaryEmerald,
+                      activeThumbColor: AppTheme.primaryEmerald,
                       onChanged: (v) => setState(() => _keywordRegex = v),
                     ),
                     const SizedBox(height: 14),
@@ -1038,7 +1038,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
-                      value: _sslMinVersion,
+                      initialValue: _sslMinVersion,
                       decoration: const InputDecoration(labelText: 'Minimum TLS Protocol Version'),
                       dropdownColor: AppTheme.bgSurfaceElevated,
                       items: const [
@@ -1085,7 +1085,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                   // DNS Advanced
                   if (_type == 'dns') ...[
                     DropdownButtonFormField<String>(
-                      value: _dnsRecordType,
+                      initialValue: _dnsRecordType,
                       decoration: const InputDecoration(labelText: 'DNS Record Type'),
                       dropdownColor: AppTheme.bgSurfaceElevated,
                       items: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'CAA', 'SOA', 'PTR', 'SRV'].map((rt) {
@@ -1114,7 +1114,7 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
                   // ICMP Advanced
                   if (_type == 'icmp') ...[
                     DropdownButtonFormField<int>(
-                      value: _icmpPacketCount,
+                      initialValue: _icmpPacketCount,
                       decoration: const InputDecoration(labelText: 'Ping Packet Train Count'),
                       dropdownColor: AppTheme.bgSurfaceElevated,
                       items: const [

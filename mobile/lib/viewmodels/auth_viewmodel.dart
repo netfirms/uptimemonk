@@ -17,6 +17,8 @@ class AuthViewModel extends ChangeNotifier {
   String? _orgId;
   /// From the ID token; null until it resolves. See [_needsVerification].
   String? _signInProvider;
+  /// True when a bootstrap or claim lookup failed, as opposed to never run.
+  bool _workspaceLookupFailed = false;
   AuthStatus _status = AuthStatus.initial;
   String? _errorMessage;
   bool _isGoogleLoading = false;
@@ -43,6 +45,22 @@ class AuthViewModel extends ChangeNotifier {
   /// GitHub and Apple users behind a link that does not exist for them.
   bool get needsEmailVerification =>
       _user != null && _needsVerification(_user!);
+
+  /// Signed in, address fine, but the workspace could not be loaded.
+  ///
+  /// Its own state because the alternative is dumping the user back on the
+  /// login screen while they hold a valid session — which invites them to
+  /// sign in again, does not say what went wrong, and repeats identically on
+  /// the next launch. That reads as "permanently logged out" for what is
+  /// usually a transient API failure.
+  /// Exposed so the router can tell a failed lookup from one still running.
+  bool get workspaceLookupFailed => _workspaceLookupFailed;
+
+  bool get workspaceUnavailable =>
+      _user != null &&
+      !needsEmailVerification &&
+      _orgId == null &&
+      _workspaceLookupFailed;
 
   bool _needsVerification(User user) => needsEmailConfirmation(
         email: user.email,
@@ -81,6 +99,7 @@ class AuthViewModel extends ChangeNotifier {
       // would swallow, leaving the user on a dashboard where nothing loads.
       if (_needsVerification(user)) {
         _orgId = null;
+        _workspaceLookupFailed = false;
         return;
       }
 
@@ -96,10 +115,36 @@ class AuthViewModel extends ChangeNotifier {
 
       // 3. Sync FCM push notification token with backend
       await PushNotificationService.instance.syncDeviceToken();
+      _workspaceLookupFailed = false;
     } catch (e) {
       debugPrint('Error resolving orgId: $e');
-      _errorMessage = e.toString();
+      _errorMessage = _readableApiError(e);
+      // Recorded rather than left implicit: `_orgId == null` alone cannot
+      // tell a failure apart from a lookup that has not run, and the router
+      // needs that difference to show a retry instead of a login form.
+      _workspaceLookupFailed = true;
     }
+  }
+
+  /// `ApiException (503): message` -> `message`. The wrapper is for logs.
+  String _readableApiError(Object e) {
+    final text = e.toString();
+    final m = RegExp(r'\((\d{3})\):\s*(.+)$', dotAll: true).firstMatch(text);
+    return m != null ? m.group(2)!.trim() : text;
+  }
+
+  /// Try the workspace lookup again, for the retry button.
+  Future<bool> retryWorkspaceLookup() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+
+    _errorMessage = null;
+    notifyListeners();
+
+    await _resolveOrgId(user);
+    _status = AuthStatus.authenticated;
+    notifyListeners();
+    return _orgId != null;
   }
 
   Future<bool> signIn(String email, String password) async {
@@ -473,6 +518,7 @@ class AuthViewModel extends ChangeNotifier {
     _user = null;
     _orgId = null;
     _signInProvider = null;
+    _workspaceLookupFailed = false;
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }

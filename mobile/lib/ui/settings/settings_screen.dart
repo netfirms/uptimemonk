@@ -669,7 +669,7 @@ class _AddContactSheetState extends State<_AddContactSheet> {
               const SizedBox(height: 16),
 
               DropdownButtonFormField<String>(
-                value: _channel.id,
+                initialValue: _channel.id,
                 dropdownColor: AppTheme.bgSurfaceElevated,
                 decoration: const InputDecoration(labelText: 'Channel'),
                 items: [
