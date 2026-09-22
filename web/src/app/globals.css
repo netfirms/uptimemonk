@@ -5323,3 +5323,138 @@ html[lang="my"] {
     display: none;
   }
 }
+
+/* =======================================================================
+   PUSH ALERT MOCKUP + STORE BADGE
+   =======================================================================
+   The mobile app was published and the landing page did not mention it
+   anywhere. Push sits in the alerts section rather than in a banner,
+   because that is where somebody is already deciding how they want to be
+   told — not a separate ask. */
+.push-mockup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+}
+
+.push-phone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 14px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+/* A notification, not a card: tight leading, small type, the app name and
+   timestamp on one muted row. Anything more decorated stops reading as
+   something that arrived on a lock screen. */
+.push-notification {
+  padding: 11px 13px;
+  border-radius: 13px;
+  background: rgba(20, 27, 38, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid var(--down);
+}
+
+.push-notification.resolved {
+  border-left-color: var(--up);
+  opacity: 0.72;
+}
+
+.push-app-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+
+.push-app-row img {
+  border-radius: 5px;
+}
+
+.push-app-name {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.push-time {
+  margin-left: auto;
+  font-size: 0.66rem;
+  color: var(--text-dim);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.push-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.push-body {
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.push-cta p {
+  margin: 0 0 16px;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* The real Google Play badge is a licensed asset with its own rules. This is
+   a plain link wearing the mark's colours — no logotype, no badge artwork —
+   so nothing is being passed off as the official badge. */
+.store-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out);
+}
+
+.store-badge:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(var(--primary-rgb), 0.45);
+}
+
+.store-badge span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.store-badge small {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  color: var(--text-dim);
+}
+
+.footer-store-link:hover {
+  color: var(--primary);
+}
+
+@media (max-width: 760px) {
+  .push-mockup {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}

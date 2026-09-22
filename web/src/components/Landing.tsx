@@ -93,7 +93,7 @@ export default function Landing({
   }
 
   // Alert Channel Tab
-  const [alertTab, setAlertTab] = useState<"slack" | "discord" | "email" | "webhook">("slack");
+  const [alertTab, setAlertTab] = useState<"push" | "slack" | "discord" | "email" | "webhook">("push");
 
   // Auth listener and redirect handler
   useEffect(() => {
@@ -854,6 +854,15 @@ export default function Landing({
 
         {/* Channel Selector */}
         <div className="channel-tabs">
+          {/* First, because a phone is the channel that wakes someone at 3am.
+              Slack at 3am is a message nobody sees until morning. */}
+          <button
+            type="button"
+            className={`channel-tab-btn ${alertTab === "push" ? "active" : ""}`}
+            onClick={() => setAlertTab("push")}
+          >
+            <span>{t("alertsPushTab")}</span>
+          </button>
           <button
             type="button"
             className={`channel-tab-btn ${alertTab === "slack" ? "active" : ""}`}
@@ -886,6 +895,54 @@ export default function Landing({
 
         {/* Alert Card Mockup */}
         <div className="alert-mockup-wrapper">
+          {alertTab === "push" && (
+            <div className="push-mockup">
+              <div className="push-phone">
+                <div className="push-notification">
+                  <div className="push-app-row">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/mascot-128.png" alt="" width={18} height={18} />
+                    <span className="push-app-name">UptimeMonke</span>
+                    <span className="push-time">now</span>
+                  </div>
+                  <div className="push-title">{t("alertsPushHeadline")}</div>
+                  <div className="push-body">{t("alertsPushBody")}</div>
+                </div>
+
+                <div className="push-notification resolved">
+                  <div className="push-app-row">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/mascot-128.png" alt="" width={18} height={18} />
+                    <span className="push-app-name">UptimeMonke</span>
+                    <span className="push-time">2m</span>
+                  </div>
+                  <div className="push-title">{t("alertsPushResolvedHeadline")}</div>
+                  <div className="push-body">{t("alertsPushResolvedBody")}</div>
+                </div>
+              </div>
+
+              <div className="push-cta">
+                <p>{t("alertsPushCta")}</p>
+                <a
+                  className="store-badge"
+                  href="https://play.google.com/store/apps/details?id=com.mfx.uptimemonke"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="#34A853" d="M3.6 1.8a1.6 1.6 0 0 0-.7 1.35v17.7c0 .55.27 1.05.7 1.35l9.9-10.2z" />
+                    <path fill="#FBBC04" d="M17.3 8.6 13.5 6.4 3.6 1.8c.2-.14.44-.2.7-.2.28 0 .55.08.8.22z" />
+                    <path fill="#EA4335" d="M17.3 15.4 13.5 17.6 5.1 22.4c-.25.14-.52.2-.8.2-.26 0-.5-.06-.7-.2z" />
+                    <path fill="#4285F4" d="M20.9 10.7c.55.3.9.78.9 1.3s-.35 1-.9 1.3l-3.6 2.1-3.8-3.4 3.8-3.4z" />
+                  </svg>
+                  <span>
+                    <small>{t("alertsPushGetItOn")}</small>
+                    Google Play
+                  </span>
+                </a>
+              </div>
+            </div>
+          )}
           {alertTab === "slack" && (
             <div className="slack-mockup">
               <div className="slack-header">
@@ -1286,6 +1343,18 @@ export default function Landing({
           <span>{t("footerTagline")}</span>
         </div>
         <div className="row" style={{ gap: "16px", alignItems: "center" }}>
+          {/* Reachable from anywhere on the page, not only from the alerts
+              section — somebody who has decided halfway down should not have
+              to scroll back to find it. */}
+          <a
+            href="https://play.google.com/store/apps/details?id=com.mfx.uptimemonke"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="dim footer-store-link"
+            style={{ fontSize: "0.8rem", textDecoration: "none" }}
+          >
+            {t("mobileAppLink")}
+          </a>
           <LanguagePicker compact />
           <a href="#hero" className="dim" style={{ fontSize: "0.8rem", textDecoration: "none" }}>{t("backToTop")}</a>
           <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
