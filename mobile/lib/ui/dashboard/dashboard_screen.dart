@@ -95,6 +95,7 @@ class DashboardScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.copy_rounded, size: 18, color: AppTheme.textSecondary),
+                      tooltip: 'Copy heartbeat URL',
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: url));
                         Navigator.pop(ctx);

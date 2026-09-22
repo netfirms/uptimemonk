@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
+<!--
+  The launch window, painted before Flutter draws its first frame.
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+  This was @android:color/white, and values-night pointed at this same
+  drawable — so the splash was white in both light and dark mode while the
+  app itself is always dark. Every cold start flashed white.
+
+  The app has no light theme, so this is unconditionally dark rather than
+  having a -night variant: matching the system would still be wrong half the
+  time.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/launch_background" />
 </layer-list>

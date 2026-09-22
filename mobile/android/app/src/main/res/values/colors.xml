@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppTheme.bgDark, so the launch window and the first Flutter frame
+         are the same colour and the handover is invisible. -->
+    <color name="launch_background">#0B131E</color>
+</resources>

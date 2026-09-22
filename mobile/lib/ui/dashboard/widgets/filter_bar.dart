@@ -89,6 +89,7 @@ class _FilterBarState extends State<FilterBar> {
                 suffixIcon: widget.searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.textMuted),
+                        tooltip: 'Clear search',
                         splashRadius: 16,
                         onPressed: () {
                           _controller.clear();

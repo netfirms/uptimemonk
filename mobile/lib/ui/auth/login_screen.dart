@@ -356,10 +356,16 @@ class _Header extends StatelessWidget {
                   ),
                 ],
               ),
-              padding: const EdgeInsets.all(16),
+              // The asset is a palette PNG with no alpha channel, so its near
+              // black background is baked in and cannot be made transparent.
+              // Padding it inside a lighter tile drew a hard black square in
+              // the middle of a rounded card. Clipping it to fill the tile
+              // instead makes that background the tile — which reads as an
+              // app icon rather than a mistake.
+              clipBehavior: Clip.antiAlias,
               child: Image.asset(
                 'assets/mascot-128.png',
-                fit: BoxFit.contain,
+                fit: BoxFit.cover,
                 semanticLabel: 'UptimeMonke',
               ),
             ),
