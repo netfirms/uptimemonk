@@ -1225,7 +1225,12 @@ export default function Dashboard() {
       {/* Footer */}
       <footer className="app-footer">
         <span>UptimeMonke · Free Website &amp; Infrastructure Monitoring</span>
-        <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
+        <span className="row" style={{ gap: 14, alignItems: "center" }}>
+          <a href="/privacy" className="dim" style={{ textDecoration: "none" }}>
+            Privacy
+          </a>
+          <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
+        </span>
       </footer>
     </main>
   );

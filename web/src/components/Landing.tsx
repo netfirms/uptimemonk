@@ -1361,6 +1361,12 @@ export default function Landing({
             {t("mobileAppLink")}
           </a>
           <LanguagePicker compact />
+          {/* A privacy policy nobody can find is not a privacy policy. Both
+              app stores and every software directory check that this link
+              exists and resolves. */}
+          <a href="/privacy" className="dim" style={{ fontSize: "0.8rem", textDecoration: "none" }}>
+            Privacy
+          </a>
           <a href="#hero" className="dim" style={{ fontSize: "0.8rem", textDecoration: "none" }}>{t("backToTop")}</a>
           <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
         </div>
