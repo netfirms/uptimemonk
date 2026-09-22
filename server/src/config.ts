@@ -36,6 +36,35 @@ function int(name: string, fallback: number): number {
 }
 
 /**
+ * Bounds for the capacity knobs, and why they exist.
+ *
+ * Most config here is inert if mistyped — a wrong `userAgent` is cosmetic.
+ * These three are not: they set how much work the fleet accepts. A check
+ * interval of 1 instead of 10 is five times the probe rate and five times the
+ * Firestore writes; a monitor cap of 5000 instead of 500 is capacity the box
+ * does not have. The console is a text field, and a text field gets typos.
+ *
+ * So values are clamped rather than trusted. The interval floor stays at the
+ * scheduler's own limit: raising the floor is the useful direction (shed load
+ * under pressure), while lowering it past 5s is not a policy choice the
+ * console should be able to make.
+ */
+const LIMIT_BOUNDS = {
+  minIntervalSeconds: { min: 5, max: 3_600 },
+  maxMonitorsFree: { min: 1, max: 5_000 },
+  maxMonitorsDonor: { min: 1, max: 5_000 },
+} as const;
+
+function clampInt(value: number, bounds: { min: number; max: number }): number {
+  if (!Number.isFinite(value)) return bounds.min;
+  return Math.min(bounds.max, Math.max(bounds.min, Math.round(value)));
+}
+
+function boundedInt(name: string, fallback: number, key: keyof typeof LIMIT_BOUNDS): number {
+  return clampInt(int(name, fallback), LIMIT_BOUNDS[key]);
+}
+
+/**
  * Worker identity.
  *
  * A "worker" is one Lightsail instance. Scaling the system out means running
@@ -92,6 +121,11 @@ export interface AppConfig {
   userAgent: string;
   heartbeatUrl: string;
 
+  /** Capacity knobs. See LIMIT_BOUNDS — these are clamped, not trusted. */
+  minIntervalSeconds: number;
+  maxMonitorsFree: number;
+  maxMonitorsDonor: number;
+
   resendApiKey: string;
   mailgunApiKey: string;
   mailgunDomain: string;
@@ -124,6 +158,10 @@ const envDefaults: AppConfig = {
   incidentRetentionDays: int("INCIDENT_RETENTION_DAYS", 365),
   userAgent: optional("USER_AGENT", "UptimeMonke/1.0 (+https://uptimemonke.com/bot)"),
   heartbeatUrl: process.env.UPTIMEMONK_HEARTBEAT_URL ?? "",
+
+  minIntervalSeconds: boundedInt("MIN_INTERVAL_SECONDS", 5, "minIntervalSeconds"),
+  maxMonitorsFree: boundedInt("MAX_MONITORS_FREE", 50, "maxMonitorsFree"),
+  maxMonitorsDonor: boundedInt("MAX_MONITORS_DONOR", 200, "maxMonitorsDonor"),
 
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   mailgunApiKey: process.env.MAILGUN_API_KEY ?? "",
@@ -165,6 +203,15 @@ export let RETENTION_DAYS = envDefaults.retentionDays;
 export let INCIDENT_RETENTION_DAYS = envDefaults.incidentRetentionDays;
 export let USER_AGENT = envDefaults.userAgent;
 export let HEARTBEAT_URL = envDefaults.heartbeatUrl;
+
+/**
+ * `export let` on purpose: ES module bindings are live, so every importer sees
+ * a new value the moment `applyOverrides` reassigns it. That is what makes the
+ * ops console able to change these without a restart.
+ */
+export let MIN_INTERVAL_SECONDS = envDefaults.minIntervalSeconds;
+export let MAX_MONITORS_FREE = envDefaults.maxMonitorsFree;
+export let MAX_MONITORS_DONOR = envDefaults.maxMonitorsDonor;
 
 export let RESEND_API_KEY = envDefaults.resendApiKey;
 export let MAILGUN_API_KEY = envDefaults.mailgunApiKey;
@@ -235,6 +282,27 @@ export function updateDynamicConfig(data?: Record<string, unknown> | null): void
       activeOverrides.heartbeatUrl = data.heartbeatUrl.trim();
     }
 
+    // Clamped on the way in, so a typo in the console cannot set a 1-second
+    // floor across the fleet or a monitor cap the box cannot carry.
+    if (data.minIntervalSeconds != null && !Number.isNaN(Number(data.minIntervalSeconds))) {
+      activeOverrides.minIntervalSeconds = clampInt(
+        Number(data.minIntervalSeconds),
+        LIMIT_BOUNDS.minIntervalSeconds
+      );
+    }
+    if (data.maxMonitorsFree != null && !Number.isNaN(Number(data.maxMonitorsFree))) {
+      activeOverrides.maxMonitorsFree = clampInt(
+        Number(data.maxMonitorsFree),
+        LIMIT_BOUNDS.maxMonitorsFree
+      );
+    }
+    if (data.maxMonitorsDonor != null && !Number.isNaN(Number(data.maxMonitorsDonor))) {
+      activeOverrides.maxMonitorsDonor = clampInt(
+        Number(data.maxMonitorsDonor),
+        LIMIT_BOUNDS.maxMonitorsDonor
+      );
+    }
+
     if (typeof data.resendApiKey === "string") {
       activeOverrides.resendApiKey = data.resendApiKey.trim();
     }
@@ -299,6 +367,20 @@ export function updateDynamicConfig(data?: Record<string, unknown> | null): void
   INCIDENT_RETENTION_DAYS = activeOverrides.incidentRetentionDays ?? envDefaults.incidentRetentionDays;
   USER_AGENT = activeOverrides.userAgent ?? envDefaults.userAgent;
   HEARTBEAT_URL = activeOverrides.heartbeatUrl ?? envDefaults.heartbeatUrl;
+
+  MIN_INTERVAL_SECONDS = activeOverrides.minIntervalSeconds ?? envDefaults.minIntervalSeconds;
+  MAX_MONITORS_FREE = activeOverrides.maxMonitorsFree ?? envDefaults.maxMonitorsFree;
+  MAX_MONITORS_DONOR = activeOverrides.maxMonitorsDonor ?? envDefaults.maxMonitorsDonor;
+
+  /**
+   * A donor cap below the free cap would make supporting the project a
+   * downgrade. Rather than reject the save — which would leave the console
+   * with an error and the fleet with nothing — the donor cap is raised to meet
+   * the free one, so the invariant holds whatever was typed.
+   */
+  if (MAX_MONITORS_DONOR < MAX_MONITORS_FREE) {
+    MAX_MONITORS_DONOR = MAX_MONITORS_FREE;
+  }
 
   RESEND_API_KEY = activeOverrides.resendApiKey ?? envDefaults.resendApiKey;
   MAILGUN_API_KEY = activeOverrides.mailgunApiKey ?? envDefaults.mailgunApiKey;
@@ -368,6 +450,10 @@ export function getEffectiveConfig(): AppConfig {
     incidentRetentionDays: INCIDENT_RETENTION_DAYS,
     userAgent: USER_AGENT,
     heartbeatUrl: HEARTBEAT_URL,
+
+    minIntervalSeconds: MIN_INTERVAL_SECONDS,
+    maxMonitorsFree: MAX_MONITORS_FREE,
+    maxMonitorsDonor: MAX_MONITORS_DONOR,
 
     resendApiKey: RESEND_API_KEY,
     mailgunApiKey: MAILGUN_API_KEY,

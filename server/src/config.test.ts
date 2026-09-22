@@ -13,6 +13,9 @@ import {
   RECAPTCHA_SECRET,
   RECAPTCHA_MIN_SCORE,
   USER_AGENT,
+  MIN_INTERVAL_SECONDS,
+  MAX_MONITORS_FREE,
+  MAX_MONITORS_DONOR,
   getEffectiveConfig,
   getConfigMetadata,
   resetDynamicConfig,
@@ -144,5 +147,80 @@ describe("seeding the dynamic config", () => {
         `${key} looks secret but is not excluded from the seed`
       );
     }
+  });
+});
+
+/**
+ * The capacity knobs.
+ *
+ * Unlike the rest of the config, a typo here changes how much work the fleet
+ * accepts — a 1-second floor is five times the probe rate and five times the
+ * Firestore writes. So the bounds are the feature, and these tests pin them.
+ */
+describe("the capacity limits an operator can change", () => {
+  beforeEach(() => {
+    resetDynamicConfig();
+  });
+
+  test("a sane change is taken as given", () => {
+    updateDynamicConfig({
+      minIntervalSeconds: 30,
+      maxMonitorsFree: 25,
+      maxMonitorsDonor: 400,
+    });
+    assert.equal(MIN_INTERVAL_SECONDS, 30);
+    assert.equal(MAX_MONITORS_FREE, 25);
+    assert.equal(MAX_MONITORS_DONOR, 400);
+  });
+
+  test("the interval floor cannot be lowered past the scheduler's own limit", () => {
+    // Raising the floor sheds load and is allowed. Lowering it below 5s is a
+    // capacity decision the console does not get to make.
+    updateDynamicConfig({ minIntervalSeconds: 1 });
+    assert.equal(MIN_INTERVAL_SECONDS, 5);
+
+    updateDynamicConfig({ minIntervalSeconds: 0 });
+    assert.equal(MIN_INTERVAL_SECONDS, 5);
+
+    updateDynamicConfig({ minIntervalSeconds: -60 });
+    assert.equal(MIN_INTERVAL_SECONDS, 5);
+  });
+
+  test("an absurd interval is clamped rather than accepted", () => {
+    updateDynamicConfig({ minIntervalSeconds: 999_999 });
+    assert.equal(MIN_INTERVAL_SECONDS, 3_600);
+  });
+
+  test("monitor caps are clamped at both ends", () => {
+    updateDynamicConfig({ maxMonitorsFree: 0, maxMonitorsDonor: 50_000 });
+    assert.equal(MAX_MONITORS_FREE, 1);
+    assert.equal(MAX_MONITORS_DONOR, 5_000);
+  });
+
+  test("a donor cap below the free cap is raised to meet it", () => {
+    // Otherwise supporting the project would be a downgrade.
+    updateDynamicConfig({ maxMonitorsFree: 120, maxMonitorsDonor: 40 });
+    assert.equal(MAX_MONITORS_FREE, 120);
+    assert.equal(MAX_MONITORS_DONOR, 120);
+  });
+
+  test("a fractional value becomes a whole number, not a fraction of a check", () => {
+    updateDynamicConfig({ minIntervalSeconds: 30.7, maxMonitorsFree: 10.2 });
+    assert.equal(MIN_INTERVAL_SECONDS, 31);
+    assert.equal(MAX_MONITORS_FREE, 10);
+  });
+
+  test("garbage leaves the previous value alone", () => {
+    updateDynamicConfig({ minIntervalSeconds: 45 });
+    assert.equal(MIN_INTERVAL_SECONDS, 45);
+    updateDynamicConfig({ minIntervalSeconds: "not a number" });
+    assert.equal(MIN_INTERVAL_SECONDS, 5, "falls back to the env default, not NaN");
+  });
+
+  test("they are exposed to the console, so it can render them", () => {
+    const config = getEffectiveConfig();
+    assert.equal(typeof config.minIntervalSeconds, "number");
+    assert.equal(typeof config.maxMonitorsFree, "number");
+    assert.equal(typeof config.maxMonitorsDonor, "number");
   });
 });

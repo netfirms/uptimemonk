@@ -1,4 +1,9 @@
 import type { Monitor } from "../types.js";
+import {
+  MIN_INTERVAL_SECONDS,
+  MAX_MONITORS_DONOR as CFG_MAX_MONITORS_DONOR,
+  MAX_MONITORS_FREE as CFG_MAX_MONITORS_FREE,
+} from "../config.js";
 
 /**
  * Donation credits.
@@ -59,9 +64,17 @@ export const GRACE_DAYS = 7;
  *  would let a lapsed donor coast for a year on a single generous month. */
 export const ROLLOVER_CYCLES = 2;
 
-/** The floor no amount of donation goes below — a scheduler limit, not a
- *  commercial one. See MIN_INTERVAL_SECONDS in scheduler.ts. */
-export const HARD_MIN_INTERVAL_SECONDS = 5;
+/**
+ * The floor no amount of donation goes below — a scheduler limit, not a
+ * commercial one.
+ *
+ * Now operator-settable from the ops console, so the floor can be raised to
+ * shed load without a deploy. It is re-exported from `config.ts` rather than
+ * declared here because `export let` bindings are live: reassigning it when
+ * `system/config` changes updates every importer, with no restart. Clamped at
+ * the source — see LIMIT_BOUNDS.
+ */
+export { MIN_INTERVAL_SECONDS as HARD_MIN_INTERVAL_SECONDS } from "../config.js";
 
 /**
  * A ceiling on monitor *count*, separate from the budget on check *rate*.
@@ -74,17 +87,19 @@ export const HARD_MIN_INTERVAL_SECONDS = 5;
  *
  * Tiered, or the free tier would out-reach a paying one at slow intervals.
  */
-export const MAX_MONITORS_DONOR = 200;
-export const MAX_MONITORS_FREE = 50;
+export { MAX_MONITORS_DONOR, MAX_MONITORS_FREE } from "../config.js";
 
-/** @deprecated The cap depends on standing now — use `maxMonitorsFor`. */
-export const HARD_MAX_MONITORS = MAX_MONITORS_DONOR;
+/**
+ * Removed: `HARD_MAX_MONITORS` was deprecated, unused outside this file, and
+ * as a `const` it would have frozen at import — silently disagreeing with the
+ * live cap the moment an operator changed it. Use `maxMonitorsFor`.
+ */
 
 export function maxMonitorsFor(c: OrgCredit, now = Date.now()): number {
   const standing = standingOf(c, now);
   return standing === "donor" || standing === "grace"
-    ? MAX_MONITORS_DONOR
-    : MAX_MONITORS_FREE;
+    ? CFG_MAX_MONITORS_DONOR
+    : CFG_MAX_MONITORS_FREE;
 }
 
 export interface OrgCredit {
@@ -106,7 +121,7 @@ const baseOf = (c: OrgCredit) => c.baseChecksPerDay ?? FREE_CHECKS_PER_DAY;
 
 /** Checks per day a monitor at this interval performs. */
 export function checksPerDay(intervalSeconds: number): number {
-  return Math.ceil(86_400 / Math.max(HARD_MIN_INTERVAL_SECONDS, intervalSeconds));
+  return Math.ceil(86_400 / Math.max(MIN_INTERVAL_SECONDS, intervalSeconds));
 }
 
 /** What an org's whole monitor set costs per day. */

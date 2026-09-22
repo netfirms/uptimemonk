@@ -154,6 +154,10 @@ export interface SystemConfigState {
   userAgent: string;
   heartbeatUrl: string;
 
+  minIntervalSeconds: string;
+  maxMonitorsFree: string;
+  maxMonitorsDonor: string;
+
   verifySecret: string;
   verifyPeerUrl: string;
 
@@ -188,6 +192,10 @@ const CONFIG_DEFAULTS: SystemConfigState = {
   incidentRetentionDays: "365",
   userAgent: "UptimeMonke/1.0 (+https://uptimemonke.com/bot)",
   heartbeatUrl: "",
+
+  minIntervalSeconds: "5",
+  maxMonitorsFree: "50",
+  maxMonitorsDonor: "200",
 
   verifySecret: "",
   verifyPeerUrl: "",
@@ -646,6 +654,9 @@ export default function AdminPage() {
             retentionDays: data.retentionDays != null ? String(data.retentionDays) : envDefaults.retentionDays,
             incidentRetentionDays: data.incidentRetentionDays != null ? String(data.incidentRetentionDays) : envDefaults.incidentRetentionDays,
             userAgent: data.userAgent != null ? String(data.userAgent) : envDefaults.userAgent,
+            minIntervalSeconds: data.minIntervalSeconds != null ? String(data.minIntervalSeconds) : envDefaults.minIntervalSeconds,
+            maxMonitorsFree: data.maxMonitorsFree != null ? String(data.maxMonitorsFree) : envDefaults.maxMonitorsFree,
+            maxMonitorsDonor: data.maxMonitorsDonor != null ? String(data.maxMonitorsDonor) : envDefaults.maxMonitorsDonor,
             heartbeatUrl: data.heartbeatUrl != null ? String(data.heartbeatUrl) : envDefaults.heartbeatUrl,
 
             verifySecret: data.verifySecret != null ? String(data.verifySecret) : envDefaults.verifySecret,
@@ -713,6 +724,9 @@ export default function AdminPage() {
           retentionDays: String(defaults.retentionDays ?? CONFIG_DEFAULTS.retentionDays),
           incidentRetentionDays: String(defaults.incidentRetentionDays ?? CONFIG_DEFAULTS.incidentRetentionDays),
           userAgent: String(defaults.userAgent ?? CONFIG_DEFAULTS.userAgent),
+          minIntervalSeconds: String(defaults.minIntervalSeconds ?? CONFIG_DEFAULTS.minIntervalSeconds),
+          maxMonitorsFree: String(defaults.maxMonitorsFree ?? CONFIG_DEFAULTS.maxMonitorsFree),
+          maxMonitorsDonor: String(defaults.maxMonitorsDonor ?? CONFIG_DEFAULTS.maxMonitorsDonor),
           heartbeatUrl: String(defaults.heartbeatUrl ?? CONFIG_DEFAULTS.heartbeatUrl),
 
           verifySecret: String(defaults.verifySecret ?? CONFIG_DEFAULTS.verifySecret),
@@ -766,6 +780,12 @@ export default function AdminPage() {
         incidentRetentionDays: Number(configForm.incidentRetentionDays) || 365,
         userAgent: configForm.userAgent.trim(),
         heartbeatUrl: configForm.heartbeatUrl.trim(),
+
+        // The worker clamps these on the way in — see LIMIT_BOUNDS in
+        // config.ts. These fallbacks only cover an empty field.
+        minIntervalSeconds: Number(configForm.minIntervalSeconds) || 5,
+        maxMonitorsFree: Number(configForm.maxMonitorsFree) || 50,
+        maxMonitorsDonor: Number(configForm.maxMonitorsDonor) || 200,
 
         verifySecret: configForm.verifySecret.trim(),
         verifyPeerUrl: configForm.verifyPeerUrl.trim(),
@@ -2509,6 +2529,82 @@ export default function AdminPage() {
             </div>
 
             <div className="config-grid">
+              {/* Capacity limits. Grouped and labelled with their bounds,
+                  because these are the only fields here that change how much
+                  work the fleet accepts — the rest are plumbing. */}
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Minimum Check Interval, seconds (MIN_INTERVAL_SECONDS)</label>
+                  <span className={`config-badge ${isFieldCustom("minIntervalSeconds") ? "custom" : "default"}`}>
+                    {isFieldCustom("minIntervalSeconds") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min={5}
+                  max={3600}
+                  className="config-input"
+                  value={configForm.minIntervalSeconds}
+                  onChange={(e) => setConfigForm({ ...configForm, minIntervalSeconds: e.target.value })}
+                  placeholder={envDefaults.minIntervalSeconds}
+                />
+                <span className="config-hint">
+                  The floor no workspace goes below. Clamped to 5–3600s by the worker;
+                  5s is the scheduler&apos;s own limit. <strong>Raising this sheds load</strong> across
+                  the whole fleet — halving the rate halves probe CPU and Firestore writes.
+                </span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Max Monitors — Free Workspace (MAX_MONITORS_FREE)</label>
+                  <span className={`config-badge ${isFieldCustom("maxMonitorsFree") ? "custom" : "default"}`}>
+                    {isFieldCustom("maxMonitorsFree") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={5000}
+                  className="config-input"
+                  value={configForm.maxMonitorsFree}
+                  onChange={(e) => setConfigForm({ ...configForm, maxMonitorsFree: e.target.value })}
+                  placeholder={envDefaults.maxMonitorsFree}
+                />
+                <span className="config-hint">
+                  A ceiling on monitor <em>count</em>, separate from the budget on check
+                  <em> rate</em>. Clamped to 1–5000. Existing monitors above a lowered cap keep
+                  running; only new ones are refused.
+                </span>
+              </div>
+
+              <div className="config-field">
+                <div className="config-label-row">
+                  <label className="config-label">Max Monitors — Donor Workspace (MAX_MONITORS_DONOR)</label>
+                  <span className={`config-badge ${isFieldCustom("maxMonitorsDonor") ? "custom" : "default"}`}>
+                    {isFieldCustom("maxMonitorsDonor") ? "Firestore Override" : "Env Default"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={5000}
+                  className="config-input"
+                  value={configForm.maxMonitorsDonor}
+                  onChange={(e) => setConfigForm({ ...configForm, maxMonitorsDonor: e.target.value })}
+                  placeholder={envDefaults.maxMonitorsDonor}
+                />
+                <span className="config-hint">
+                  Clamped to 1–5000, and raised to match the free cap if set below it —
+                  otherwise supporting the project would be a downgrade.
+                  {Number(configForm.maxMonitorsDonor) < Number(configForm.maxMonitorsFree) && (
+                    <strong style={{ color: "var(--amber, #f59e0b)", display: "block", marginTop: "4px" }}>
+                      Below the free cap ({configForm.maxMonitorsFree}) — the worker will raise it to match.
+                    </strong>
+                  )}
+                </span>
+              </div>
+
               <div className="config-field">
                 <div className="config-label-row">
                   <label className="config-label">Max In-Flight Probe Concurrency (PROBE_CONCURRENCY)</label>

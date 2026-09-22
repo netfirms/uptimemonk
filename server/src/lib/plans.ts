@@ -34,8 +34,6 @@ export interface PlanLimits {
 
 /** Everything is on for everyone now; only capacity differs. */
 const OPEN = {
-  maxMonitors: MAX_MONITORS_DONOR,
-  minIntervalSeconds: HARD_MIN_INTERVAL_SECONDS,
   maxStatusPages: 100,
   maxSeats: 50,
   retentionDays: 365,
@@ -44,7 +42,9 @@ const OPEN = {
   apiAccess: true,
 } as const;
 
-export const PLANS: Record<Org["plan"], PlanLimits> = {
+type PlanBase = Omit<PlanLimits, "maxMonitors" | "minIntervalSeconds">;
+
+export const PLANS: Record<Org["plan"], PlanBase> = {
   free: { id: "free", label: "Free", bonusChecksPerDay: 0, ...OPEN },
 
   // Grandfathered. The bonus is roughly what each plan's old monitor cap
@@ -55,8 +55,20 @@ export const PLANS: Record<Org["plan"], PlanLimits> = {
   scale: { id: "scale", label: "Patron", bonusChecksPerDay: 1_000 * 1_440, ...OPEN },
 };
 
+/**
+ * The two capacity fields are resolved here, not in `PLANS`.
+ *
+ * `PLANS` is a module-scope literal, so anything baked into it is captured at
+ * import and would keep reporting the value the worker booted with — which
+ * would make the ops console appear to do nothing. Reading the live config
+ * bindings per call is what lets a change take effect without a restart.
+ */
 export function limitsFor(plan: Org["plan"] | undefined): PlanLimits {
-  return PLANS[plan ?? "free"];
+  return {
+    ...PLANS[plan ?? "free"],
+    maxMonitors: MAX_MONITORS_DONOR,
+    minIntervalSeconds: HARD_MIN_INTERVAL_SECONDS,
+  };
 }
 
 /** The free daily allowance for an org, including any grandfathered bonus. */
