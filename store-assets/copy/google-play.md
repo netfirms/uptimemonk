@@ -107,8 +107,8 @@ https://uptimemonke.com
 https://uptimemonke.com/privacy
 ```
 
-> Confirm this URL resolves before submitting; Play rejects a listing whose
-> privacy policy link is dead.
+> Live and verified in production on 23 September 2026. Re-check before submitting —
+> Play rejects a listing whose privacy policy link is dead.
 
 ---
 

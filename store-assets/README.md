@@ -3,20 +3,19 @@
 Generated from the source images in `promo-resources/` for the App Store and
 Google Play listings.
 
-## ⚠️ Blocking prerequisite: there is no privacy policy page
+## Privacy policy — resolved
 
-Both stores require a **live, real privacy policy URL** and will reject a
-listing without one. As of this generation:
+`https://uptimemonke.com/privacy` is live and serves a real policy, written
+from an audit of what the code stores rather than a template. It is linked from
+the landing and dashboard footers. Verified in production on 23 September 2026.
 
-- `https://uptimemonke.com/privacy` returns HTTP **200**, but only because the
-  static export serves the landing page as a catch-all for unknown paths. It is
-  **not** a privacy policy — the page contains no policy text.
-- No privacy policy route exists in `web/src`, and the app does not link to one.
-
-**Do not submit either store until a real policy page exists.** Fix the URL in
-`copy/apple-app-store.md` and `copy/google-play.md` to point at it. The policy
-must describe what the app actually collects: email address, display name, and
-the FCM device token — see the Data safety section in `copy/google-play.md`.
+The policy describes exactly what the Data safety section in
+`copy/google-play.md` declares: email address, display name and photo URL,
+Firebase account id, monitor configuration, alert contact destinations, check
+results and incidents, the FCM device token, and GA4 analytics carrying an
+opaque workspace id. **If you change what the app collects, change the policy in
+the same commit** — a store listing whose declaration and policy disagree is
+rejected, and the disagreement is what gets noticed.
 
 ## Layout
 

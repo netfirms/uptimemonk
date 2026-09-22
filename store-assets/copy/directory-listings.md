@@ -11,12 +11,11 @@ single overstatement that surfaces in a trial costs more than the listing wins.
 
 ## ⚠️ Read before submitting anywhere
 
-**1. There is still no privacy policy page.** `/privacy` returns 404 on the
-Firebase domain and no route exists in `web/src`. GetApp requires one to verify
-a vendor profile; Product Hunt does not require it but commenters ask, and an
-app that handles email addresses and device tokens without one reads badly.
-This blocks GetApp outright and weakens the rest. Same blocker already recorded
-in `store-assets/README.md` for the app stores.
+**1. Privacy policy — done.** `https://uptimemonke.com/privacy` is live and
+linked from the site footer, verified in production on 23 September 2026. This
+was the blocker on GetApp, and it is cleared. If the app's data practices
+change, update the policy in the same commit — a directory listing that
+contradicts the policy it links to is worse than no listing.
 
 **2. iOS is TestFlight only.** There is no public App Store listing. Every
 platform field below says "Web, Android, iOS (TestFlight)" — do not tick a
@@ -31,8 +30,8 @@ configure one before launching, add it back in all four places.
 **4. Decide the launch order.** Product Hunt is a one-shot event: you get one
 launch per product and the first six hours decide it. AlternativeTo and
 Stacklist are evergreen and can go up today. The sensible order is
-AlternativeTo + Stacklist now, GetApp once a privacy policy exists, Product
-Hunt last and deliberately.
+AlternativeTo + Stacklist now, then GetApp, and Product Hunt last and
+deliberately.
 
 ---
 
@@ -145,8 +144,7 @@ Android:     https://play.google.com/store/apps/details?id=com.mfx.uptimemonke
 
 # 2. GetApp
 
-**Blocked until a privacy policy exists.** GetApp (Gartner Digital Markets)
-verifies vendors and syndicates to Capterra and Software Advice, so the profile
+GetApp (Gartner Digital Markets) verifies vendors and syndicates to Capterra and Software Advice, so the profile
 is B2B-formal and reviewed by a human. Write for a buyer comparing three tools
 in a spreadsheet, not a developer browsing.
 
@@ -286,8 +284,8 @@ https://uptimemonke.com
 
 # 4. Product Hunt
 
-One shot. Do not launch until the privacy policy exists, the gallery is ready
-and you can be present in the comments for the first six hours.
+One shot. Do not launch until the gallery is ready and you can be present in
+the comments for the first six hours.
 
 ### Name
 ```
@@ -369,7 +367,7 @@ Reuse `store-assets/` screenshots. Order them:
 5. Monitor types — breadth
 
 ### Launch-day checklist
-- [ ] Privacy policy page live at `https://uptimemonke.com/privacy`
+- [x] Privacy policy page live at `https://uptimemonke.com/privacy`
 - [ ] Play listing link works from a logged-out browser
 - [ ] Free signup works end to end from a clean browser session
 - [ ] Status page demo URL ready to paste into comments

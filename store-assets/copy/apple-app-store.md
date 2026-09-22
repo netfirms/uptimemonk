@@ -123,8 +123,8 @@ https://uptimemonke.com
 https://uptimemonke.com/privacy
 ```
 
-> Verify this path resolves before submitting — Apple rejects a listing whose
-> privacy policy link 404s.
+> Live and verified in production on 23 September 2026. Re-check before submitting —
+> Apple rejects a listing whose privacy policy link 404s.
 
 ---
 
