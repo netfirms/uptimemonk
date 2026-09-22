@@ -106,19 +106,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
       <body>
-        {/*
-          Marks the document as scripted BEFORE first paint, so the reveal
-          animations can hide their content without risking a page that stays
-          invisible when JS is off or fails. `.reveal` is scoped to
-          `.js-ready`, so no script means everything simply renders.
-          Setting it here rather than in an effect avoids a frame of visible
-          content flashing before it is hidden to animate in.
-        */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `document.documentElement.classList.add('js-ready')`,
-          }}
-        />
         <div className="ambient-glow" aria-hidden="true" />
         <I18nProvider>
           {children}
