@@ -130,7 +130,7 @@ export default function OrgSettings({
                       width: "32px",
                       height: "32px",
                       borderRadius: "50%",
-                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      background: "linear-gradient(135deg, #3fa9c9 0%, #2e8aa6 100%)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -157,9 +157,9 @@ export default function OrgSettings({
                       onOpenProfile();
                     }}
                     style={{
-                      background: "rgba(59, 214, 113, 0.15)",
-                      borderColor: "#3BD671",
-                      color: "#3BD671",
+                      background: "rgba(111, 195, 223, 0.15)",
+                      borderColor: "#6fc3df",
+                      color: "#6fc3df",
                       whiteSpace: "nowrap",
                       fontWeight: "600"
                     }}

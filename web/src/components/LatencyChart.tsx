@@ -87,8 +87,8 @@ export default function LatencyChart({
       >
         <defs>
           <linearGradient id="lcFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3BD671" stopOpacity="0.34" />
-            <stop offset="100%" stopColor="#3BD671" stopOpacity="0" />
+            <stop offset="0%" stopColor="#6fc3df" stopOpacity="0.34" />
+            <stop offset="100%" stopColor="#6fc3df" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -118,7 +118,7 @@ export default function LatencyChart({
         <path
           d={geom.line}
           fill="none"
-          stroke="#3BD671"
+          stroke="#6fc3df"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -141,9 +141,9 @@ export default function LatencyChart({
               strokeWidth="1"
               strokeDasharray="3 3"
             />
-            <circle r="5" cx={active.x} cy={active.y} fill="#3BD671" />
+            <circle r="5" cx={active.x} cy={active.y} fill="#6fc3df" />
             {/* 2px surface ring, so the marker reads against the line under it. */}
-            <circle r="5" cx={active.x} cy={active.y} fill="none" stroke="#0e1622" strokeWidth="2" />
+            <circle r="5" cx={active.x} cy={active.y} fill="none" stroke="#070d14" strokeWidth="2" />
           </g>
         )}
 

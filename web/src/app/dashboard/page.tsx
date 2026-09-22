@@ -536,9 +536,9 @@ export default function Dashboard() {
         <div className="stat-box">
           <div className="stat-title">
             <span>{t("dashOverallUptime")}</span>
-            <span style={{ color: "#3BD671" }}>30 DAYS</span>
+            <span style={{ color: "#6fc3df" }}>30 DAYS</span>
           </div>
-          <div className="stat-num" style={{ color: "#3BD671" }}>
+          <div className="stat-num" style={{ color: "#6fc3df" }}>
             {stats.avgUptime}%
           </div>
           <div className="dim">System-wide operational ratio</div>
@@ -549,7 +549,7 @@ export default function Dashboard() {
             <span>{t("dashUpMonitors")}</span>
             <span className="status-dot up" />
           </div>
-          <div className="stat-num" style={{ color: "#3BD671" }}>
+          <div className="stat-num" style={{ color: "#6fc3df" }}>
             {stats.upCount}
           </div>
           <div className="dim">Reporting healthy response</div>
@@ -797,9 +797,9 @@ export default function Dashboard() {
                           copyHeartbeatUrl(m.id, m.heartbeatToken!);
                         }}
                         style={{
-                          background: copiedTokenId === m.id ? "rgba(16, 185, 129, 0.15)" : "rgba(255, 255, 255, 0.08)",
-                          border: `1px solid ${copiedTokenId === m.id ? "rgba(16, 185, 129, 0.4)" : "var(--border)"}`,
-                          color: copiedTokenId === m.id ? "#10b981" : "var(--text)",
+                          background: copiedTokenId === m.id ? "rgba(63, 169, 201, 0.15)" : "rgba(255, 255, 255, 0.08)",
+                          border: `1px solid ${copiedTokenId === m.id ? "rgba(63, 169, 201, 0.4)" : "var(--border)"}`,
+                          color: copiedTokenId === m.id ? "#3fa9c9" : "var(--text)",
                           borderRadius: "4px",
                           padding: "2px 8px",
                           fontSize: "0.72rem",

@@ -27,7 +27,7 @@ export default function GlobalError({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#111822",
+          background: "#0b121a",
           color: "#f8fafc",
           fontFamily:
             "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
@@ -38,15 +38,15 @@ export default function GlobalError({
           <h1 style={{ fontSize: "1.3rem", margin: "0 0 10px", letterSpacing: "-0.02em" }}>
             UptimeMonke could not start
           </h1>
-          <p style={{ margin: "0 0 18px", fontSize: "0.92rem", lineHeight: 1.6, color: "#a3aab5" }}>
+          <p style={{ margin: "0 0 18px", fontSize: "0.92rem", lineHeight: 1.6, color: "#93a7b4" }}>
             Your monitors are unaffected — checks run on our workers and alerts
             are still going out. This is the web app failing to load.
           </p>
           <button
             onClick={reset}
             style={{
-              background: "#3bd671",
-              color: "#08151f",
+              background: "#6fc3df",
+              color: "#04121a",
               border: "none",
               borderRadius: "8px",
               padding: "10px 18px",
@@ -58,7 +58,7 @@ export default function GlobalError({
             Try again
           </button>
           {error.digest && (
-            <p style={{ marginTop: "18px", fontSize: "0.72rem", color: "#7c838f" }}>
+            <p style={{ marginTop: "18px", fontSize: "0.72rem", color: "#7d909e" }}>
               Reference: {error.digest}
             </p>
           )}

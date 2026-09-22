@@ -538,13 +538,13 @@ export default function NewMonitorForm({
                 width: "48px",
                 height: "48px",
                 borderRadius: "50%",
-                background: "rgba(16, 185, 129, 0.15)",
-                border: "1px solid rgba(16, 185, 129, 0.4)",
+                background: "rgba(63, 169, 201, 0.15)",
+                border: "1px solid rgba(63, 169, 201, 0.4)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 margin: "0 auto 16px",
-                color: "#10b981",
+                color: "#3fa9c9",
               }}
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -601,8 +601,8 @@ export default function NewMonitorForm({
                     setTimeout(() => setCopiedSuccessUrl(false), 2500);
                   }}
                   style={{
-                    background: copiedSuccessUrl ? "rgba(16, 185, 129, 0.2)" : "var(--primary)",
-                    color: copiedSuccessUrl ? "#10b981" : "#fff",
+                    background: copiedSuccessUrl ? "rgba(63, 169, 201, 0.2)" : "var(--primary)",
+                    color: copiedSuccessUrl ? "#3fa9c9" : "#fff",
                     padding: "4px 12px",
                     fontSize: "0.75rem",
                   }}
@@ -1257,8 +1257,8 @@ export default function NewMonitorForm({
                                 setTimeout(() => setCopiedToken(false), 2500);
                               }}
                               style={{
-                                background: copiedToken ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.1)",
-                                color: copiedToken ? "#10b981" : "var(--text)",
+                                background: copiedToken ? "rgba(63, 169, 201, 0.2)" : "rgba(255, 255, 255, 0.1)",
+                                color: copiedToken ? "#3fa9c9" : "var(--text)",
                                 border: "1px solid var(--border)",
                                 borderRadius: "4px",
                                 padding: "2px 8px",

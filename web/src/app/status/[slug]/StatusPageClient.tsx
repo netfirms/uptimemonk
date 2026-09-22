@@ -140,9 +140,9 @@ export default function StatusPageClient() {
           marginBottom: 24,
           padding: 24,
           background: allUp
-            ? "linear-gradient(135deg, rgba(59,214,113,.12) 0%, rgba(19,27,37,.95) 100%)"
-            : "linear-gradient(135deg, rgba(239,68,68,.15) 0%, rgba(19,27,37,.95) 100%)",
-          border: `1px solid ${allUp ? "rgba(59,214,113,.35)" : "rgba(239,68,68,.35)"}`,
+            ? "linear-gradient(135deg, rgba(111,195,223,.12) 0%, rgba(13,20,28,.95) 100%)"
+            : "linear-gradient(135deg, rgba(239,68,68,.15) 0%, rgba(13,20,28,.95) 100%)",
+          border: `1px solid ${allUp ? "rgba(111,195,223,.35)" : "rgba(239,68,68,.35)"}`,
         }}
       >
         <div className="row">

@@ -683,9 +683,9 @@ export default function MonitorDetail({
                       className="btn-sm"
                       onClick={() => copySnippet(`https://api.uptimemonke.com/heartbeat/${m.heartbeatToken}`, "url")}
                       style={{
-                        background: copiedKey === "url" ? "rgba(16, 185, 129, 0.2)" : "var(--primary)",
-                        color: copiedKey === "url" ? "#10b981" : "#fff",
-                        borderColor: copiedKey === "url" ? "rgba(16, 185, 129, 0.5)" : "transparent",
+                        background: copiedKey === "url" ? "rgba(63, 169, 201, 0.2)" : "var(--primary)",
+                        color: copiedKey === "url" ? "#3fa9c9" : "#fff",
+                        borderColor: copiedKey === "url" ? "rgba(63, 169, 201, 0.5)" : "transparent",
                         padding: "4px 10px",
                         fontSize: "0.75rem",
                       }}
@@ -741,9 +741,9 @@ export default function MonitorDetail({
                           copySnippet(code, activeSnippetTab);
                         }}
                         style={{
-                          background: copiedKey === activeSnippetTab ? "rgba(16, 185, 129, 0.15)" : "rgba(255, 255, 255, 0.06)",
-                          border: `1px solid ${copiedKey === activeSnippetTab ? "rgba(16, 185, 129, 0.4)" : "var(--border)"}`,
-                          color: copiedKey === activeSnippetTab ? "#10b981" : "var(--text-dim)",
+                          background: copiedKey === activeSnippetTab ? "rgba(63, 169, 201, 0.15)" : "rgba(255, 255, 255, 0.06)",
+                          border: `1px solid ${copiedKey === activeSnippetTab ? "rgba(63, 169, 201, 0.4)" : "var(--border)"}`,
+                          color: copiedKey === activeSnippetTab ? "#3fa9c9" : "var(--text-dim)",
                           borderRadius: "4px",
                           padding: "3px 8px",
                           fontSize: "0.72rem",

@@ -35,7 +35,7 @@ export default function OpengraphImage() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: "#0b131e",
+          background: "#070b10",
           padding: "72px",
           fontFamily: "sans-serif",
         }}
@@ -79,7 +79,7 @@ export default function OpengraphImage() {
                 width: 16,
                 height: 34,
                 borderRadius: 3,
-                background: i === 29 ? "#ef4444" : i === 14 ? "#f59e0b" : "#3BD671",
+                background: i === 29 ? "#ef4444" : i === 14 ? "#f59e0b" : "#6fc3df",
               }}
             />
           ))}

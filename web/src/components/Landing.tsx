@@ -453,33 +453,33 @@ export default function Landing({
         {/* Feature Badges Strip */}
         <div className="features-strip">
           <div className="feature-pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6fc3df" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z" />
             </svg>
             <span>{t("pillHttp")}</span>
           </div>
           <div className="feature-pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6fc3df" strokeWidth="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
             </svg>
             <span>{t("pillSsl")}</span>
           </div>
           <div className="feature-pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6fc3df" strokeWidth="2">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
             </svg>
             <span>{t("pillPing")}</span>
           </div>
           <div className="feature-pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6fc3df" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
             <span>{t("pillCron")}</span>
           </div>
           <div className="feature-pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6fc3df" strokeWidth="2">
               <rect width="18" height="18" x="3" y="3" rx="2" />
               <path d="M7 8h10M7 12h10" />
             </svg>
@@ -986,7 +986,7 @@ export default function Landing({
                     <p className="dim" style={{ fontSize: "0.82rem", margin: "4px 0" }}>
                       Target: <code>https://api.acme-corp.dev/healthz</code>
                     </p>
-                    <p style={{ color: "#3BD671", fontSize: "0.82rem" }}>
+                    <p style={{ color: "#6fc3df", fontSize: "0.82rem" }}>
                       {t("alertClosed")}
                     </p>
                   </div>
@@ -1091,7 +1091,7 @@ export default function Landing({
         <div className="why-grid">
           <div className="why-card">
             <div className="why-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6fc3df" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
@@ -1104,7 +1104,7 @@ export default function Landing({
 
           <div className="why-card">
             <div className="why-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6fc3df" strokeWidth="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
               </svg>
             </div>
@@ -1116,7 +1116,7 @@ export default function Landing({
 
           <div className="why-card">
             <div className="why-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6fc3df" strokeWidth="2">
                 <rect width="18" height="18" x="3" y="3" rx="2" />
                 <path d="M7 8h10M7 12h10" />
               </svg>
@@ -1129,7 +1129,7 @@ export default function Landing({
 
           <div className="why-card">
             <div className="why-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3BD671" strokeWidth="2">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6fc3df" strokeWidth="2">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>

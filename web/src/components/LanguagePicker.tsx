@@ -131,7 +131,7 @@ export default function LanguagePicker({
                       height="14"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="#10b981"
+                      stroke="#3fa9c9"
                       strokeWidth="2.5"
                       aria-hidden="true"
                     >

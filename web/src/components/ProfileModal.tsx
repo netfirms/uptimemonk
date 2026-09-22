@@ -230,7 +230,7 @@ export default function ProfileModal({
                 title="Click to copy User ID"
               >
                 <code>{currentUser.uid.slice(0, 10)}…{currentUser.uid.slice(-6)}</code>
-                <span style={{ fontSize: "0.7rem", color: copiedUid ? "#3BD671" : "inherit" }}>
+                <span style={{ fontSize: "0.7rem", color: copiedUid ? "#6fc3df" : "inherit" }}>
                   {copiedUid ? "✓ Copied" : "Copy"}
                 </span>
               </button>
@@ -245,7 +245,7 @@ export default function ProfileModal({
                     onClose();
                     onOpenWorkspaceSettings();
                   }}
-                  style={{ fontSize: "0.82rem", color: "#3BD671", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                  style={{ fontSize: "0.82rem", color: "#6fc3df", display: "inline-flex", alignItems: "center", gap: "4px" }}
                 >
                   <span>🏢 Workspace &amp; Public Status Page Settings</span>
                   <span>→</span>
