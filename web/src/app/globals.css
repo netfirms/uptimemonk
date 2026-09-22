@@ -11,39 +11,38 @@
   /* Lifted off near-black. The old base was #0b131e, which read as a terminal
      rather than a product — and one accent hue on near-black is what made the
      page feel like a tool for people who already agree with it. */
-  --bg: #0e1726;
+  --bg: #111822;
   /* Three tinted lights instead of one grey radial, so the page has hue
      before any content is drawn. Kept low-alpha: colour in the backdrop,
      not a gradient anybody has to read text against. */
   --bg-gradient:
-    radial-gradient(760px circle at 12% -6%, rgba(167, 139, 250, 0.16), transparent 62%),
-    radial-gradient(680px circle at 88% 2%, rgba(56, 189, 248, 0.14), transparent 60%),
-    radial-gradient(900px circle at 50% 8%, rgba(59, 214, 113, 0.1), transparent 66%),
-    linear-gradient(180deg, #16203200 0%, #0e1726 55%);
+    radial-gradient(1100px circle at 50% -8%, rgba(59, 214, 113, 0.09), transparent 64%),
+    linear-gradient(180deg, #161d28 0%, #111822 60%);
 
-  /* --- Accents -----------------------------------------------------------
-     Decorative hues, rotated across sections so the page is not one colour
-     repeated forty times. Deliberately NOT the status hues: green stays the
-     brand and "up", amber is maintenance and red is down, so reusing those
-     for decoration would make a heading look like a state. */
-  --accent-violet: #a78bfa;
-  --accent-cyan: #38bdf8;
-  --accent-blue: #60a5fa;
-  --accent-fuchsia: #e879f9;
-  --accent-mint: #3bd671;
+  /* --- Accent ------------------------------------------------------------
+     One secondary, and that is the whole palette.
+     
+     This was five hues rotated across sections by :nth-child. Five accents
+     is not a palette, it is an absence of one — and hues assigned by
+     position are chosen by an algorithm rather than for a reason.
+     
+     Ochre is warm, sits opposite the green without competing with it, and is
+     not a status colour (amber is maintenance, red is down), so it can carry
+     the supporter story without reading as a state. */
+  --accent-ochre: #d9a23b;
   
-  --surface: #16202f;
-  --surface-card: rgba(24, 33, 48, 0.82);
-  --surface-hover: #1d283c;
+  --surface: #19212c;
+  --surface-card: rgba(26, 34, 45, 0.84);
+  --surface-hover: #202935;
   --surface-input: #0e1622;
   
-  --border: #28364a;
+  --border: #2b3441;
   --border-hover: #36475c;
   --border-focus: #3BD671;
   
   --text: #ffffff;
-  --text-muted: #9fb0c6;
-  --text-dim: #64748b;
+  --text-muted: #a3aab5;
+  --text-dim: #7c838f;
   
   --up: #3BD671;
   --up-bg: rgba(59, 214, 113, 0.12);
@@ -223,10 +222,7 @@ code, pre, .font-mono {
   transform: translateX(-50%);
   width: min(1400px, 100vw);
   height: 520px;
-  background:
-    radial-gradient(46% 62% at 22% 0%, rgba(167, 139, 250, 0.22) 0%, transparent 70%),
-    radial-gradient(44% 58% at 78% 4%, rgba(56, 189, 248, 0.2) 0%, transparent 70%),
-    radial-gradient(50% 55% at 50% 0%, rgba(59, 214, 113, 0.16) 0%, transparent 72%);
+  background: radial-gradient(52% 58% at 50% 0%, rgba(59, 214, 113, 0.13) 0%, transparent 72%);
   pointer-events: none;
   z-index: 0;
   overflow: hidden;
@@ -1110,10 +1106,31 @@ button.btn-outline-red {
 }
 
 /* --- Section Headings --- */
+/**
+ * Left-aligned, not centred.
+ *
+ * Every section head sitting centred above a grid of cards is the brochure
+ * template — and centred prose has no consistent left edge for the eye to
+ * return to, so each line starts somewhere new. Ranging them left gives the
+ * page a spine and lets the hero keep centring as the one deliberate
+ * exception rather than the default.
+ */
 .section-head {
-  text-align: center;
-  max-width: 680px;
-  margin: 64px auto 32px;
+  text-align: left;
+  max-width: 620px;
+  margin: 72px 0 30px;
+}
+
+/* A short rule under the eyebrow, in place of the centred-and-floating look.
+   One mark, doing the job the symmetry was doing. */
+.section-head::after {
+  content: "";
+  display: block;
+  width: 34px;
+  height: 2px;
+  margin-top: 16px;
+  background: var(--primary);
+  opacity: 0.55;
 }
 
 .section-head h2 {
@@ -4697,17 +4714,18 @@ html[lang="my"] {
   box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
 }
 
+/**
+ * Not a gradient.
+ *
+ * A four-stop rainbow across the largest text on a page is a colour effect
+ * standing in for hierarchy, and it is the first thing that makes a layout
+ * look generated. Solid ink, with the product name carrying the one accent,
+ * says the same thing and lets the typography do the work.
+ */
 .hero-gradient-text {
-  background: linear-gradient(
-    110deg,
-    #3bd671 0%,
-    #38bdf8 38%,
-    #818cf8 68%,
-    #e879f9 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--text);
 }
+
 
 .hero-presets-strip {
   display: flex;
@@ -5159,82 +5177,47 @@ html[lang="my"] {
 }
 
 /* =======================================================================
-   SECTION ACCENTS
+   ACCENTS — TWO, USED ON PURPOSE
    =======================================================================
-   Each section takes a different hue, applied by position so no JSX has to
-   carry a colour. The eyebrow tag was #3BD671 on every one of them, which is
-   most of why the page read as monochrome. */
-.onboarding-journey-section .section-tag { color: var(--accent-violet); }
-.demo-section .section-tag              { color: var(--accent-cyan); }
-.alerts-section .section-tag            { color: var(--accent-fuchsia); }
-.features-grid-section .section-tag     { color: var(--accent-blue); }
-.donate-strip .section-tag              { color: var(--accent-mint); }
-.faq-section .section-tag               { color: var(--accent-violet); }
+   This was five hues rotated by :nth-child, which is decoration assigned by
+   position: nothing chose violet for the onboarding section, an algorithm
+   did. Restraint is what reads as intent.
 
-/* Onboarding steps: three steps, three hues. A numbered sequence in one
-   colour reads as three of the same thing. */
-.journey-cards-grid > *:nth-child(1) .journey-badge {
-  background: rgba(167, 139, 250, 0.14);
-  border-color: rgba(167, 139, 250, 0.34);
-  color: var(--accent-violet);
-}
-.journey-cards-grid > *:nth-child(2) .journey-badge {
-  background: rgba(56, 189, 248, 0.14);
-  border-color: rgba(56, 189, 248, 0.34);
-  color: var(--accent-cyan);
-}
-.journey-cards-grid > *:nth-child(3) .journey-badge {
-  background: rgba(59, 214, 113, 0.14);
-  border-color: rgba(59, 214, 113, 0.34);
-  color: var(--accent-mint);
+   Green is the brand and carries the primary action. Ochre is the one
+   secondary, for the supporter/capacity story — a warm counterweight that is
+   not a status colour and not a competing brand. Everything else is ink. */
+
+/* The eyebrow tags go quiet. They were five different colours shouting the
+   same volume as the headings underneath them. */
+.section-tag {
+  color: var(--text-dim);
+  font-weight: 600;
 }
 
-/* Feature cards: a coloured top edge that appears on hover, cycling through
-   the accents. Cheap, and it makes a grid of six cards feel like six things
-   rather than one card six times. */
+/* Except the one that is actually about money, which earns the accent. */
+.donate-strip .section-tag {
+  color: var(--accent-ochre);
+}
+
+/* Onboarding steps read as a sequence, so they share a colour and differ by
+   number — which is what a numbered sequence is for. */
+.journey-badge {
+  background: rgba(59, 214, 113, 0.1);
+  border-color: rgba(59, 214, 113, 0.26);
+  color: var(--primary);
+}
+
+/* One hover treatment, not a per-card colour lottery. */
 .why-card {
   position: relative;
   overflow: hidden;
 }
 
-.why-card::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  background: var(--card-accent, var(--accent-mint));
-  opacity: 0;
-  transition: opacity 0.22s var(--ease-out);
-}
-
-.why-card:hover::after { opacity: 1; }
-
-.why-card:nth-child(6n + 1) { --card-accent: var(--accent-violet); }
-.why-card:nth-child(6n + 2) { --card-accent: var(--accent-cyan); }
-.why-card:nth-child(6n + 3) { --card-accent: var(--accent-mint); }
-.why-card:nth-child(6n + 4) { --card-accent: var(--accent-blue); }
-.why-card:nth-child(6n + 5) { --card-accent: var(--accent-fuchsia); }
-.why-card:nth-child(6n + 6) { --card-accent: var(--accent-cyan); }
-
 .why-card:hover {
-  border-color: color-mix(in oklab, var(--card-accent) 42%, transparent);
-  transform: translateY(-2px);
+  border-color: rgba(59, 214, 113, 0.32);
 }
 
-/* Audience chips pick up the accents too — four roles, four hues. */
-.audience-roles .audience-role:nth-child(1):hover {
-  border-color: rgba(167, 139, 250, 0.55);
-  background: rgba(167, 139, 250, 0.12);
-}
-.audience-roles .audience-role:nth-child(2):hover {
-  border-color: rgba(56, 189, 248, 0.55);
-  background: rgba(56, 189, 248, 0.12);
-}
-.audience-roles .audience-role:nth-child(3):hover {
-  border-color: rgba(96, 165, 250, 0.55);
-  background: rgba(96, 165, 250, 0.12);
-}
-.audience-roles .audience-role:nth-child(4):hover {
-  border-color: rgba(232, 121, 249, 0.55);
-  background: rgba(232, 121, 249, 0.12);
+.audience-role:hover {
+  border-color: rgba(59, 214, 113, 0.45);
+  background: rgba(59, 214, 113, 0.08);
 }
