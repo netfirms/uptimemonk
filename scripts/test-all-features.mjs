@@ -213,7 +213,13 @@ describe("UptimeMonk — All Features Verification Suite", () => {
       assert.equal(PLANS.free.bonusChecksPerDay, 0);
       assert.ok(PLANS.solo.bonusChecksPerDay > 0);
       for (const p of ["free", "solo", "team", "scale"]) {
-        assert.equal(PLANS[p].minIntervalSeconds, 5, `${p} interval floor`);
+        // The interval floor and monitor cap are operator-settable now, so
+        // they are resolved by `limitsFor` rather than baked into `PLANS` —
+        // a literal would report whatever the worker booted with. What this
+        // still asserts is the point of the block: the floor is the same for
+        // every plan, because no tier gates it.
+        assert.equal(limitsFor(p).minIntervalSeconds, 5, `${p} interval floor`);
+        assert.ok(limitsFor(p).maxMonitors > 0, `${p} monitor cap`);
         assert.equal(PLANS[p].multiRegion, true, `${p} multi-region`);
         assert.equal(PLANS[p].apiAccess, true, `${p} api`);
       }
