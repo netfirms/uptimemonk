@@ -215,6 +215,26 @@ code, pre, .font-mono {
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border);
   border-radius: 12px;
+
+  /**
+   * `backdrop-filter` creates a stacking context, which traps everything
+   * inside it.
+   *
+   * The language menu sets `z-index: 10000` and still rendered *behind* the
+   * dashboard: a z-index only orders an element among its siblings inside the
+   * nearest stacking context, and it cannot lift it out of one. With the bar
+   * unpositioned, that context sat in normal flow order, so any positioned
+   * content after it painted on top.
+   *
+   * So the bar itself has to be raised, not the menu. 100 clears page content
+   * (which uses 2–50) and stays well below modals and toasts at 9999+, which
+   * must still cover the bar.
+   *
+   * The landing page never showed this because `.landing-topbar` is sticky and
+   * already carried a z-index — the same reason, fixed by accident.
+   */
+  position: relative;
+  z-index: 100;
 }
 
 .brand-badge {
@@ -843,7 +863,8 @@ button.btn-outline-red {
 .landing-topbar {
   position: sticky;
   top: 12px;
-  z-index: 50;
+  /* z-index comes from `.topbar` (100). Re-declaring it here as 50 made the
+     same bar stack differently on two pages for no reason. */
 }
 
 .landing-nav {
