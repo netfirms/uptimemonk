@@ -1,6 +1,6 @@
 {
   "name": "uptimemonk-server",
-  "version": "0.5.15",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "UptimeMonk probe + API service for AWS Lightsail",
