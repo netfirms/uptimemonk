@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/probe_pulse.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
@@ -292,7 +293,11 @@ class DashboardScreen extends StatelessWidget {
           ),
           body: vm.isLoading
               ? const Center(
-                  child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+                  child: ProbePulse(
+                    size: 108,
+                    showMark: false,
+                    messages: ['Fetching your monitors…'],
+                  ),
                 )
               : RefreshIndicator(
                   onRefresh: vm.refreshAll,

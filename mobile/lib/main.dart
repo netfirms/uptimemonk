@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'core/auth_routing.dart';
 import 'core/theme.dart';
+import 'ui/widgets/probe_pulse.dart';
 import 'data/services/push_service.dart';
 import 'viewmodels/auth_viewmodel.dart';
 import 'viewmodels/dashboard_viewmodel.dart';
@@ -39,12 +40,36 @@ class UptimeMonkeApp extends StatelessWidget {
       ],
       child: Consumer<AuthViewModel>(
         builder: (context, authVm, _) {
+          // Built once: calling _resolveHome twice — for the key and the
+          // child — would construct the whole destination tree twice on
+          // every rebuild.
+          final home = _resolveHome(authVm);
           return MaterialApp(
             title: 'UptimeMonke',
             scaffoldMessengerKey: rootScaffoldMessengerKey,
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,
-            home: _resolveHome(authVm),
+            // Cross-fade between destinations rather than cutting. The
+            // splash-to-login and login-to-dashboard handovers were both a
+            // hard swap, which reads as a flicker on a fast device.
+            //
+            // Keyed by runtimeType, not by widget identity: rebuilding the
+            // same destination (a rebuild on any auth change) must not
+            // re-run the transition, or the dashboard would fade on every
+            // notifyListeners.
+            home: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 320),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              layoutBuilder: (current, previous) => Stack(
+                alignment: Alignment.center,
+                children: [...previous, if (current != null) current],
+              ),
+              child: KeyedSubtree(
+                key: ValueKey(home.runtimeType),
+                child: home,
+              ),
+            ),
           );
         },
       ),
@@ -64,9 +89,20 @@ class UptimeMonkeApp extends StatelessWidget {
 
     switch (destination) {
       case AuthDestination.loading:
+        // The first thing anyone sees. A bare spinner here told them nothing
+        // and looked like the app had stalled; the pulse says a check is
+        // going out, which is what is actually happening.
         return const Scaffold(
+          backgroundColor: AppTheme.bgDark,
           body: Center(
-            child: CircularProgressIndicator(color: AppTheme.primaryEmerald),
+            child: ProbePulse(
+              size: 132,
+              messages: [
+                'Waking the monkey…',
+                'Reaching the edge probes…',
+                'Checking your workspace…',
+              ],
+            ),
           ),
         );
 
