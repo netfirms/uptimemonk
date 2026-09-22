@@ -629,9 +629,9 @@ button.btn-outline-red {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* The name now shares this row with up to three chips. Without wrapping,
-     a long name pushes the protocol tag off the card on a narrow screen —
-     and the tag is the thing being scanned for. */
+  /* Only the protocol tag shares this row now — the rest moved to
+     `.monitor-marks`. Wrapping stays: a long name would otherwise push the
+     tag off a narrow card, and the tag is what the list is scanned by. */
   flex-wrap: wrap;
   row-gap: 5px;
 }
@@ -5060,4 +5060,57 @@ html[lang="my"] {
   .audience-role { font-size: 0.78rem; padding: 6px 12px; }
   .preview-chart-slot { padding: 10px 10px 12px; }
   .latency-chart { padding: 12px 12px 8px; }
+}
+
+/* =======================================================================
+   MONITOR CARD — SECONDARY MARKS
+   =======================================================================
+   Interval, public, cert expiry and mute state. All still on the card, but
+   stripped of pill chrome: a border and a fill make a chip compete with the
+   monitor name, and four of them beside a name means the name is no longer
+   the first thing read. Separated by middots, which cost no space.
+
+   Nothing here is removed — only demoted. */
+.monitor-marks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  margin-top: 3px;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.monitor-marks .mark {
+  display: inline-flex;
+  align-items: center;
+  font-family: "JetBrains Mono", monospace;
+  white-space: nowrap;
+}
+
+/* The separator is drawn, not typed, so it never lands at the end of a
+   wrapped line or before a conditional mark that did not render. */
+.monitor-marks .mark + .mark::before {
+  content: "·";
+  margin-right: 7px;
+  color: var(--border-hover);
+}
+
+/* Expiry keeps a colour when it is close. A quiet mark is the right weight;
+   an invisible one is not, and a lapsing certificate is actionable. */
+.monitor-marks .mark-cert.warn {
+  color: var(--maintenance);
+}
+
+.monitor-marks .mark-cert.down {
+  color: var(--down);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .monitor-marks {
+    gap: 0 8px;
+    font-size: 0.66rem;
+  }
 }

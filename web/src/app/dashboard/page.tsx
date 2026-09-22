@@ -729,35 +729,11 @@ export default function Dashboard() {
               <div className="grow">
                 <div className="monitor-name">
                   <span>{m.name}</span>
+                  {/* The protocol tag stays on the name row — it is what the
+                      list is scanned by. Everything else moved down to the
+                      subline, because five chips beside a name means the name
+                      stops being the thing you see first. */}
                   <span className={`protocol-tag ${m.type}`}>{protocolTag(m.type)}</span>
-                  <span className="interval-tag">{intervalText}</span>
-                  {m.publicOnStatusPage && (
-                    <span className="interval-tag public" title="Shown on your public status page">
-                      Public
-                    </span>
-                  )}
-                  {state?.certExpiresAt != null && (() => {
-                    const b = certBadge(t, state.certExpiresAt);
-                    return (
-                      <span
-                        className={`cert-tag ${b.state}`}
-                        title={`Certificate valid until ${new Date(
-                          state.certExpiresAt
-                        ).toLocaleDateString(undefined, {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}`}
-                      >
-                        {b.text}
-                      </span>
-                    );
-                  })()}
-                  {m.muteAlerts && (
-                    <span className="interval-tag muted" title="Incidents are recorded but nobody is paged">
-                      Muted
-                    </span>
-                  )}
                 </div>
                 <div className="monitor-target">
                   {m.type === "heartbeat" && m.heartbeatToken ? (
@@ -826,6 +802,43 @@ export default function Dashboard() {
                     </a>
                   ) : (
                     <span>{m.type === "heartbeat" ? "Heartbeat Push API" : m.type}</span>
+                  )}
+                </div>
+
+                {/* Secondary facts: present and readable, but quiet. Nothing
+                    was removed — it is the weight that changed, so status,
+                    name and target carry the scan. */}
+                <div className="monitor-marks">
+                  <span className="mark">{intervalText}</span>
+                  {m.publicOnStatusPage && (
+                    <span className="mark" title="Shown on your public status page">
+                      public
+                    </span>
+                  )}
+                  {state?.certExpiresAt != null && (() => {
+                    const b = certBadge(t, state.certExpiresAt);
+                    return (
+                      <span
+                        /* Expiry keeps its colour when it is close: a quiet
+                           mark is still the right weight, an invisible one is
+                           not, and a cert about to lapse is actionable. */
+                        className={`mark mark-cert ${b.state}`}
+                        title={`Certificate valid until ${new Date(
+                          state.certExpiresAt
+                        ).toLocaleDateString(undefined, {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}`}
+                      >
+                        {b.text}
+                      </span>
+                    );
+                  })()}
+                  {m.muteAlerts && (
+                    <span className="mark" title="Incidents are recorded but nobody is paged">
+                      muted
+                    </span>
                   )}
                 </div>
               </div>
