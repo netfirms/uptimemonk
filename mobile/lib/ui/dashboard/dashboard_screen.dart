@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../widgets/probe_pulse.dart';
 import '../widgets/stagger_in.dart';
@@ -289,8 +291,17 @@ class DashboardScreen extends StatelessWidget {
               ],
             ),
             actions: [
-              // Credits Chip (if available)
-              if (vm.creditsRemaining != null && vm.creditsRemaining! > 0)
+              // Credits chip — a donated balance, so never on iOS.
+              //
+              // It only appears for someone who has donated, carries a coffee
+              // mark, and reads as a purchased balance. App Store Guideline
+              // 3.1.1 covers steering to payment outside In-App Purchase, and
+              // a reviewer has no way to tell this apart from a paid-credit
+              // meter. The server already withholds the funding block from
+              // iOS; this is the matching half.
+              if (!Platform.isIOS &&
+                  vm.creditsRemaining != null &&
+                  vm.creditsRemaining! > 0)
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: Container(

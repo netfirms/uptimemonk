@@ -114,7 +114,12 @@ describe("fitting the budget", () => {
   test("the refusal talks about checks, not about a tier the user cannot see", () => {
     const v = fitsBudget(free(), Array(50).fill(mon(60)));
     assert.ok(!/plan/i.test(v.reason!), v.reason);
-    assert.match(v.reason!, /support the project/);
+    // The numbers, and no pitch. An API error string is shown by every
+    // client including the iOS app, and a solicitation outside In-App
+    // Purchase is what App Store review rejects under Guideline 3.1.1.
+    assert.match(v.reason!, /checks a day/);
+    assert.doesNotMatch(v.reason!, /support the project|donat|upgrade|\$/i,
+      "the refusal must not solicit payment — see Guideline 3.1.1");
   });
 
   test("a donation buys real headroom over the free allowance", () => {

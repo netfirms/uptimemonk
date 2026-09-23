@@ -1,7 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { auth, col } from "../sync/firebase.js";
 import { requireAdmin, requireAuth } from "./auth.js";
-import { listMonitors, getOrgCredit, creditLedger, deleteOrg } from "../db/repo.js";
+import {
+  deleteAccountAndData,
+  findOwnedOrg,
+  otherMembersOf,
+} from "../lib/accountDeletion.js";
+import { listMonitors, getOrgCredit, creditLedger } from "../db/repo.js";
 import { budgetFor, standingOf } from "../lib/credits.js";
 import { readinessSummary } from "../lib/readiness.js";
 import { readFileSync } from "node:fs";
@@ -146,67 +151,19 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const orgSnap = await col.orgs().where("ownerUid", "==", uid).get();
-      const orgId = orgSnap.empty ? null : orgSnap.docs[0].id;
-
-      if (orgId) {
-        const members = await col.users().where("orgId", "==", orgId).get();
-        const others = members.docs.filter((d) => d.id !== uid);
-        if (others.length) {
-          return reply.code(409).send({
-            error: `That workspace has ${others.length} other member(s). Move or remove them first.`,
-            code: "org-has-members",
-          });
-        }
+      const orgId = await findOwnedOrg(uid);
+      if (orgId && (await otherMembersOf(orgId, uid))) {
+        const others = await otherMembersOf(orgId, uid);
+        return reply.code(409).send({
+          error: `That workspace has ${others} other member(s). Move or remove them first.`,
+          code: "org-has-members",
+        });
       }
 
-      // Firestore first. Batched per collection rather than one giant batch,
-      // because a batch caps at 500 writes and a busy workspace exceeds it.
-      let firestoreDocs = 0;
-      if (orgId) {
-        for (const query of [
-          col.monitors().where("orgId", "==", orgId),
-          col.incidents().where("orgId", "==", orgId),
-          col.alertContacts().where("orgId", "==", orgId),
-          col.statusPages().where("orgId", "==", orgId),
-          col.statusSlugs().where("orgId", "==", orgId),
-        ]) {
-          const snap = await query.get();
-          for (let i = 0; i < snap.docs.length; i += 400) {
-            const batch = col.orgs().firestore.batch();
-            snap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
-            await batch.commit();
-          }
-          firestoreDocs += snap.size;
-        }
-
-        await col.orgStatus().doc(orgId).delete();
-        await col.orgs().doc(orgId).delete();
-        firestoreDocs += 2;
-      }
-
-      await col.users().doc(uid).delete();
-      firestoreDocs += 1;
-
-      // Then the worker's own tables, which nothing upstream describes.
-      const removed = orgId ? deleteOrg(orgId) : { monitors: 0, contacts: 0, ledger: 0 };
-
-      // The account last, so a failure above leaves something recoverable.
-      await auth().deleteUser(uid);
-
-      log.warn(
-        {
-          deletedUid: uid,
-          deletedEmail: account.email ?? null,
-          orgId,
-          firestoreDocs,
-          ...removed,
-          by: req.user?.email,
-        },
-        "admin deleted account"
-      );
-
-      return { deleted: true, uid, orgId, firestoreDocs, ...removed };
+      // The deletion itself lives in lib/accountDeletion so this and the
+      // self-service route cannot drift into deleting different things.
+      const result = await deleteAccountAndData(uid, "operator", req.user?.email);
+      return { deleted: true, ...result };
     }
   );
 

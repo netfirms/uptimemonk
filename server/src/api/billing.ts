@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { Timestamp } from "firebase-admin/firestore";
 import { col } from "../sync/firebase.js";
 import { requireAuth } from "./auth.js";
+import { isAppleClient } from "../lib/recaptcha.js";
 import { log } from "../lib/log.js";
 import { getOrgCredit, postCredit, setDonationState } from "../db/repo.js";
 import {
@@ -71,6 +72,47 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get("/v1/billing", { preHandler: requireAuth() }, async (req) => {
     const credit = getOrgCredit(req.user!.orgId);
+
+    /**
+     * The iOS build is told its balance and never how to add to it.
+     *
+     * App Store Guideline 3.1.1 forbids steering users to a payment method
+     * outside In-App Purchase, and a Stripe URL in an API response is exactly
+     * that even when no button currently renders it. Withholding it here
+     * rather than only hiding the UI means a future screen cannot surface it
+     * by accident — the app is never given the link to show.
+     *
+     * Standing, balance and budget stay: they are what the workspace *has*,
+     * which the app needs to explain why a monitor was refused, and are not
+     * an offer to sell anything.
+     */
+    const appleClient = isAppleClient(req.headers["x-platform"]);
+
+    const funding = appleClient
+      ? {}
+      : {
+          suggestedUsd: SUGGESTED_USD,
+
+          /**
+           * The one-click option. Available whether or not a secret key is
+           * set: taking money through a Payment Link needs no API key at all,
+           * only the webhook secret to *record* it. Those are separate
+           * concerns and the UI reports them separately.
+           */
+          link: {
+            url: donationLinkFor(req.user!.orgId),
+            cents: DONATION_LINK_CENTS,
+            checks: monthlyGrantCents(DONATION_LINK_CENTS),
+            recurring: DONATION_LINK_RECURRING,
+            /** False means a donation would be taken but never credited. */
+            credited: Boolean(STRIPE_WEBHOOK_SECRET),
+          },
+
+          // Custom amounts need the API key, since they create a session.
+          enabled: Boolean(stripe),
+          preview: SUGGESTED_USD.map((usd) => ({ usd, checks: monthlyGrant(usd) })),
+        };
+
     return {
       standing: standingOf(credit),
       credits: credit.credits,
@@ -78,26 +120,9 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       graceUntil: credit.graceUntil,
       checksPerDayBudget: budgetFor(credit),
       maxMonitors: maxMonitorsFor(credit),
-      suggestedUsd: SUGGESTED_USD,
-
-      /**
-       * The one-click option. Available whether or not a secret key is set:
-       * taking money through a Payment Link needs no API key at all, only the
-       * webhook secret to *record* it. Those are separate concerns and the UI
-       * reports them separately.
-       */
-      link: {
-        url: donationLinkFor(req.user!.orgId),
-        cents: DONATION_LINK_CENTS,
-        checks: monthlyGrantCents(DONATION_LINK_CENTS),
-        recurring: DONATION_LINK_RECURRING,
-        /** False means a donation would be taken but never credited. */
-        credited: Boolean(STRIPE_WEBHOOK_SECRET),
-      },
-
-      // Custom amounts need the API key, since they create a session.
-      enabled: Boolean(stripe),
-      preview: SUGGESTED_USD.map((usd) => ({ usd, checks: monthlyGrant(usd) })),
+      /** Lets a client render an explanation instead of an empty panel. */
+      fundingAvailable: !appleClient,
+      ...funding,
     };
   });
 
@@ -113,6 +138,15 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     "/v1/billing/checkout",
     { preHandler: requireAuth() },
     async (req, reply) => {
+      // Refused for the iOS build as well as hidden from it. The app has no
+      // screen that calls this, and that is exactly why the check belongs
+      // here: a route reachable only by accident is the one that gets reached
+      // by accident, and a payment path outside In-App Purchase is what App
+      // Store review rejects.
+      if (isAppleClient(req.headers["x-platform"])) {
+        return reply.code(404).send({ error: "Not available." });
+      }
+
       if (!stripe) {
         return reply.code(503).send({ error: "Donations are not configured on this server" });
       }

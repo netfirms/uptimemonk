@@ -11,6 +11,11 @@ import { requireAuth, needsEmailConfirmation } from "./auth.js";
 import { log } from "../lib/log.js";
 import { verifyRecaptcha, botGateApplies } from "../lib/recaptcha.js";
 import {
+  deleteAccountAndData,
+  findOwnedOrg,
+  otherMembersOf,
+} from "../lib/accountDeletion.js";
+import {
   SECRET_CONFIG_KEYS,
   SIGNUP_NOTIFY_EMAIL,
   APP_URL,
@@ -401,6 +406,45 @@ export async function miscRoutes(app: FastifyInstance): Promise<void> {
       log.warn({ err, orgId: info.orgId }, "signup notice could not be sent");
     }
   }
+
+  /**
+   * Delete your own account and everything in it.
+   *
+   * Required by App Store Guideline 5.1.1(v): an app that creates accounts
+   * must offer deletion from inside the app. A support address or a link to
+   * the website does not satisfy it, and this is what the review was failing
+   * on.
+   *
+   * Server-side through the Admin SDK rather than client-side `user.delete()`,
+   * which raises `requires-recent-login` for any session older than a few
+   * minutes — the usual reason a delete button appears to work and silently
+   * does not.
+   *
+   * No confirmation parameter and no grace period. The client confirms before
+   * calling, and a deletion that quietly does not happen is worse than one
+   * that does: someone asking to be forgotten has to be able to rely on it.
+   */
+  app.delete("/v1/me", { preHandler: requireAuth() }, async (req, reply) => {
+    const uid = req.user!.uid;
+
+    const orgId = await findOwnedOrg(uid);
+    if (orgId) {
+      const others = await otherMembersOf(orgId, uid);
+      if (others > 0) {
+        // Deleting the owner would take the workspace down under the people
+        // still using it. They get told to hand it over first.
+        return reply.code(409).send({
+          error:
+            `This workspace has ${others} other member${others === 1 ? "" : "s"}. ` +
+            `Transfer ownership or remove them before deleting your account.`,
+          code: "org-has-members",
+        });
+      }
+    }
+
+    const result = await deleteAccountAndData(uid, "self-service");
+    return { deleted: true, ...result };
+  });
 
   app.get("/v1/me", { preHandler: requireAuth() }, async (req) => {
     const plan = getOrgPlan(req.user!.orgId) as Plan;

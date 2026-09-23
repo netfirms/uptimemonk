@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import '../../core/constants.dart';
@@ -14,6 +15,15 @@ class ApiException implements Exception {
   @override
   String toString() => 'ApiException ($statusCode): $message';
 }
+
+/// Which store build this is.
+///
+/// The server withholds every payment path from the iOS build: App Store
+/// Guideline 3.1.1 forbids steering users to a payment method outside In-App
+/// Purchase, and a submission was rejected for it. Sent as its own header
+/// rather than folded into `x-client`, which the bot gate reads — see
+/// `_authHeaders`.
+final String appPlatform = Platform.isIOS ? 'ios' : 'android';
 
 class ApiClient {
   final String baseUrl;
@@ -33,7 +43,12 @@ class ApiClient {
       // token — that is a browser technology. See the bot-gate comment in
       // server/src/api/misc.ts: the exemption is deliberate and weak, and is
       // meant to be replaced by Firebase App Check.
+      //
+      // Do not narrow this to 'ios' to identify the platform: the bot gate
+      // keys on this exact value, so changing it would re-arm the captcha for
+      // sign-ups the app cannot pass. The platform goes in its own header.
       'x-client': 'mobile',
+      'x-platform': appPlatform,
     };
   }
 
@@ -269,6 +284,29 @@ class ApiClient {
 
     final data = _handleResponse(res) as Map<String, dynamic>;
     return data['displayName'] as String? ?? displayName;
+  }
+
+  /// Delete this account and everything belonging to it.
+  ///
+  /// The App Store requires an in-app way to do this for any app that creates
+  /// accounts (Guideline 5.1.1(v)); a link to the website does not satisfy it,
+  /// and the submission was rejected for its absence.
+  ///
+  /// Goes through the server rather than `FirebaseAuth.currentUser.delete()`
+  /// on purpose. The client-side call throws `requires-recent-login` for any
+  /// session older than a few minutes, so the button would appear to work and
+  /// would not — and it deletes only the Auth record, leaving the workspace,
+  /// monitors and history behind.
+  ///
+  /// Returns the counts the server removed, so the confirmation can say what
+  /// actually went rather than a generic success.
+  Future<Map<String, dynamic>> deleteAccount() async {
+    final headers = await _authHeaders();
+    final res = await http
+        .delete(Uri.parse('$baseUrl/v1/me'), headers: headers)
+        .timeout(AppConstants.requestTimeout);
+
+    return (_handleResponse(res) as Map<String, dynamic>?) ?? <String, dynamic>{};
   }
 
   // --- Org & Billing ---

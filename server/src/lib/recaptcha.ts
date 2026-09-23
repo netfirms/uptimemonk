@@ -40,6 +40,25 @@ export function botGateApplies(clientHeader: string | string[] | undefined): boo
   return clientHeader !== "mobile";
 }
 
+/**
+ * True when the caller is the iOS build.
+ *
+ * A **separate** header from `X-Client` on purpose. `botGateApplies` keys on
+ * `X-Client === "mobile"`, so narrowing that value to "ios" would quietly
+ * re-arm the captcha for iOS sign-ups and break them — the gate would start
+ * demanding a reCAPTCHA token the app has no way to mint.
+ *
+ * Used to withhold anything that would read as a purchase: an iOS build that
+ * shows a payment path outside In-App Purchase fails review under App Store
+ * Guideline 3.1.1, and that is what the submission was rejected for.
+ *
+ * Spoofable, like every request header, and that is fine. The cost of a lie is
+ * that a caller sees *less*; nothing is protected by it.
+ */
+export function isAppleClient(platformHeader: string | string[] | undefined): boolean {
+  return platformHeader === "ios";
+}
+
 export interface RecaptchaVerdict {
   ok: boolean;
   score?: number;

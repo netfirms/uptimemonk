@@ -672,8 +672,13 @@ class _MonitorFormScreenState extends State<MonitorFormScreen> {
             ),
             const SizedBox(height: 6),
             Text(
+              // States the limit; does not sell past it. "Needs an upgrade"
+              // is an offer, and an iOS build that makes one outside In-App
+              // Purchase fails review under Guideline 3.1.1. Neutral on every
+              // platform rather than forked, so the builds cannot drift — and
+              // the wording is more honest anyway.
               _minIntervalSeconds > 5
-                  ? 'Faster intervals need an upgrade — the current plan checks every ${_formatInterval(_minIntervalSeconds)} at most.'
+                  ? 'This workspace checks every ${_formatInterval(_minIntervalSeconds)} at most.'
                   : 'Sub-minute checks running from the edge probe fleet.',
               style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
             ),

@@ -249,6 +249,16 @@ export function fitsBudget(
 
   if (used <= budget) return { ok: true, used, budget, standing };
 
+  /**
+   * This wording reaches every client, so it states the numbers and stops.
+   * It used to end "or support the project to raise the budget" — which is a
+   * solicitation, and an iOS build that shows one outside In-App Purchase
+   * fails App Store review under Guideline 3.1.1.
+   *
+   * How to raise the budget belongs in the surface that can actually offer
+   * it: the web dashboard, which has the donation UI. Do not put it back here.
+   */
+
   const perDay = (n: number) => n.toLocaleString();
   return {
     ok: false,
@@ -258,8 +268,8 @@ export function fitsBudget(
     reason:
       standing === "free" || standing === "lapsed"
         ? `That needs ${perDay(used)} checks a day and this workspace has ` +
-          `${perDay(budget)}. Slow some monitors down, or support the project ` +
-          `to raise the budget.`
+          `${perDay(budget)}. Slow some monitors down to fit, or raise the ` +
+          `workspace budget.`
         : `That needs ${perDay(used)} checks a day and your balance covers ` +
           `${perDay(budget)}.`,
   };

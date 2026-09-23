@@ -210,6 +210,123 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// Confirm, then delete the account and everything in it.
+  ///
+  /// Two-step on purpose. The first dialog explains what goes; the second
+  /// requires typing DELETE, because this sits one tap below Sign Out and a
+  /// mis-tap here is not recoverable. Apple requires the deletion to be
+  /// reachable in-app (Guideline 5.1.1(v)); nothing requires it to be easy to
+  /// do by accident.
+  Future<void> _confirmDeleteAccount() async {
+    final warned = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.bgSurface,
+        title: const Text('Delete your account?'),
+        content: const Text(
+          'This removes your account, this workspace, every monitor and its '
+          'history, and your alert contacts.\n\n'
+          'Monitoring stops immediately and nothing can be recovered.',
+          style: TextStyle(height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep my account',
+                style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continue',
+                style: TextStyle(color: AppTheme.statusDown)),
+          ),
+        ],
+      ),
+    );
+    if (warned != true || !mounted) return;
+
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final matches = controller.text.trim().toUpperCase() == 'DELETE';
+          return AlertDialog(
+            backgroundColor: AppTheme.bgSurface,
+            title: const Text('Type DELETE to confirm'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(hintText: 'DELETE'),
+              onChanged: (_) => setLocal(() {}),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel',
+                    style: TextStyle(color: AppTheme.textMuted)),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.statusDown,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: matches ? () => Navigator.pop(ctx, true) : null,
+                child: const Text('Delete forever'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    controller.dispose();
+    if (confirmed != true || !mounted) return;
+
+    // A blocking spinner: this deletes across Firestore, the worker's database
+    // and Firebase Auth, so it is not instant, and a second tap would fire a
+    // second delete against an account that is already going.
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: AppTheme.statusDown),
+      ),
+    );
+
+    try {
+      await _apiClient.deleteAccount();
+      if (!mounted) return;
+      Navigator.pop(context); // the spinner
+
+      // Sign out locally so the router returns to the login screen. The
+      // account is already gone server-side, so this only clears this device;
+      // a failure here must not look like the deletion failed.
+      try {
+        await context.read<AuthViewModel>().signOut();
+      } catch (e) {
+        debugPrint('Sign-out after account deletion: $e');
+      }
+
+      if (mounted) {
+        Navigator.of(context).popUntil((r) => r.isFirst);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppTheme.bgSurfaceElevated,
+            content: Text('Your account and all of its data have been deleted.'),
+            duration: Duration(seconds: 6),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // the spinner
+      _toast(_readable(e), ok: false);
+    }
+  }
+
   // --------------------------------------------------------------- contacts
 
   /// [report] is handed the outcome, so a caller that wants to measure an
@@ -398,6 +515,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 await authVm.signOut();
                 if (context.mounted) Navigator.pop(context);
               },
+            ),
+
+            const SizedBox(height: 28),
+
+            // --- Danger zone ---------------------------------------------
+            // Below sign-out and visually separated, because the two are one
+            // tap apart and only one of them is reversible.
+            const Divider(color: AppTheme.borderDark, height: 1),
+            const SizedBox(height: 20),
+            const Text(
+              'DELETE ACCOUNT',
+              style: TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Permanently removes your account, this workspace, every monitor '
+              'and its history, and your alert contacts. Monitoring stops '
+              'immediately. This cannot be undone.',
+              style: TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 13,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.statusDown,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                alignment: Alignment.centerLeft,
+              ),
+              icon: const Icon(Icons.delete_forever_outlined, size: 18),
+              label: const Text('Delete my account',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: _confirmDeleteAccount,
             ),
 
             // Version at the foot of the settings list, where people look when
