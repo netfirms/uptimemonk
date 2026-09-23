@@ -9,7 +9,7 @@ import {
   countFeedbackByStatus,
   updateFeedback,
   deleteFeedback,
-} from "../db/repo.js";
+} from "../sync/feedbackStore.js";
 import type { FeedbackKind, FeedbackStatus } from "../types.js";
 import { log } from "../lib/log.js";
 
@@ -138,12 +138,12 @@ export async function feedbackRoutes(app: FastifyInstance): Promise<void> {
     // Idempotent for the impatient-second-click case. Reported as success:
     // the sender's message did arrive, and telling them it was a duplicate
     // invites them to send it a third time with a word changed.
-    if (isDuplicateFeedback(email, message, DUPLICATE_WINDOW_MS)) {
+    if (await isDuplicateFeedback(email, message, DUPLICATE_WINDOW_MS)) {
       log.info({ email }, "feedback: duplicate suppressed");
       return reply.code(202).send({ ok: true, duplicate: true });
     }
 
-    const saved = insertFeedback({
+    const saved = await insertFeedback({
       kind,
       message,
       email,
@@ -173,10 +173,13 @@ export async function feedbackRoutes(app: FastifyInstance): Promise<void> {
         ? (req.query.status as FeedbackStatus)
         : undefined;
       const limit = Number(req.query.limit) || undefined;
-      return {
-        counts: countFeedbackByStatus(),
-        messages: listFeedback({ status, limit }),
-      };
+      // In parallel: the counts drive the badges and the list drives the
+      // rows, and neither depends on the other.
+      const [counts, messages] = await Promise.all([
+        countFeedbackByStatus(),
+        listFeedback({ status, limit }),
+      ]);
+      return { counts, messages };
     }
   );
 
@@ -196,7 +199,7 @@ export async function feedbackRoutes(app: FastifyInstance): Promise<void> {
       patch.operatorNote = String(req.body.operatorNote).slice(0, MAX_MESSAGE);
     }
 
-    if (!updateFeedback(req.params.id, patch)) {
+    if (!(await updateFeedback(req.params.id, patch))) {
       return reply.code(404).send({ error: "No such message." });
     }
     return { ok: true };
@@ -206,7 +209,7 @@ export async function feedbackRoutes(app: FastifyInstance): Promise<void> {
     "/v1/admin/feedback/:id",
     guard,
     async (req, reply) => {
-      if (!deleteFeedback(req.params.id)) {
+      if (!(await deleteFeedback(req.params.id))) {
         return reply.code(404).send({ error: "No such message." });
       }
       return { ok: true };

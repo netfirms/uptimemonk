@@ -88,6 +88,21 @@ service cloud.firestore {
       allow write: if false; // the probe box owns every field
     }
 
+    /**
+     * Feedback is write-only from the worker and readable by nobody through
+     * the client SDK.
+     *
+     * Messages carry an email address and whatever the sender chose to write,
+     * which may include anything. Letting a signed-in user read this
+     * collection would expose every other user's message; letting the client
+     * write would remove the reCAPTCHA gate and the rate limiter that the API
+     * route puts in front of it. The admin console reads it through the
+     * worker's /v1/admin/feedback, which is behind requireAdmin.
+     */
+    match /feedback/{id} {
+      allow read, write: if false;
+    }
+
     match /incidents/{id} {
       allow read: if inOrg(resource.data.orgId);
       // Users may acknowledge an incident, nothing more.

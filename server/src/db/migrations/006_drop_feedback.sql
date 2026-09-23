@@ -1,0 +1,11 @@
+-- Feedback moved to Firestore.
+--
+-- It was here for one release. The reasoning that keeps check results in
+-- SQLite — thousands of writes a minute, and regenerable if lost — is exactly
+-- backwards for feedback: a handful a day, and irreplaceable, because a person
+-- wrote it once. This file has no off-box backup (Litestream is installed and
+-- inactive), so it is the wrong home for the only unrecoverable data here.
+--
+-- Dropped rather than left in place: an empty table that nothing writes to is
+-- a trap for whoever reads the schema next.
+DROP TABLE IF EXISTS feedback;

@@ -79,6 +79,23 @@ export const col = {
    * the check-and-claim atomic instead of a race.
    */
   statusSlugs: () => db().collection("statusSlugs"),
+  /**
+   * Contact / suggestion messages.
+   *
+   * In Firestore rather than SQLite, unlike every other high-volume thing the
+   * worker writes, because feedback is the one category of data here that
+   * cannot be regenerated. A lost hour of check results heals on the next
+   * probe; a lost suggestion is gone, and nobody can tell you what it said.
+   * The SQLite file on the probe box has no off-box backup — Litestream is
+   * installed and inactive — so irreplaceable human-authored text does not
+   * belong on it.
+   *
+   * The volume argument that keeps check results out of Firestore does not
+   * apply: that is thousands of writes a minute, this is a handful a day
+   * against a 20,000/day quota.
+   */
+  feedback: () => db().collection("feedback"),
+
   /** Applied Stripe event ids, so a retry cannot grant twice. */
   stripeEvents: () => db().collection("stripeEvents"),
   /**
