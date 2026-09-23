@@ -27,9 +27,9 @@ wedged — that is the failure mode that matters, not process liveness.
 ## Commands
 
 ```bash
-npm test                     # everything that needs no emulator: 436 server
+npm test                     # everything that needs no emulator: 459 server
                              # + 34 monitoring + 28 feature tests
-npm --prefix server test     # 436 server tests alone, no network or emulator
+npm --prefix server test     # 459 server tests alone, no network or emulator
 npm run test:rules           # 24 rules tests; needs the Firestore emulator running
 npm run test:status          # status-page integration tests; starts the emulator itself
 npm run emulators            # firebase-tools@14 — v15 requires Java 21, host has 17
@@ -39,7 +39,7 @@ npm run deploy:lightsail uptimemonk-worker-1     # worker only
 
 # Mobile is a separate toolchain and is NOT covered by `npm test`.
 # flutter is not on PATH: export PATH="$HOME/development/flutter/bin:$PATH"
-cd mobile && flutter test    # 119 widget/unit tests
+cd mobile && flutter test    # 135 widget/unit tests
 cd mobile && flutter analyze
 cd mobile && ./go releaseToAndroidStore   # fastlane android alpha_deploy
 cd mobile && ./go releaseToIosStore       # fastlane ios testflightupload — TestFlight, not the App Store
@@ -202,6 +202,18 @@ this endpoint ends up either permanently broken or quietly waved through.
 Applied event ids are recorded in Firestore, not SQLite: the API process
 serving the webhook may not be the worker that owns the org, and a grant must
 land once across the fleet. See `api/billing.test.ts`.
+
+**A push token never travels in a URL path.** Fastify's `maxParamLength`
+defaults to 100 characters and an FCM registration token is about 163, so
+`DELETE /v1/devices/:token` answered 414 `FST_ERR_MAX_PARAM_LENGTH` for every
+token this product has ever issued — unregistering a device had never once
+succeeded, push rows accumulated on every sign-out, and the thrown error only
+became visible because account deletion surfaced it. The token goes in the
+body, which also keeps a device-addressable secret out of access logs. Every
+test in `api/devices.test.ts` passed throughout, because they all exercised
+pure helpers while the failure was in routing; the route-level cases there now
+inject the real route unauthenticated, where 401 means "routed" and 414 is the
+regression.
 
 **The test-notification button uses `deliver()`, not a shortcut.** It is the
 same function the drainer calls, with the same secrets and per-channel

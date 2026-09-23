@@ -187,12 +187,23 @@ class ApiClient {
     _handleResponse(res);
   }
 
+  /// The token travels in the body, never in the path.
+  ///
+  /// Fastify's `maxParamLength` defaults to 100 characters and an FCM
+  /// registration token is about 163, so `DELETE /v1/devices/:token` answered
+  /// 414 `FST_ERR_MAX_PARAM_LENGTH` for every real token this app has ever
+  /// held — push registrations were never cleaned up on sign-out, and the
+  /// thrown error surfaced during account deletion. The route has always
+  /// accepted the token from the body as well; a body also keeps a
+  /// device-addressable secret out of access logs, which a query string would
+  /// not. A body is sent, so declaring JSON here is correct — see
+  /// `buildHeaders`.
   Future<void> unregisterDevice(String token) async {
-    final headers = await _authHeaders();
-    final encoded = Uri.encodeComponent(token);
+    final headers = await _jsonHeaders();
     final res = await http.delete(
-      Uri.parse('$baseUrl/v1/devices/$encoded'),
+      Uri.parse('$baseUrl/v1/devices'),
       headers: headers,
+      body: jsonEncode({'token': token}),
     ).timeout(AppConstants.requestTimeout);
 
     _handleResponse(res);

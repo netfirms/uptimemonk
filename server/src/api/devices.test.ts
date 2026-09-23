@@ -1,6 +1,9 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { deviceDocId, pickDuplicateFcmRows, pickSupersededFcmRows } from "./contacts.js";
+import Fastify from "fastify";
+import type { FastifyInstance } from "fastify";
+import { contactRoutes } from "./contacts.js";
 
 /**
  * Duplicate push registrations.
@@ -135,5 +138,71 @@ describe("retiring a device's rotated token", () => {
       { id: "self", token: "new-tok", uid: "u1", platform: "ios" }
     );
     assert.deepEqual(removed, []);
+  });
+});
+
+/**
+ * Where the token is allowed to travel.
+ *
+ * `DELETE /v1/devices/:token` answered 414 `FST_ERR_MAX_PARAM_LENGTH` for
+ * every token this product has ever issued: Fastify's `maxParamLength`
+ * defaults to 100 characters and an FCM registration token is around 163. So
+ * unregistering a device had never once succeeded — push rows accumulated on
+ * every sign-out, and the thrown error surfaced during account deletion.
+ *
+ * Every test above this one passed throughout, because they all exercise pure
+ * helpers and the failure was in routing. These inject the real route instead.
+ *
+ * No credentials are sent on purpose: `requireAuth` answers 401 before it
+ * reaches Firebase, so 401 means "routed", and that is exactly the distinction
+ * that was broken. A 414 here is the regression.
+ */
+describe("unregistering a device", () => {
+  // Representative of what FCM actually issues: an APNs-backed token, well
+  // past the 100-character routing limit.
+  const realisticToken = "cXN-yT0kS0uHqRr2Vw9bZq:APA91b" + "H".repeat(134);
+
+  // Each case gets its own instance: registering the real route is the whole
+  // point, and a shared app would let one test's state reach another.
+  const withApp = async <T>(fn: (app: FastifyInstance) => Promise<T>): Promise<T> => {
+    const app = Fastify();
+    await app.register(contactRoutes);
+    await app.ready();
+    try {
+      return await fn(app);
+    } finally {
+      await app.close();
+    }
+  };
+
+  test("a real token in the body routes through to authentication", async () => {
+    // The contract the mobile client depends on.
+    const res = await withApp((app) =>
+      app.inject({
+        method: "DELETE",
+        url: "/v1/devices",
+        headers: { "content-type": "application/json" },
+        payload: JSON.stringify({ token: realisticToken }),
+      })
+    );
+    assert.notEqual(res.statusCode, 414, "a body-carried token must not hit the URI limit");
+    assert.equal(res.statusCode, 401);
+  });
+
+  test("a real token in the path is still refused by routing", async () => {
+    // Pinned so nobody moves the token back into the path believing it works:
+    // it does not, and the failure is invisible from the pure helpers above.
+    const res = await withApp((app) =>
+      app.inject({
+        method: "DELETE",
+        url: `/v1/devices/${encodeURIComponent(realisticToken)}`,
+      })
+    );
+    assert.equal(res.statusCode, 414);
+  });
+
+  test("the token is longer than the limit that broke it", () => {
+    // If this ever stops being true the test above stops meaning anything.
+    assert.ok(realisticToken.length > 100, `token was only ${realisticToken.length} chars`);
   });
 });

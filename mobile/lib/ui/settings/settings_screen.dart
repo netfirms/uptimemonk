@@ -12,6 +12,16 @@ import '../../data/services/api_client.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../widgets/app_version_label.dart';
 
+/// Whether what was typed unlocks the irreversible delete.
+///
+/// Top-level and pure so the gate can be tested without pumping a dialog: an
+/// off-by-one here either blocks a user who typed the word correctly or, far
+/// worse, arms the button for something they did not mean to type. Trimmed
+/// because the iOS keyboard's autospace appends one, and upper-cased because
+/// the field sets `TextCapitalization.characters` but a hardware keyboard or a
+/// paste ignores it.
+bool confirmationMatches(String input) => input.trim().toUpperCase() == 'DELETE';
+
 /// What a channel is called, what it needs, and how to draw it.
 ///
 /// `fcm` is deliberately absent from [_addableChannels]: those contacts are
@@ -246,44 +256,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (warned != true || !mounted) return;
 
-    final controller = TextEditingController();
+    // The dialog owns its controller, because the controller has to outlive
+    // the pop. Disposing it here — the instant `showDialog`'s future completes
+    // — was a frame too early: the route's exit transition keeps rebuilding
+    // the field for the length of its animation, and every one of those
+    // rebuilds reads `controller.text`. Throwing from inside build is what put
+    // a red error screen over the app, and it left the element tree corrupt
+    // enough that the unmount cascaded into `_dependents.isEmpty`, duplicate
+    // GlobalKeys and "dirty widget in the wrong build scope".
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) {
-          final matches = controller.text.trim().toUpperCase() == 'DELETE';
-          return AlertDialog(
-            backgroundColor: AppTheme.bgSurface,
-            title: const Text('Type DELETE to confirm'),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              autocorrect: false,
-              enableSuggestions: false,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(hintText: 'DELETE'),
-              onChanged: (_) => setLocal(() {}),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel',
-                    style: TextStyle(color: AppTheme.textMuted)),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.statusDown,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: matches ? () => Navigator.pop(ctx, true) : null,
-                child: const Text('Delete forever'),
-              ),
-            ],
-          );
-        },
-      ),
+      builder: (_) => const DeleteConfirmDialog(),
     );
-    controller.dispose();
     if (confirmed != true || !mounted) return;
 
     // A blocking spinner: this deletes across Firestore, the worker's database
@@ -970,6 +954,63 @@ class _AddContactSheetState extends State<_AddContactSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The "type DELETE" confirmation.
+///
+/// A `StatefulWidget` rather than a `StatefulBuilder` closing over a local
+/// `TextEditingController`, so the controller is disposed by `State.dispose`
+/// when the route has actually finished unmounting — not when its pop future
+/// resolves, which happens while the exit animation is still rebuilding the
+/// field. See the note at the call site.
+class DeleteConfirmDialog extends StatefulWidget {
+  const DeleteConfirmDialog({super.key});
+
+  @override
+  State<DeleteConfirmDialog> createState() => DeleteConfirmDialogState();
+}
+
+class DeleteConfirmDialogState extends State<DeleteConfirmDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final matches = confirmationMatches(_controller.text);
+    return AlertDialog(
+      backgroundColor: AppTheme.bgSurface,
+      title: const Text('Type DELETE to confirm'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        autocorrect: false,
+        enableSuggestions: false,
+        textCapitalization: TextCapitalization.characters,
+        decoration: const InputDecoration(hintText: 'DELETE'),
+        onChanged: (_) => setState(() {}),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child:
+              const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppTheme.statusDown,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: matches ? () => Navigator.pop(context, true) : null,
+          child: const Text('Delete forever'),
+        ),
+      ],
     );
   }
 }
