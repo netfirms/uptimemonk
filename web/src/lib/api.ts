@@ -427,3 +427,65 @@ export const api = {
     }
   },
 };
+
+// ---------------------------------------------------------------- feedback
+
+export type FeedbackKind = "suggestion" | "bug" | "question" | "other";
+
+/**
+ * Sends a contact / suggestion message.
+ *
+ * Deliberately does not go through `request`: that helper throws when nobody
+ * is signed in, and the single most valuable message this form can receive is
+ * "I tried to sign up and it did not work" — which by definition arrives from
+ * someone without an account.
+ *
+ * So the token is attached when there is one and omitted when there is not.
+ * The server reads the address from the token when present and ignores the
+ * one in the body, which is what stops anyone filing a message under someone
+ * else's address.
+ */
+export async function sendFeedback(input: {
+  kind: FeedbackKind;
+  message: string;
+  /** Ignored by the server when signed in; required when not. */
+  email?: string;
+  name?: string;
+}): Promise<{ ok: true; duplicate?: boolean }> {
+  const user = auth.currentUser;
+
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  let recaptcha: string | undefined;
+
+  if (user) {
+    headers.authorization = `Bearer ${await user.getIdToken()}`;
+  } else {
+    // Only the anonymous path is gated. A verified Firebase token is already
+    // stronger evidence of a person than a reCAPTCHA score.
+    const { recaptchaToken } = await import("./recaptcha");
+    recaptcha = await recaptchaToken("feedback");
+  }
+
+  const res = await fetch(`${API_URL}/v1/feedback`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      kind: input.kind,
+      message: input.message,
+      email: input.email,
+      name: input.name,
+      appVersion: process.env.NEXT_PUBLIC_APP_VERSION,
+      recaptchaToken: recaptcha,
+    }),
+  });
+
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(
+      body.error ?? "We could not send that. Please try again.",
+      res.status,
+      body.code
+    );
+  }
+  return body as { ok: true; duplicate?: boolean };
+}

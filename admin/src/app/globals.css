@@ -912,3 +912,198 @@ code, pre, .font-mono {
   margin-top: 16px;
 }
 
+
+/* =======================================================================
+   FEEDBACK INBOX
+   ======================================================================= */
+
+.feedback-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  vertical-align: middle;
+  color: var(--bg, #0b0f14);
+  background: var(--accent, #6fc3df);
+}
+
+.fb-refresh,
+.fb-filter {
+  border: 1px solid var(--border, #24313d);
+  background: var(--surface, #111a22);
+  color: var(--text-dim, #8aa0ad);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fb-refresh:hover:not(:disabled),
+.fb-filter:hover {
+  color: var(--text, #e8f6fc);
+  border-color: var(--accent, #6fc3df);
+}
+
+.fb-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fb-filter.is-active {
+  color: var(--accent, #6fc3df);
+  border-color: var(--accent, #6fc3df);
+}
+
+.fb-filter-count {
+  margin-left: 6px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.fb-error {
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  padding: 10px 14px;
+}
+
+.fb-empty {
+  color: var(--text-dim, #8aa0ad);
+  font-size: 0.88rem;
+  padding: 28px 14px;
+  text-align: center;
+}
+
+.fb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+
+.fb-item {
+  border: 1px solid var(--border, #24313d);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--surface, #111a22);
+}
+
+/* Unhandled messages carry a lit edge rather than a different background:
+   the operator scans this list, and an edge reads faster than a fill. */
+.fb-item.is-new {
+  border-left: 3px solid var(--accent, #6fc3df);
+}
+
+.fb-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.fb-item-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fb-kind {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  opacity: 0.9;
+}
+
+.fb-kind-bug { color: #ff8f6b; }
+.fb-kind-suggestion { color: #6fc3df; }
+.fb-kind-question { color: #ffd166; }
+.fb-kind-other { color: #8aa0ad; }
+
+.fb-email {
+  font-size: 0.85rem;
+  color: var(--text, #e8f6fc);
+  font-weight: 600;
+}
+
+.fb-anon {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #ffd166;
+  border: 1px dashed currentColor;
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+.fb-item-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 0.74rem;
+  color: var(--text-dim, #8aa0ad);
+  font-variant-numeric: tabular-nums;
+}
+
+.fb-message {
+  /* People write in lines. Collapsing them makes a bug report harder to
+     read than the reporter intended. */
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text, #e8f6fc);
+  margin: 0 0 10px;
+}
+
+.fb-note {
+  font-size: 0.8rem;
+  color: var(--text-dim, #8aa0ad);
+  border-left: 2px solid var(--border, #24313d);
+  padding-left: 10px;
+  margin: 0 0 10px;
+}
+
+.fb-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.fb-actions button,
+.fb-reply {
+  border: 1px solid var(--border, #24313d);
+  background: transparent;
+  color: var(--text-dim, #8aa0ad);
+  border-radius: 8px;
+  padding: 5px 11px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.fb-actions button:hover:not(:disabled),
+.fb-reply:hover {
+  color: var(--text, #e8f6fc);
+  border-color: var(--accent, #6fc3df);
+}
+
+.fb-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.fb-reply {
+  color: var(--accent, #6fc3df);
+  border-color: currentColor;
+}

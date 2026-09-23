@@ -181,6 +181,13 @@ class AnalyticsEvents {
       Analytics.track('donate_started', {'usd': usd});
   static Future<void> capacityBlocked() => Analytics.track('capacity_blocked');
 
+  /// Kind only — never the message, which is the sender's words.
+  ///
+  /// Defined here with no call site yet: the feedback form is on the web only
+  /// so far, and the names have to match when mobile grows one.
+  static Future<void> feedbackSent(String kind) =>
+      Analytics.track('feedback_sent', {'kind': kind});
+
   /// The failure the user actually saw — how we learn which errors are common.
   static Future<void> actionFailed(String action, [int? status]) =>
       Analytics.track('action_failed', {'action': action, 'status': status});

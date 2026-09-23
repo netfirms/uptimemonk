@@ -10,11 +10,13 @@ import {
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import FeedbackPanel from "@/components/FeedbackPanel";
 
 // --- Domain Models ---
 
 export type AdminTab =
   | "overview"
+  | "feedback"
   | "users"
   | "workers"
   | "monitors"
@@ -1242,6 +1244,13 @@ export default function AdminPage() {
         </button>
 
         <button
+          className={`admin-tab-btn ${activeTab === "feedback" ? "active" : ""}`}
+          onClick={() => setActiveTab("feedback")}
+        >
+          <span>✉️ Feedback</span>
+        </button>
+
+        <button
           className={`admin-tab-btn ${activeTab === "settings" ? "active" : ""}`}
           onClick={() => setActiveTab("settings")}
         >
@@ -1476,6 +1485,8 @@ export default function AdminPage() {
           </section>
         </>
       )}
+
+      {activeTab === "feedback" && <FeedbackPanel />}
 
       {/* 4. TAB 2: USER MANAGEMENT */}
       {activeTab === "users" && (

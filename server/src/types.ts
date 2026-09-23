@@ -220,3 +220,29 @@ export interface OutboxRow {
   status: "pending" | "sent" | "failed";
   lastError?: string | null;
 }
+
+/**
+ * A message from the contact / suggestion form.
+ *
+ * `uid` and `orgId` are present only when the sender was signed in. Their
+ * absence is what marks a message as arriving from the public form, which is
+ * the less trustworthy path and the one an operator should read with more
+ * suspicion.
+ */
+export type FeedbackKind = "suggestion" | "bug" | "question" | "other";
+export type FeedbackStatus = "new" | "read" | "archived";
+
+export interface Feedback {
+  id: string;
+  createdAt: number;
+  kind: FeedbackKind;
+  message: string;
+  email: string;
+  name: string;
+  uid?: string | null;
+  orgId?: string | null;
+  source: string;
+  appVersion?: string | null;
+  status: FeedbackStatus;
+  operatorNote: string;
+}

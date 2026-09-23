@@ -83,6 +83,9 @@ export const events = {
   donateStarted: (usd: number) => track("donate_started", { usd }),
   capacityBlocked: () => track("capacity_blocked"),
 
+  /** Kind only — never the message, which is the sender's words. */
+  feedbackSent: (kind: string) => track("feedback_sent", { kind }),
+
   /** The failure the user actually saw — how we learn which errors are common. */
   actionFailed: (action: string, status?: number) =>
     track("action_failed", { action, status }),

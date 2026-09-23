@@ -12,6 +12,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { events } from "@/lib/analytics";
+import FeedbackModal from "@/components/FeedbackModal";
 import AuthModal from "./AuthModal";
 import LanguagePicker from "./LanguagePicker";
 import { useI18n } from "@/lib/i18n/context";
@@ -42,6 +43,7 @@ export default function Landing({
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isGithubSigningIn, setIsGithubSigningIn] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"signup" | "signin">("signup");
   const [quickUrl, setQuickUrl] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<"ai" | "web" | "ssl" | "heartbeat">("ai");
@@ -1367,10 +1369,30 @@ export default function Landing({
           <a href="/privacy" className="dim" style={{ fontSize: "0.8rem", textDecoration: "none" }}>
             Privacy
           </a>
+          {/* A button, not a mailto: an address in the footer gets scraped,
+              and most people will not switch to a mail client to tell you a
+              chart is broken. */}
+          <button
+            type="button"
+            className="dim"
+            onClick={() => setFeedbackOpen(true)}
+            style={{
+              fontSize: "0.8rem",
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              font: "inherit",
+            }}
+          >
+            Contact us
+          </button>
           <a href="#hero" className="dim" style={{ fontSize: "0.8rem", textDecoration: "none" }}>{t("backToTop")}</a>
           <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
         </div>
       </footer>
+
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
       {/* Modern Accessible Auth Modal */}
       <AuthModal

@@ -5893,3 +5893,209 @@ html[lang="my"] {
   padding-top: 24px;
   border-top: 1px solid var(--border);
 }
+
+/* =======================================================================
+   FEEDBACK MODAL
+   =======================================================================
+   Its own namespace, the way .auth-modal-* owns the sign-in dialog. There is
+   no shared modal system in this file and inventing one for the second
+   dialog would mean restyling the first.
+   ======================================================================= */
+
+.feedback-modal {
+  width: min(560px, 100%);
+  max-height: min(88vh, 760px);
+  overflow-y: auto;
+  border-radius: var(--glass-radius);
+  padding: 24px;
+}
+
+.feedback-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.feedback-sub {
+  font-size: 0.85rem;
+  margin: 0 0 18px;
+  line-height: 1.5;
+}
+
+.feedback-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  line-height: 1;
+}
+
+.feedback-close:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+/* A fieldset carries the grouping for a screen reader; the browser's default
+   border and padding would draw a box nobody wants. */
+.feedback-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.feedback-kind {
+  padding: 7px 13px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface-input);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.feedback-kind:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.feedback-kind.is-active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.12);
+}
+
+.feedback-textarea,
+.feedback-input {
+  width: 100%;
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-family: inherit;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.feedback-textarea:focus,
+.feedback-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15);
+}
+
+.feedback-textarea::placeholder,
+.feedback-input::placeholder {
+  color: var(--text-dim);
+}
+
+.feedback-meta {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 0.75rem;
+  margin: 6px 0 14px;
+}
+
+.feedback-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.feedback-as {
+  font-size: 0.8rem;
+  margin: 0 0 4px;
+}
+
+.feedback-as strong {
+  color: var(--text);
+}
+
+.feedback-error {
+  color: var(--down);
+  font-size: 0.82rem;
+  margin: 12px 0 0;
+}
+
+.feedback-btn {
+  background: var(--primary);
+  color: var(--primary-text);
+  border: none;
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.feedback-btn:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.feedback-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.feedback-submit {
+  width: 100%;
+  margin-top: 16px;
+}
+
+/* --- the sent state ----------------------------------------------------
+   Given real space rather than a toast. Someone who just wrote several
+   paragraphs needs to see that they arrived; a message that vanishes reads
+   as a failure and gets sent again. */
+.feedback-done {
+  text-align: center;
+  padding: 16px 8px 8px;
+}
+
+.feedback-done-mark {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.12);
+  border: 1px solid rgba(var(--primary-rgb), 0.35);
+}
+
+.feedback-done h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+
+.feedback-done p {
+  font-size: 0.87rem;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.feedback-done strong {
+  color: var(--text);
+}
+
+@media (max-width: 480px) {
+  .feedback-modal {
+    padding: 18px;
+  }
+}
