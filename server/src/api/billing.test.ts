@@ -11,7 +11,7 @@ process.env.STRIPE_WEBHOOK_SECRET = "whsec_dummy";
 const Fastify = (await import("fastify")).default;
 const Stripe = (await import("stripe")).default;
 const { openDb, closeDb } = await import("../db/index.js");
-const { billingRoutes } = await import("./billing.js");
+const { billingRoutes, fundingBlock } = await import("./billing.js");
 
 let app: Awaited<ReturnType<typeof Fastify>>;
 
@@ -85,6 +85,40 @@ describe("starting a donation", () => {
       payload: { usd: 5 },
     });
     assert.equal(res.statusCode, 401);
+  });
+});
+
+describe("what the iOS build is told about paying", () => {
+  /**
+   * App Store Guideline 3.1.1: an iOS build must not steer anyone to a
+   * payment method outside In-App Purchase. A submission was rejected for it,
+   * and this is the one place that decides what a client is offered.
+   */
+  test("an Apple client is offered nothing at all", () => {
+    const block = fundingBlock(true, "org_abc", true);
+    assert.deepEqual(block, {}, "no link, no amounts, no preview");
+  });
+
+  test("the payment URL never reaches an Apple client", () => {
+    // The specific failure: a Stripe URL in an API response is a payment path
+    // even when no button currently renders it, and a later screen could.
+    const serialised = JSON.stringify(fundingBlock(true, "org_abc", true));
+    assert.doesNotMatch(serialised, /stripe|http|usd|cents|donat/i);
+  });
+
+  test("every other client still gets the full offer", () => {
+    // The gate must be narrow: withholding this from web or Android would
+    // quietly turn donations off for the platforms that allow them.
+    const block = fundingBlock(false, "org_abc", true) as Record<string, any>;
+    assert.ok(block.link?.url, "the one-click link is present");
+    assert.ok(Array.isArray(block.preview), "custom amounts are present");
+    assert.equal(block.enabled, true);
+  });
+
+  test("the link is still tagged with the workspace for non-Apple clients", () => {
+    // Untagged, a payment is taken and credited to nobody.
+    const block = fundingBlock(false, "org_xyz", true) as Record<string, any>;
+    assert.match(String(block.link.url), /org_xyz/);
   });
 });
 

@@ -57,6 +57,46 @@ const SUGGESTED_USD = [3, 5, 10, 25];
 const MIN_USD = 1;
 const MAX_USD = 500;
 
+/**
+ * What a client is told about paying, if anything.
+ *
+ * Exported so the App Store constraint has a test rather than only a code
+ * review: an iOS build shown a payment path outside In-App Purchase fails
+ * review under Guideline 3.1.1, and this is the single place that decides.
+ *
+ * Returns an empty object for Apple clients — not a block with nulls in it.
+ * A key present and empty is something a client can still render badly.
+ */
+export function fundingBlock(
+  appleClient: boolean,
+  orgId: string,
+  stripeConfigured: boolean
+): Record<string, unknown> {
+  if (appleClient) return {};
+  return {
+    suggestedUsd: SUGGESTED_USD,
+
+    /**
+     * The one-click option. Available whether or not a secret key is set:
+     * taking money through a Payment Link needs no API key at all, only the
+     * webhook secret to *record* it. Those are separate concerns and the UI
+     * reports them separately.
+     */
+    link: {
+      url: donationLinkFor(orgId),
+      cents: DONATION_LINK_CENTS,
+      checks: monthlyGrantCents(DONATION_LINK_CENTS),
+      recurring: DONATION_LINK_RECURRING,
+      /** False means a donation would be taken but never credited. */
+      credited: Boolean(STRIPE_WEBHOOK_SECRET),
+    },
+
+    // Custom amounts need the API key, since they create a session.
+    enabled: stripeConfigured,
+    preview: SUGGESTED_USD.map((usd) => ({ usd, checks: monthlyGrant(usd) })),
+  };
+}
+
 export async function billingRoutes(app: FastifyInstance): Promise<void> {
   // The webhook lives in its own plugin scope so its raw-body parser applies
   // only to it. Fastify content-type parsers are per-encapsulation-context;
@@ -87,31 +127,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
      * an offer to sell anything.
      */
     const appleClient = isAppleClient(req.headers["x-platform"]);
-
-    const funding = appleClient
-      ? {}
-      : {
-          suggestedUsd: SUGGESTED_USD,
-
-          /**
-           * The one-click option. Available whether or not a secret key is
-           * set: taking money through a Payment Link needs no API key at all,
-           * only the webhook secret to *record* it. Those are separate
-           * concerns and the UI reports them separately.
-           */
-          link: {
-            url: donationLinkFor(req.user!.orgId),
-            cents: DONATION_LINK_CENTS,
-            checks: monthlyGrantCents(DONATION_LINK_CENTS),
-            recurring: DONATION_LINK_RECURRING,
-            /** False means a donation would be taken but never credited. */
-            credited: Boolean(STRIPE_WEBHOOK_SECRET),
-          },
-
-          // Custom amounts need the API key, since they create a session.
-          enabled: Boolean(stripe),
-          preview: SUGGESTED_USD.map((usd) => ({ usd, checks: monthlyGrant(usd) })),
-        };
+    const funding = fundingBlock(appleClient, req.user!.orgId, Boolean(stripe));
 
     return {
       standing: standingOf(credit),
