@@ -24,6 +24,15 @@ class AuthViewModel extends ChangeNotifier {
   String get _analyticsMethod => analyticsMethodFor(_signInProvider);
   /// True when a bootstrap or claim lookup failed, as opposed to never run.
   bool _workspaceLookupFailed = false;
+
+  /// True from the moment a deletion is requested until sign-out completes.
+  ///
+  /// Deleting the account makes the next forced token refresh fail, which is
+  /// indistinguishable from a broken workspace lookup — so without this the
+  /// router showed the workspace-unavailable error screen on the way out, and
+  /// someone who just asked to be deleted was told something went wrong.
+  bool _deletingAccount = false;
+  bool get deletingAccount => _deletingAccount;
   AuthStatus _status = AuthStatus.initial;
   String? _errorMessage;
   bool _isGoogleLoading = false;
@@ -134,6 +143,10 @@ class AuthViewModel extends ChangeNotifier {
       _workspaceLookupFailed = false;
     } catch (e) {
       debugPrint('Error resolving orgId: $e');
+      // A lookup that fails because the account is being deleted is expected,
+      // not a fault to report. Leaving the flags alone keeps the router off
+      // the error screen.
+      if (_deletingAccount) return;
       _errorMessage = _readableApiError(e);
       // The workspace lookup failing is the single worst thing that can happen
       // to a new account — it is the 403/429 class of bug that stranded users
@@ -527,6 +540,40 @@ class AuthViewModel extends ChangeNotifier {
       debugPrint('Password reset failed: $e');
       return 'Could not send the reset email. Try again shortly.';
     }
+  }
+
+  /// Delete this account and everything in it, then sign out.
+  ///
+  /// Owned here rather than by the settings screen because the deletion and
+  /// the auth state have to move together: the account disappears server-side
+  /// before the client session does, and every listener in between sees an
+  /// identity that no longer resolves.
+  ///
+  /// Signs out only on success. A failed deletion must leave the session
+  /// intact, or the user is thrown to the login screen with their account
+  /// still there and no idea which of the two happened.
+  Future<void> deleteAccount() async {
+    _deletingAccount = true;
+    notifyListeners();
+    try {
+      await _apiClient.deleteAccount();
+    } catch (e) {
+      _deletingAccount = false;
+      notifyListeners();
+      rethrow;
+    }
+    // From here the account is gone, so sign-out failures are noise: the
+    // session is already worthless.
+    try {
+      await signOut();
+    } catch (e) {
+      debugPrint('Sign-out after account deletion: $e');
+      _user = null;
+      _orgId = null;
+      _status = AuthStatus.unauthenticated;
+    }
+    _deletingAccount = false;
+    notifyListeners();
   }
 
   Future<void> signOut() async {

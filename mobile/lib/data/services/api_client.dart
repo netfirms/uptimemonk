@@ -25,31 +25,56 @@ class ApiException implements Exception {
 /// `_authHeaders`.
 final String appPlatform = Platform.isIOS ? 'ios' : 'android';
 
+/// Builds the request headers.
+///
+/// **Only claim a JSON body when one is actually being sent.** Fastify rejects
+/// an empty body declared as `application/json` with
+/// `FST_ERR_CTP_EMPTY_JSON_BODY` and answers 400 with a message about content
+/// types that says nothing about what the user was trying to do.
+///
+/// Every bodyless call in this client used to send the header regardless, so
+/// pausing a monitor, deleting a monitor, deleting an alert contact,
+/// unregistering the device on sign-out, and deleting an account all failed in
+/// production — each caller turned the 400 into a generic toast, so nothing
+/// looked broken enough to chase. The web client hit this once and fixed it
+/// there only.
+///
+/// Top-level and pure so the rule has a test rather than a comment.
+Map<String, String> buildHeaders({required String token, required bool json}) {
+  return {
+    if (json) 'content-type': 'application/json',
+    'authorization': 'Bearer $token',
+    // Tells /v1/bootstrap this is the app, which cannot mint a reCAPTCHA
+    // token — that is a browser technology. See the bot-gate comment in
+    // server/src/api/misc.ts: the exemption is deliberate and weak, and is
+    // meant to be replaced by Firebase App Check.
+    //
+    // Do not narrow this to 'ios' to identify the platform: the bot gate keys
+    // on this exact value, so changing it would re-arm the captcha for
+    // sign-ups the app cannot pass. The platform goes in its own header.
+    'x-client': 'mobile',
+    'x-platform': appPlatform,
+  };
+}
+
 class ApiClient {
   final String baseUrl;
 
   ApiClient({this.baseUrl = AppConstants.apiUrl});
 
-  Future<Map<String, String>> _authHeaders() async {
+  /// Headers for a request that sends no body.
+  Future<Map<String, String>> _authHeaders() => _headers(json: false);
+
+  /// Headers for a request that sends a JSON body.
+  Future<Map<String, String>> _jsonHeaders() => _headers(json: true);
+
+  Future<Map<String, String>> _headers({required bool json}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw ApiException('You must be signed in to perform this action', 401);
     }
     final token = await user.getIdToken();
-    return {
-      'content-type': 'application/json',
-      'authorization': 'Bearer $token',
-      // Tells /v1/bootstrap this is the app, which cannot mint a reCAPTCHA
-      // token — that is a browser technology. See the bot-gate comment in
-      // server/src/api/misc.ts: the exemption is deliberate and weak, and is
-      // meant to be replaced by Firebase App Check.
-      //
-      // Do not narrow this to 'ios' to identify the platform: the bot gate
-      // keys on this exact value, so changing it would re-arm the captcha for
-      // sign-ups the app cannot pass. The platform goes in its own header.
-      'x-client': 'mobile',
-      'x-platform': appPlatform,
-    };
+    return buildHeaders(token: token ?? '', json: json);
   }
 
   dynamic _handleResponse(http.Response response) {
@@ -75,7 +100,7 @@ class ApiClient {
 
   // --- Bootstrap ---
   Future<String> bootstrap() async {
-    final headers = await _authHeaders();
+    final headers = await _jsonHeaders();
     final res = await http.post(
       Uri.parse('$baseUrl/v1/bootstrap'),
       headers: headers,
@@ -88,7 +113,7 @@ class ApiClient {
 
   // --- Monitor Operations ---
   Future<Map<String, dynamic>> createMonitor(Map<String, dynamic> input) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonHeaders();
     final res = await http.post(
       Uri.parse('$baseUrl/v1/monitors'),
       headers: headers,
@@ -99,7 +124,7 @@ class ApiClient {
   }
 
   Future<void> updateMonitor(String id, Map<String, dynamic> input) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonHeaders();
     final res = await http.patch(
       Uri.parse('$baseUrl/v1/monitors/$id'),
       headers: headers,
@@ -148,7 +173,7 @@ class ApiClient {
     required String platform,
     String? name,
   }) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonHeaders();
     final res = await http.post(
       Uri.parse('$baseUrl/v1/devices'),
       headers: headers,
@@ -187,7 +212,7 @@ class ApiClient {
   }
 
   Future<void> testContact(String id) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonHeaders();
     final res = await http.post(
       Uri.parse('$baseUrl/v1/contacts/$id/test'),
       headers: headers,
@@ -207,7 +232,7 @@ class ApiClient {
     required String name,
     required String destination,
   }) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonHeaders();
     final res = await http.post(
       Uri.parse('$baseUrl/v1/contacts'),
       headers: headers,
@@ -226,7 +251,7 @@ class ApiClient {
   /// Channel and destination are immutable server-side: changing either would
   /// carry the old destination's verified status to a new one.
   Future<void> updateContact(String id, {String? name, bool? enabled}) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonHeaders();
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (enabled != null) body['enabled'] = enabled;
@@ -252,7 +277,7 @@ class ApiClient {
 
   /// Send (or resend) the confirmation for a destination that needs one.
   Future<void> verifyContact(String id) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonHeaders();
     final res = await http.post(
       Uri.parse('$baseUrl/v1/contacts/$id/verify'),
       headers: headers,
@@ -275,7 +300,7 @@ class ApiClient {
 
   /// Change the display name on the account.
   Future<String> updateDisplayName(String displayName) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonHeaders();
     final res = await http.patch(
       Uri.parse('$baseUrl/v1/me'),
       headers: headers,
@@ -322,7 +347,7 @@ class ApiClient {
 
   /// Rename the workspace. Owner-only server-side.
   Future<String> updateOrgName(String name) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonHeaders();
     final res = await http.patch(
       Uri.parse('$baseUrl/v1/org'),
       headers: headers,

@@ -71,4 +71,76 @@ void main() {
       );
     });
   });
+
+  group('deleting an account', () {
+    test('goes straight to login instead of the error screen', () {
+      // The bug this exists for: deleting the account makes the next forced
+      // token refresh fail, which lands in the same catch as a broken
+      // workspace lookup. The router then showed workspaceUnavailable — an
+      // error — for the moment between the account going and sign-out
+      // completing. Someone who just asked to be deleted was told something
+      // had gone wrong.
+      expect(
+        resolveDestination(
+          initial: false,
+          signedIn: true,
+          needsEmailVerification: false,
+          orgId: null,
+          workspaceLookupFailed: true,
+          deletingAccount: true,
+        ),
+        AuthDestination.login,
+      );
+    });
+
+    test('outranks a dashboard that is still resolvable', () {
+      // The org id may still be cached when the delete returns. Showing the
+      // dashboard for an account that no longer exists is worse than showing
+      // the login screen a moment early.
+      expect(
+        resolveDestination(
+          initial: false,
+          signedIn: true,
+          needsEmailVerification: false,
+          orgId: 'org_abc',
+          workspaceLookupFailed: false,
+          deletingAccount: true,
+        ),
+        AuthDestination.login,
+      );
+    });
+
+    test('does not outrank the initial splash', () {
+      // Before auth has resolved there is nothing to delete and nothing to
+      // show; jumping to login here would flash a form at someone who is
+      // already signed in.
+      expect(
+        resolveDestination(
+          initial: true,
+          signedIn: false,
+          needsEmailVerification: false,
+          orgId: null,
+          workspaceLookupFailed: false,
+          deletingAccount: true,
+        ),
+        AuthDestination.loading,
+      );
+    });
+
+    test('a genuine workspace failure still earns the error screen', () {
+      // The narrow case must stay narrow: a real broken lookup is what that
+      // screen and its retry button are for.
+      expect(
+        resolveDestination(
+          initial: false,
+          signedIn: true,
+          needsEmailVerification: false,
+          orgId: null,
+          workspaceLookupFailed: true,
+          deletingAccount: false,
+        ),
+        AuthDestination.workspaceUnavailable,
+      );
+    });
+  });
 }

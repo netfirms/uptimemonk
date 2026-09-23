@@ -29,8 +29,20 @@ AuthDestination resolveDestination({
   required bool needsEmailVerification,
   required String? orgId,
   required bool workspaceLookupFailed,
+  bool deletingAccount = false,
 }) {
   if (initial) return AuthDestination.loading;
+
+  // A deletion in flight outranks everything below.
+  //
+  // Without this the app flashed the workspace-unavailable error on its way
+  // out: deleting the account makes the next forced token refresh fail, which
+  // is indistinguishable from a broken workspace lookup, so the router showed
+  // the error screen for the moment between the account going and sign-out
+  // completing. Someone who just asked to be deleted should not be told
+  // something went wrong.
+  if (deletingAccount) return AuthDestination.login;
+
   if (!signedIn) return AuthDestination.login;
   if (needsEmailVerification) return AuthDestination.verifyEmail;
   if (orgId != null) return AuthDestination.dashboard;

@@ -111,6 +111,7 @@ class UptimeMonkeApp extends StatelessWidget {
       needsEmailVerification: authVm.needsEmailVerification,
       orgId: authVm.orgId,
       workspaceLookupFailed: authVm.workspaceLookupFailed,
+      deletingAccount: authVm.deletingAccount,
     );
 
     // These destinations are swapped by `home:` rather than pushed, so the

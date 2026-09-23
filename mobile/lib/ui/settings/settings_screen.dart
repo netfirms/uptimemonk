@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/analytics.dart';
+import '../../main.dart' show rootScaffoldMessengerKey;
 import '../../core/theme.dart';
 import '../../data/models/alert_contact.dart';
 import '../../data/services/api_client.dart';
@@ -296,35 +297,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
 
+    // The view model owns the whole lifecycle. The account disappears
+    // server-side before the client session does, and every listener in
+    // between sees an identity that no longer resolves — orchestrating that
+    // from a screen is what made the app flash the workspace-unavailable
+    // error on its way to the login page.
+    final authVm = context.read<AuthViewModel>();
     try {
-      await _apiClient.deleteAccount();
-      if (!mounted) return;
-      Navigator.pop(context); // the spinner
-
-      // Sign out locally so the router returns to the login screen. The
-      // account is already gone server-side, so this only clears this device;
-      // a failure here must not look like the deletion failed.
-      try {
-        await context.read<AuthViewModel>().signOut();
-      } catch (e) {
-        debugPrint('Sign-out after account deletion: $e');
-      }
-
-      if (mounted) {
-        Navigator.of(context).popUntil((r) => r.isFirst);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: AppTheme.bgSurfaceElevated,
-            content: Text('Your account and all of its data have been deleted.'),
-            duration: Duration(seconds: 6),
-          ),
-        );
-      }
+      await authVm.deleteAccount();
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // the spinner
       _toast(_readable(e), ok: false);
+      return;
     }
+
+    if (!mounted) return;
+    Navigator.pop(context); // the spinner
+    Navigator.of(context).popUntil((r) => r.isFirst);
+
+    // Posted to the root messenger, not this screen's. By now the router has
+    // swapped the tree for the login screen and this context is on its way
+    // out, so a snackbar addressed to it would never be seen.
+    rootScaffoldMessengerKey.currentState?.showSnackBar(
+      const SnackBar(
+        backgroundColor: AppTheme.bgSurfaceElevated,
+        content: Text('Your account and all of its data have been deleted.'),
+        duration: Duration(seconds: 6),
+      ),
+    );
   }
 
   // --------------------------------------------------------------- contacts
