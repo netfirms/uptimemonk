@@ -43,7 +43,22 @@ cd mobile && flutter test    # 135 widget/unit tests
 cd mobile && flutter analyze
 cd mobile && ./go releaseToAndroidStore   # fastlane android alpha_deploy
 cd mobile && ./go releaseToIosStore       # fastlane ios testflightupload — TestFlight, not the App Store
+
+# An iOS build fills this disk — it has twice, and the second time the volume
+# hit zero, which fails every tool that writes a temp file, editors included.
+cd mobile && make space      # what is using disk; read-only, safe at 0 bytes
+cd mobile && make rescue     # reclaim DerivedData + build/ (~2.9 GB measured)
 ```
+
+`make rescue` deletes only regenerable artefacts and never touches
+`~/Library/Developer/Xcode/Archives`: those dSYMs are what symbolicate crash
+reports from builds already on TestFlight, and they cannot be rebuilt. It also
+leaves simulators alone, because erasing one wipes the signed-in session of the
+app under test. `make reset-sims` does erase them and refuses without
+`CONFIRM=yes`. Each destructive target kills `XCBBuildService` first — deleting
+DerivedData under a live build service is what produced `unable to load
+transferred PIF: PIF object has been invalidated` on this host, a failure that
+looks nothing like its cause.
 
 The iOS lane needs `LC_ALL=en_US.UTF-8` and
 `FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT=180` on this host: the default 3-second
